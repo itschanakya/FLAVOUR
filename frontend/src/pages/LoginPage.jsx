@@ -509,7 +509,7 @@ export default function LoginPage() {
                       {emailSent ? (
                         <p className="text-slate-400 text-xs mt-1">We've sent a 6-digit OTP to your registered email. Please check your inbox.</p>
                       ) : (
-                        <p className="text-amber-400 text-xs mt-1">⚠️ Email could not be delivered. Please check your spam folder or use your backup code to login.</p>
+                        <p className="text-amber-400 text-xs mt-1">⚠️ OTP could not be delivered to your email. Please verify your credentials are correct or contact the Admin to resolve this issue.</p>
                       )}
                       {/* Emergency Backup Code hidden for security */}
                     </div>
