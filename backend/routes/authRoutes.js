@@ -106,11 +106,10 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    // OTP Logic for regular users
+    // OTP Logic for regular users (15 minute validity)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiry = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 mins
 
-    await db.run('UPDATE users SET otp = ?, otp_expiry = ? WHERE id = ?', [otp, expiry, user.id]);
+    await db.run('UPDATE users SET otp = ?, otp_expiry = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?', [otp, user.id]);
 
     // Send email
     await sendOtpEmail(user.email, otp);
@@ -137,7 +136,7 @@ router.post('/verify-otp', async (req, res) => {
 
     const db = await getDB();
     const user = await db.get(
-      'SELECT * FROM users WHERE LOWER(TRIM(login_id)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?)',
+      'SELECT *, (otp_expiry >= NOW()) as is_valid_time FROM users WHERE LOWER(TRIM(login_id)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?)',
       [login_id.trim(), login_id.trim()]
     );
 
@@ -145,13 +144,11 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(401).json({ error: 'Invalid user.' });
     }
 
-    if (user.otp !== otp) {
-      return res.status(401).json({ error: 'Invalid OTP.' });
+    if (!user.otp || String(user.otp).trim() !== String(otp).trim()) {
+      return res.status(401).json({ error: 'Invalid OTP. Please check the code sent to your email.' });
     }
 
-    const now = new Date();
-    const expiryDate = new Date(user.otp_expiry);
-    if (now > expiryDate) {
+    if (user.otp_expiry && user.is_valid_time === 0) {
       return res.status(401).json({ error: 'OTP has expired. Please log in again.' });
     }
 

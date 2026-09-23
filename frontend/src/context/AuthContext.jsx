@@ -42,13 +42,24 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   const login = async (email, password, expectedRole) => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, expectedRole })
-    });
+    let res;
+    try {
+      res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, expectedRole })
+      });
+    } catch (networkErr) {
+      throw new Error('Unable to connect to the backend server. Please ensure the backend is running.');
+    }
 
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (jsonErr) {
+      throw new Error(`Server returned unexpected response (${res.status} ${res.statusText}).`);
+    }
+
     if (!res.ok) {
       throw new Error(data.error || 'Authentication failed');
     }
@@ -67,13 +78,24 @@ export function AuthProvider({ children }) {
   };
 
   const verifyOtp = async (login_id, otp) => {
-    const res = await fetch('/api/auth/verify-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login_id, otp })
-    });
+    let res;
+    try {
+      res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login_id, otp })
+      });
+    } catch (networkErr) {
+      throw new Error('Unable to connect to the backend server.');
+    }
     
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (jsonErr) {
+      throw new Error(`Server returned unexpected response (${res.status} ${res.statusText}).`);
+    }
+
     if (!res.ok) {
       throw new Error(data.error || 'OTP Verification failed');
     }

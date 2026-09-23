@@ -148,8 +148,10 @@ export default function AppSettings() {
   // 3. Admin: Units List & Edit Modal State
   const [unitsList, setUnitsList] = useState([]);
   const [editingUnit, setEditingUnit] = useState(null);
+  const [isAddingUnit, setIsAddingUnit] = useState(false);
   const [unitForm, setUnitForm] = useState({
     unit_name: '',
+    unit_code: '',
     location: '',
     ncc_group: 'Group B',
     unit_email: '',
@@ -543,11 +545,29 @@ export default function AppSettings() {
     }
   };
 
+  // Admin: Open Onboard Unit Modal
+  const handleOpenAddUnit = () => {
+    setIsAddingUnit(true);
+    setEditingUnit({ isNew: true });
+    setUnitForm({
+      unit_name: '',
+      unit_code: '',
+      location: 'Delhi',
+      ncc_group: 'Group B',
+      unit_email: '',
+      login_id: '',
+      password: 'Unit@123'
+    });
+    setError('');
+  };
+
   // Admin: Open Edit Unit Modal
   const handleOpenEditUnit = (unit) => {
+    setIsAddingUnit(false);
     setEditingUnit(unit);
     setUnitForm({
       unit_name: unit.unit_name || '',
+      unit_code: unit.unit_code || '',
       location: unit.location || '',
       ncc_group: unit.ncc_group || 'Group B',
       unit_email: unit.unit_email || '',
@@ -557,24 +577,38 @@ export default function AppSettings() {
     setError('');
   };
 
-  // Admin: Save Unit Credentials
+  // Admin: Save Unit Credentials or Onboard Unit
   const handleSaveUnitCredentials = async (e) => {
     e.preventDefault();
     try {
       setSaving(true);
       setError('');
-      const res = await fetch(`/api/units/${editingUnit.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(unitForm)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to update unit credentials');
+      if (isAddingUnit) {
+        const res = await fetch('/api/units', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(unitForm)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Failed to onboard unit');
+      } else {
+        const res = await fetch(`/api/units/${editingUnit.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(unitForm)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Failed to update unit credentials');
+      }
       
       setEditingUnit(null);
+      setIsAddingUnit(false);
       fetchUnits();
     } catch (err) {
       setError(err.message);
@@ -871,7 +905,13 @@ export default function AppSettings() {
             {/* 1. ADMIN TABS */}
             {role === 'ADMIN' && (
               <>
-                
+                <button 
+                  onClick={() => setActiveTab('units')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'units' ? 'bg-amber-50 text-amber-700 font-bold border border-amber-200' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Building2 className="w-4 h-4 text-amber-500" />
+                  Manage NCC Units
+                </button>
                 <button 
                   onClick={() => setActiveTab('unit-credentials')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'unit-credentials' ? 'bg-amber-50 text-amber-700 font-bold border border-amber-200' : 'text-slate-600 hover:bg-slate-50'}`}
@@ -1020,6 +1060,15 @@ export default function AppSettings() {
                     className="w-full pl-9 pr-3 py-2 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-sm"
                   />
                 </div>
+              )}
+              {(activeTab === 'unit-credentials' || activeTab === 'units') && (
+                <button
+                  onClick={handleOpenAddUnit}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all whitespace-nowrap cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  Onboard Unit
+                </button>
               )}
               {activeTab === 'delivery-partners' && (
                 <button
@@ -2327,21 +2376,27 @@ export default function AppSettings() {
         </div>
       </div>
 
-      {/* ADMIN: EDIT UNIT CREDENTIALS MODAL */}
+      {/* ADMIN: ONBOARD / EDIT UNIT CREDENTIALS MODAL */}
       {editingUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 space-y-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl border border-slate-200 p-6 space-y-4 shadow-2xl my-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-100 text-amber-700">
-                  <Key className="w-5 h-5" />
+                <div className={`p-2 rounded-xl ${isAddingUnit ? 'bg-amber-500 text-slate-950' : 'bg-amber-100 text-amber-700'}`}>
+                  {isAddingUnit ? <Building2 className="w-5 h-5" /> : <Key className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Edit Unit Credentials</h3>
-                  <p className="text-xs text-slate-500 font-mono">{editingUnit.unit_name} ({editingUnit.unit_code})</p>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    {isAddingUnit ? 'Onboard New NCC Unit' : 'Edit Unit Credentials'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {isAddingUnit 
+                      ? 'Add a Battalion / Regiment and issue Unit login credentials'
+                      : `${editingUnit.unit_name} (${editingUnit.unit_code})`}
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setEditingUnit(null)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setEditingUnit(null); setIsAddingUnit(false); }} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2352,55 +2407,117 @@ export default function AppSettings() {
               </div>
             )}
 
-            <form onSubmit={handleSaveUnitCredentials} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveUnitCredentials} className="space-y-3.5 text-xs">
+              {isAddingUnit && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">Unit Full Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={unitForm.unit_name}
+                        onChange={(e) => setUnitForm({ ...unitForm, unit_name: e.target.value })}
+                        placeholder="e.g. 2 DELHI ARTY BTY NCC"
+                        className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">Unit Code (Unique) *</label>
+                      <input
+                        type="text"
+                        required
+                        value={unitForm.unit_code}
+                        onChange={(e) => setUnitForm({ ...unitForm, unit_code: e.target.value })}
+                        placeholder="e.g. 2 DAB NCC"
+                        className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500 uppercase font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">NCC Group</label>
+                      <select
+                        value={unitForm.ncc_group}
+                        onChange={(e) => setUnitForm({ ...unitForm, ncc_group: e.target.value })}
+                        className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500 bg-white"
+                      >
+                        <option value="Group A">Group A</option>
+                        <option value="Group B">Group B</option>
+                        <option value="Group C">Group C</option>
+                        <option value="Group D">Group D</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">City / Location</label>
+                      <input
+                        type="text"
+                        value={unitForm.location}
+                        onChange={(e) => setUnitForm({ ...unitForm, location: e.target.value })}
+                        placeholder="e.g. Delhi / Bengaluru"
+                        className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Unit Email Address</label>
+                <label className="block text-slate-700 font-semibold mb-1">Official Unit Email Address *</label>
                 <input
                   type="email"
                   required
                   value={unitForm.unit_email}
                   onChange={(e) => setUnitForm({ ...unitForm, unit_email: e.target.value })}
+                  placeholder="e.g. unit@ncc.gov.in"
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">User ID / Login ID</label>
+                <label className="block text-slate-700 font-semibold mb-1">User ID / Login ID *</label>
                 <input
                   type="text"
                   required
                   value={unitForm.login_id}
                   onChange={(e) => setUnitForm({ ...unitForm, login_id: e.target.value })}
+                  placeholder="e.g. 2DABNCC"
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Reset Password</label>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  {isAddingUnit ? 'Initial Password *' : 'Reset Password'}
+                </label>
                 <input
                   type="text"
+                  required={isAddingUnit}
                   value={unitForm.password}
                   onChange={(e) => setUnitForm({ ...unitForm, password: e.target.value })}
-                  placeholder="Leave blank to keep unchanged"
+                  placeholder={isAddingUnit ? 'e.g. Unit@123' : 'Leave blank to keep unchanged'}
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
                 />
-                <span className="text-[11px] text-slate-400 mt-1 block">Enter a new password to reset it for this Unit.</span>
+                {!isAddingUnit && (
+                  <span className="text-[11px] text-slate-400 mt-1 block">Enter a new password to reset it for this Unit.</span>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setEditingUnit(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200"
+                  onClick={() => { setEditingUnit(null); setIsAddingUnit(false); }}
+                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-lg shadow-amber-500/20"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-lg shadow-amber-500/20 cursor-pointer"
                 >
-                  {saving ? 'Updating...' : 'Save Unit Credentials'}
+                  {saving ? (isAddingUnit ? 'Onboarding...' : 'Updating...') : (isAddingUnit ? 'Onboard Unit' : 'Save Unit Credentials')}
                 </button>
               </div>
             </form>

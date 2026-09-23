@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -40,6 +40,18 @@ export default function Layout({ children }) {
   const [fleetDeliveryCount, setFleetDeliveryCount] = useState(0);
   const [documentationCount, setDocumentationCount] = useState(0);
   const [unitReviewCount, setUnitReviewCount] = useState(0);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Auto-detect and manual toggle state for Laptop (PC) vs Mobile View
   const [isMobileView, setIsMobileView] = useState(() => {
@@ -151,29 +163,25 @@ export default function Layout({ children }) {
       { path: '/documentation', label: 'Documentation', icon: FileCheck },
       { path: '/reports', label: 'Reports & Analytics', icon: Layers },
       { path: '/inventory', label: 'Inventory', icon: ClipboardList },
-      { path: '/bill-collection', label: 'Bill Collection', icon: Receipt },
-      { path: '/settings', label: 'App Settings', icon: Settings }
+      { path: '/bill-collection', label: 'Bill Collection', icon: Receipt }
     ],
     UNIT: [
       { path: '/dashboard', label: 'Unit Dashboard', icon: BarChart3 },
       { path: '/unit-demand', label: 'Refreshment Demand', icon: ShoppingBag },
       { path: '/institutions', label: 'Institutions & Vacancy', icon: School },
       { path: '/review-demands', label: 'Review Demands Queue', icon: FileCheck },
-      { path: '/reports', label: 'Reports & Analytics', icon: Layers },
-      { path: '/settings', label: 'App Settings', icon: Settings }
+      { path: '/reports', label: 'Reports & Analytics', icon: Layers }
     ],
     INSTITUTION: [
       { path: '/dashboard', label: 'Refreshment Demand', icon: ShoppingBag },
       { path: '/demand-history', label: 'Demand History', icon: History },
       { path: '/summary', label: 'Weekly / Monthly Summary', icon: BarChart3 },
       { path: '/school-summary', label: 'School Annual Summary', icon: Layers },
-      { path: '/bills', label: 'Bill Submission', icon: Receipt },
-      { path: '/settings', label: 'App Settings', icon: Settings }
+      { path: '/bills', label: 'Bill Submission', icon: Receipt }
     ],
     DELIVERY: [
       { path: '/dashboard', label: 'My Route & Packets', icon: Truck },
-      { path: '/driver-summary', label: 'Delivery Summary', icon: ClipboardList },
-      { path: '/settings', label: 'Driver Account', icon: Settings }
+      { path: '/driver-summary', label: 'Delivery Summary', icon: ClipboardList }
     ]
   };
 
@@ -457,33 +465,16 @@ export default function Layout({ children }) {
         <div className="w-full px-2.5 sm:px-6 lg:px-8 xl:px-10 max-w-full">
           <div className="min-h-[3.75rem] sm:min-h-[4.5rem] py-1.5 sm:py-2 flex items-center justify-between gap-2 sm:gap-4 max-w-full">
 
-            {/* Left: Emblem + System Title + Active Particular Console Identity */}
-            <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
-              <div className="w-9 h-9 sm:w-13 sm:h-13 md:w-15 md:h-15 rounded-xl sm:rounded-2xl overflow-hidden border border-slate-200 shadow-xs shrink-0 flex items-center justify-center bg-[#0d5ea6] transition-transform hover:scale-105 duration-200">
+            {/* Left: Emblem + System Title */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden border border-slate-200 shadow-xs shrink-0 flex items-center justify-center bg-[#0d5ea6] transition-transform hover:scale-105 duration-200">
                 <img src="/logo.png" alt="Flavour Base Logo" className="w-full h-full object-cover" />
               </div>
 
               <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <h1 className="font-extrabold text-xs sm:text-base tracking-tight text-slate-900 leading-none truncate">
-                    NCC REFRESHMENT SYSTEM
-                  </h1>
-                  {!isMobileView && (
-                    <span className={`hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase border shrink-0 ${consoleMeta.badgeStyle}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${consoleMeta.dotStyle}`}></span>
-                      {consoleMeta.badgeLabel}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5 sm:mt-1 truncate">
-                  <span className="text-slate-800 font-bold truncate max-w-[180px] sm:max-w-none">{consoleMeta.subTitle}</span>
-                  {!isMobileView && consoleMeta.jurisdiction && (
-                    <>
-                      <span className="text-slate-300 hidden md:inline">•</span>
-                      <span className="text-slate-500 hidden md:inline truncate">{consoleMeta.jurisdiction}</span>
-                    </>
-                  )}
-                </div>
+                <h1 className="font-extrabold text-xs sm:text-base tracking-tight text-slate-900 leading-none truncate">
+                  NCC REFRESHMENT SYSTEM
+                </h1>
               </div>
             </div>
 
@@ -548,66 +539,77 @@ export default function Layout({ children }) {
               </nav>
             )}
 
-            {/* Right: Actions & Optional Demo Switcher ONLY for ADMIN */}
-            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            {/* Right: Actions, AD Profile Menu & Device Toggle */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              {/* Notification Bell */}
+              <NotificationBell />
 
+              {/* AD Profile Avatar & Menu (Contains App Settings & Logout) */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-extrabold text-xs flex items-center justify-center shadow-xs hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all cursor-pointer ring-2 ring-blue-500/20"
+                  title="Account & Settings"
+                >
+                  {role === 'ADMIN' ? 'AD' : (role === 'UNIT' ? 'UN' : (role === 'INSTITUTION' ? 'IN' : 'AD'))}
+                </button>
 
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3.5 py-2 border-b border-slate-100">
+                      <div className="text-xs font-bold text-slate-900 truncate">{user?.name || 'Administrator'}</div>
+                      <div className="text-[10px] font-mono text-slate-500 truncate">ID: {user?.login_id || user?.email || 'ADMIN'}</div>
+                    </div>
+                    <div className="py-1">
+                      <Link
+                        to="/settings"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+                      >
+                        <Settings className="w-4 h-4 text-slate-400" />
+                        <span>App Settings</span>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => { setUserMenuOpen(false); logout(); }}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4 text-rose-500" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              {/* Laptop / Mobile Device View Switcher */}
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/90 shadow-xs" title="Switch between Laptop / PC and Mobile Device View">
+              {/* PC / Mobile Icons Only on Right Corner */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 shadow-xs" title="Device View">
                 <button
                   type="button"
                   onClick={() => toggleDeviceView(false)}
-                  className={`px-1.5 sm:px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                     !isMobileView
-                      ? 'bg-white text-blue-800 shadow-xs border border-slate-200'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-white text-blue-700 shadow-xs border border-slate-200'
+                      : 'text-slate-400 hover:text-slate-700'
                   }`}
                   title="Laptop / Desktop PC View"
                 >
-                  <Monitor className="w-3.5 h-3.5 text-blue-600" />
-                  <span className="hidden sm:inline text-[11px]">PC</span>
+                  <Monitor className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => toggleDeviceView(true)}
-                  className={`px-1.5 sm:px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                     isMobileView
-                      ? 'bg-white text-emerald-800 shadow-xs border border-slate-200'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-white text-emerald-700 shadow-xs border border-slate-200'
+                      : 'text-slate-400 hover:text-slate-700'
                   }`}
                   title="Mobile Phone View"
                 >
-                  <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="hidden sm:inline text-[11px]">Mobile</span>
+                  <Smartphone className="w-3.5 h-3.5" />
                 </button>
               </div>
-
-              {/* Vertical Separator */}
-              <div className="h-5 w-px bg-slate-200 hidden md:block"></div>
-
-              {/* User Identity Chip */}
-              <div className="hidden lg:flex flex-col text-right">
-                <span className="text-xs font-bold text-slate-800 leading-tight">
-                  {user?.name || 'Personnel'}
-                </span>
-                <span className="text-[10px] font-semibold text-slate-500 font-mono leading-tight">
-                  ID: {user?.login_id || (user?.email && user?.email.includes('@') ? user?.email.split('@')[0] : user?.email)}
-                </span>
-              </div>
-
-              {/* Notification Bell */}
-              <NotificationBell />
-
-              {/* Sign Out Button */}
-              <button
-                onClick={logout}
-                title="Sign Out"
-                className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors shadow-xs cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden md:inline text-xs font-semibold">Sign Out</span>
-              </button>
             </div>
           </div>
         </div>

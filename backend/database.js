@@ -5,10 +5,53 @@ let dbInstance = null;
 
 class DBWrapper {
   constructor(pool) { this.pool = pool; }
-  async get(sql, params) { const [rows] = await this.pool.execute(sql, params || []); return rows[0] || null; }
-  async all(sql, params) { const [rows] = await this.pool.execute(sql, params || []); return rows; }
-  async run(sql, params) { const [result] = await this.pool.execute(sql, params || []); return { lastID: result.insertId, changes: result.affectedRows }; }
-  async exec(sql) { await this.pool.query(sql); }
+  async get(sql, params) {
+    try {
+      const [rows] = await this.pool.execute(sql, params || []);
+      return rows[0] || null;
+    } catch (err) {
+      if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ECONNRESET' || err.fatal) {
+        const [rows] = await this.pool.execute(sql, params || []);
+        return rows[0] || null;
+      }
+      throw err;
+    }
+  }
+  async all(sql, params) {
+    try {
+      const [rows] = await this.pool.execute(sql, params || []);
+      return rows;
+    } catch (err) {
+      if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ECONNRESET' || err.fatal) {
+        const [rows] = await this.pool.execute(sql, params || []);
+        return rows;
+      }
+      throw err;
+    }
+  }
+  async run(sql, params) {
+    try {
+      const [result] = await this.pool.execute(sql, params || []);
+      return { lastID: result.insertId, changes: result.affectedRows };
+    } catch (err) {
+      if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ECONNRESET' || err.fatal) {
+        const [result] = await this.pool.execute(sql, params || []);
+        return { lastID: result.insertId, changes: result.affectedRows };
+      }
+      throw err;
+    }
+  }
+  async exec(sql) {
+    try {
+      await this.pool.query(sql);
+    } catch (err) {
+      if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ECONNRESET' || err.fatal) {
+        await this.pool.query(sql);
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 async function getDB() {
@@ -20,6 +63,8 @@ async function getDB() {
     connectionLimit: 10,
     queueLimit: 0,
     multipleStatements: true,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: true } : undefined
   });
 
