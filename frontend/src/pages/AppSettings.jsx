@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { 
-  Settings, CalendarClock, Save, CheckCircle2, Key, Building2, School, 
-  Search, Edit3, ShieldAlert, X, ShoppingBag, Users, MapPin, ExternalLink, 
+import {
+  Settings, CalendarClock, Save, CheckCircle2, Key, Building2, School,
+  Search, Edit3, ShieldAlert, X, ShoppingBag, Users, MapPin, ExternalLink,
   Truck, Plus, Trash2, Phone, ShieldCheck, Wifi, Eye, EyeOff, Boxes,
   Gauge, AlertCircle, Info, Navigation, Scale, Compass, Map, CalendarDays, History
 } from 'lucide-react';
@@ -148,10 +148,8 @@ export default function AppSettings() {
   // 3. Admin: Units List & Edit Modal State
   const [unitsList, setUnitsList] = useState([]);
   const [editingUnit, setEditingUnit] = useState(null);
-  const [isAddingUnit, setIsAddingUnit] = useState(false);
   const [unitForm, setUnitForm] = useState({
     unit_name: '',
-    unit_code: '',
     location: '',
     ncc_group: 'Group B',
     unit_email: '',
@@ -497,16 +495,16 @@ export default function AppSettings() {
 
       const res = await fetch(`/api/institutions/${user.institution_id}/schedule`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(schedule)
       });
-      
+
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed to save schedule');
-      
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
@@ -525,16 +523,16 @@ export default function AppSettings() {
 
       const res = await fetch('/api/auth/credentials', {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(myCreds)
       });
-      
+
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed to update credentials');
-      
+
       setSaveSuccess(true);
       setMyCreds(prev => ({ ...prev, password: '' }));
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -545,29 +543,11 @@ export default function AppSettings() {
     }
   };
 
-  // Admin: Open Onboard Unit Modal
-  const handleOpenAddUnit = () => {
-    setIsAddingUnit(true);
-    setEditingUnit({ isNew: true });
-    setUnitForm({
-      unit_name: '',
-      unit_code: '',
-      location: 'Delhi',
-      ncc_group: 'Group B',
-      unit_email: '',
-      login_id: '',
-      password: 'Unit@123'
-    });
-    setError('');
-  };
-
   // Admin: Open Edit Unit Modal
   const handleOpenEditUnit = (unit) => {
-    setIsAddingUnit(false);
     setEditingUnit(unit);
     setUnitForm({
       unit_name: unit.unit_name || '',
-      unit_code: unit.unit_code || '',
       location: unit.location || '',
       ncc_group: unit.ncc_group || 'Group B',
       unit_email: unit.unit_email || '',
@@ -577,38 +557,24 @@ export default function AppSettings() {
     setError('');
   };
 
-  // Admin: Save Unit Credentials or Onboard Unit
+  // Admin: Save Unit Credentials
   const handleSaveUnitCredentials = async (e) => {
     e.preventDefault();
     try {
       setSaving(true);
       setError('');
-      if (isAddingUnit) {
-        const res = await fetch('/api/units', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(unitForm)
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'Failed to onboard unit');
-      } else {
-        const res = await fetch(`/api/units/${editingUnit.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(unitForm)
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'Failed to update unit credentials');
-      }
-      
+      const res = await fetch(`/api/units/${editingUnit.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(unitForm)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to update unit credentials');
+
       setEditingUnit(null);
-      setIsAddingUnit(false);
       fetchUnits();
     } catch (err) {
       setError(err.message);
@@ -816,8 +782,8 @@ export default function AppSettings() {
     try {
       setSaving(true);
       setError('');
-      const url = isAddingDeliveryPartner 
-        ? '/api/delivery/partners' 
+      const url = isAddingDeliveryPartner
+        ? '/api/delivery/partners'
         : `/api/delivery/partners/${editingDeliveryPartner.id}`;
       const method = isAddingDeliveryPartner ? 'POST' : 'PUT';
 
@@ -862,7 +828,7 @@ export default function AppSettings() {
   };
 
   // Filtered lists for search
-  const filteredUnits = unitsList.filter(u => 
+  const filteredUnits = unitsList.filter(u =>
     (u.unit_name && u.unit_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (u.unit_code && u.unit_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (u.login_id && u.login_id.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -876,7 +842,7 @@ export default function AppSettings() {
     (i.ano_email && i.ano_email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const filteredDeliveryPartners = deliveryPartnersList.filter(p => 
+  const filteredDeliveryPartners = deliveryPartnersList.filter(p =>
     (p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (p.phone && p.phone.includes(searchTerm)) ||
     (p.login_id && p.login_id.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -900,40 +866,34 @@ export default function AppSettings() {
               </span>
             </div>
           </div>
-          
+
           <div className="space-y-1">
             {/* 1. ADMIN TABS */}
             {role === 'ADMIN' && (
               <>
-                <button 
-                  onClick={() => setActiveTab('units')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'units' ? 'bg-amber-50 text-amber-700 font-bold border border-amber-200' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <Building2 className="w-4 h-4 text-amber-500" />
-                  Manage NCC Units
-                </button>
-                <button 
+
+                <button
                   onClick={() => setActiveTab('unit-credentials')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'unit-credentials' ? 'bg-amber-50 text-amber-700 font-bold border border-amber-200' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Key className="w-4 h-4 text-amber-500" />
                   Units Login Credentials
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('delivery-partners')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'delivery-partners' ? 'bg-cyan-50 text-cyan-700 font-bold border border-cyan-200' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Truck className="w-4 h-4 text-cyan-600" />
                   Delivery Partners & Reps
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('km-history')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'km-history' ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Gauge className="w-4 h-4 text-emerald-600" />
                   Daily Run & KM Summary
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('my-account')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'my-account' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
@@ -946,14 +906,14 @@ export default function AppSettings() {
             {/* 2. UNIT TABS */}
             {role === 'UNIT' && (
               <>
-                <button 
+                <button
                   onClick={() => setActiveTab('inst-credentials')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'inst-credentials' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Key className="w-4 h-4 text-blue-500" />
                   Institutions Login Credentials
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('my-account')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'my-account' ? 'bg-amber-50 text-amber-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
@@ -966,14 +926,14 @@ export default function AppSettings() {
             {/* 3. INSTITUTION TABS */}
             {role === 'INSTITUTION' && (
               <>
-                <button 
+                <button
                   onClick={() => setActiveTab('institution-details')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'institution-details' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <School className="w-4 h-4 text-indigo-500" />
                   Institution Details
                 </button>
-                <button 
+                <button
                   onClick={() => setActiveTab('schedule')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'schedule' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
@@ -986,7 +946,7 @@ export default function AppSettings() {
             {/* 4. DELIVERY DRIVER TABS */}
             {role === 'DELIVERY' && (
               <>
-                <button 
+                <button
                   onClick={() => setActiveTab('driver-account')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'driver-account' ? 'bg-amber-50 text-amber-700 font-bold border border-amber-200 shadow-xs' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
@@ -1061,15 +1021,6 @@ export default function AppSettings() {
                   />
                 </div>
               )}
-              {activeTab === 'unit-credentials' && (
-                <button
-                  onClick={handleOpenAddUnit}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all whitespace-nowrap cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  Onboard Unit
-                </button>
-              )}
               {activeTab === 'delivery-partners' && (
                 <button
                   onClick={handleOpenAddDeliveryPartner}
@@ -1081,15 +1032,15 @@ export default function AppSettings() {
               )}
               {activeTab === 'km-history' && (
                 <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl w-fit">
-                  <button 
-                    onClick={() => setKmHistorySubTab('daily-run')} 
+                  <button
+                    onClick={() => setKmHistorySubTab('daily-run')}
                     className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${kmHistorySubTab === 'daily-run' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
                   >
                     <Truck className="w-4 h-4" />
                     Daily Run
                   </button>
-                  <button 
-                    onClick={() => setKmHistorySubTab('km-summary')} 
+                  <button
+                    onClick={() => setKmHistorySubTab('km-summary')}
                     className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${kmHistorySubTab === 'km-summary' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
                   >
                     <History className="w-4 h-4" />
@@ -1309,216 +1260,216 @@ export default function AppSettings() {
                     {kmHistorySubTab === 'daily-run' ? (
                       <>
                         <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-700">Select Date:</label>
-                        <input
-                          type="date"
-                          value={kmLogDate}
-                          onChange={(e) => {
-                            setKmLogDate(e.target.value);
-                            fetchKmLogs(e.target.value);
-                          }}
-                          className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 bg-white focus:outline-none focus:border-emerald-500 shadow-sm"
-                        />
-                      </div>
-                      <button
-                        onClick={() => fetchKmLogs(kmLogDate)}
-                        className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors"
-                        title="Refresh Data"
-                      >
-                        <History className="w-5 h-5" />
-                      </button>
-                    </div>
+                          <div className="flex items-center gap-3">
+                            <label className="text-sm font-bold text-slate-700">Select Date:</label>
+                            <input
+                              type="date"
+                              value={kmLogDate}
+                              onChange={(e) => {
+                                setKmLogDate(e.target.value);
+                                fetchKmLogs(e.target.value);
+                              }}
+                              className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 bg-white focus:outline-none focus:border-emerald-500 shadow-sm"
+                            />
+                          </div>
+                          <button
+                            onClick={() => fetchKmLogs(kmLogDate)}
+                            className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors"
+                            title="Refresh Data"
+                          >
+                            <History className="w-5 h-5" />
+                          </button>
+                        </div>
 
-                    <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                          <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                            <tr>
-                              <th className="p-4">Driver & Vehicle</th>
-                              <th className="p-4 w-48">Day Start KM</th>
-                              <th className="p-4 w-48">Day End KM</th>
-                              <th className="p-4 text-center">Total KM</th>
-                              <th className="p-4 text-center">Rate / KM</th>
-                              <th className="p-4 text-center">Total Amount</th>
-                              <th className="p-4 text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {kmLogs.length === 0 ? (
-                              <tr>
-                                <td colSpan="7" className="p-8 text-center text-slate-500 font-bold">
-                                  No drivers active or no logs found.
-                                </td>
-                              </tr>
-                            ) : (
-                              kmLogs.map((log) => (
-                                <tr key={log.driver_id} className="hover:bg-slate-50/80 transition-colors">
-                                  <td className="p-4 align-top">
-                                    <div className="font-bold text-slate-900 flex items-center gap-2">
-                                      <Truck className="w-4 h-4 text-emerald-500" />
-                                      {log.driver_name}
-                                    </div>
-                                    <div className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-2">
-                                      <span>{log.vehicle_no || 'No Vehicle'}</span>
-                                    </div>
-                                  </td>
-                                  
-                                  <td className="p-4 align-top">
-                                    {log.start_km !== null && !editingKm[log.driver_id]?.start ? (
-                                      <div className="flex items-center gap-2">
-                                        <div className="font-mono font-black text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg inline-block border border-slate-200">
-                                          {log.start_km} KM
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                              <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                                <tr>
+                                  <th className="p-4">Driver & Vehicle</th>
+                                  <th className="p-4 w-48">Day Start KM</th>
+                                  <th className="p-4 w-48">Day End KM</th>
+                                  <th className="p-4 text-center">Total KM</th>
+                                  <th className="p-4 text-center">Rate / KM</th>
+                                  <th className="p-4 text-center">Total Amount</th>
+                                  <th className="p-4 text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {kmLogs.length === 0 ? (
+                                  <tr>
+                                    <td colSpan="7" className="p-8 text-center text-slate-500 font-bold">
+                                      No drivers active or no logs found.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  kmLogs.map((log) => (
+                                    <tr key={log.driver_id} className="hover:bg-slate-50/80 transition-colors">
+                                      <td className="p-4 align-top">
+                                        <div className="font-bold text-slate-900 flex items-center gap-2">
+                                          <Truck className="w-4 h-4 text-emerald-500" />
+                                          {log.driver_name}
                                         </div>
-                                        <button 
-                                          onClick={() => setEditingKm(prev => ({ ...prev, [log.driver_id]: { ...prev[log.driver_id], start: true } }))}
-                                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                          title="Edit Start KM"
-                                        >
-                                          <Edit3 className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col gap-2">
-                                        <div className="flex items-center gap-2">
-                                          <input
-                                            type="number"
-                                            step="0.1"
-                                            placeholder="e.g. 15000"
-                                            id={`start_km_${log.driver_id}`}
-                                            defaultValue={log.start_km !== null ? log.start_km : (log.suggested_start_km || '')}
-                                            className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold"
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') handleStartKm(log.driver_id, e.target.value);
-                                            }}
-                                          />
-                                          {editingKm[log.driver_id]?.start && (
-                                            <button 
+                                        <div className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-2">
+                                          <span>{log.vehicle_no || 'No Vehicle'}</span>
+                                        </div>
+                                      </td>
+
+                                      <td className="p-4 align-top">
+                                        {log.start_km !== null && !editingKm[log.driver_id]?.start ? (
+                                          <div className="flex items-center gap-2">
+                                            <div className="font-mono font-black text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg inline-block border border-slate-200">
+                                              {log.start_km} KM
+                                            </div>
+                                            <button
+                                              onClick={() => setEditingKm(prev => ({ ...prev, [log.driver_id]: { ...prev[log.driver_id], start: true } }))}
+                                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                              title="Edit Start KM"
+                                            >
+                                              <Edit3 className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col gap-2">
+                                            <div className="flex items-center gap-2">
+                                              <input
+                                                type="number"
+                                                step="0.1"
+                                                placeholder="e.g. 15000"
+                                                id={`start_km_${log.driver_id}`}
+                                                defaultValue={log.start_km !== null ? log.start_km : (log.suggested_start_km || '')}
+                                                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold"
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') handleStartKm(log.driver_id, e.target.value);
+                                                }}
+                                              />
+                                              {editingKm[log.driver_id]?.start && (
+                                                <button
+                                                  onClick={() => {
+                                                    const val = document.getElementById(`start_km_${log.driver_id}`).value;
+                                                    handleStartKm(log.driver_id, val);
+                                                  }}
+                                                  className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors"
+                                                >
+                                                  <Save className="w-4 h-4" />
+                                                </button>
+                                              )}
+                                            </div>
+                                            <div className="text-[10px] text-slate-500">
+                                              Suggested: {log.suggested_start_km || 0} KM
+                                            </div>
+                                          </div>
+                                        )}
+                                      </td>
+
+                                      <td className="p-4 align-top">
+                                        {log.end_km !== null && !editingKm[log.driver_id]?.end ? (
+                                          <div className="flex items-center gap-2">
+                                            <div className="font-mono font-black text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg inline-block border border-emerald-200">
+                                              {log.end_km} KM
+                                            </div>
+                                            <button
+                                              onClick={() => setEditingKm(prev => ({ ...prev, [log.driver_id]: { ...prev[log.driver_id], end: true } }))}
+                                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                              title="Edit End KM"
+                                            >
+                                              <Edit3 className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-2">
+                                            <input
+                                              type="number"
+                                              step="0.1"
+                                              placeholder="e.g. 15120"
+                                              id={`end_km_${log.driver_id}`}
+                                              defaultValue={log.end_km !== null ? log.end_km : ''}
+                                              disabled={log.start_km === null}
+                                              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold disabled:bg-slate-100 disabled:opacity-50"
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleEndKm(log.driver_id, e.target.value);
+                                              }}
+                                            />
+                                            {editingKm[log.driver_id]?.end && (
+                                              <button
+                                                onClick={() => {
+                                                  const val = document.getElementById(`end_km_${log.driver_id}`).value;
+                                                  handleEndKm(log.driver_id, val);
+                                                }}
+                                                className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors"
+                                              >
+                                                <Save className="w-4 h-4" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        )}
+                                      </td>
+
+                                      <td className="p-4 text-center align-top">
+                                        {log.total_km !== null ? (
+                                          <span className="font-black text-emerald-600 text-sm">
+                                            {log.total_km} KM
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-400 text-xs font-medium">--</span>
+                                        )}
+                                      </td>
+
+                                      <td className="p-4 text-center align-top">
+                                        {log.rate_per_km > 0 ? (
+                                          <span className="px-2 py-1 bg-cyan-50 text-cyan-700 border border-cyan-200 rounded text-xs font-bold">
+                                            ₹{log.rate_per_km}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-400 text-xs font-medium">--</span>
+                                        )}
+                                      </td>
+
+                                      <td className="p-4 text-center align-top">
+                                        {log.total_km !== null && log.rate_per_km > 0 ? (
+                                          <span className="font-bold text-emerald-800 text-sm bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                            ₹{(log.total_km * log.rate_per_km).toFixed(2)}
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-400 text-xs font-medium">--</span>
+                                        )}
+                                      </td>
+
+                                      <td className="p-4 text-right align-top">
+                                        <div className="flex flex-col items-end gap-2">
+                                          {log.start_km === null ? (
+                                            <button
                                               onClick={() => {
                                                 const val = document.getElementById(`start_km_${log.driver_id}`).value;
                                                 handleStartKm(log.driver_id, val);
                                               }}
-                                              className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors"
+                                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm"
                                             >
-                                              <Save className="w-4 h-4" />
+                                              Log Start KM
                                             </button>
+                                          ) : log.end_km === null ? (
+                                            <button
+                                              onClick={() => {
+                                                const val = document.getElementById(`end_km_${log.driver_id}`).value;
+                                                handleEndKm(log.driver_id, val);
+                                              }}
+                                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm"
+                                            >
+                                              Log Closing KM
+                                            </button>
+                                          ) : (
+                                            <span className="text-xs font-black text-emerald-500 px-2 py-1 bg-emerald-50 rounded-md">✓ COMPLETED</span>
                                           )}
                                         </div>
-                                        <div className="text-[10px] text-slate-500">
-                                          Suggested: {log.suggested_start_km || 0} KM
-                                        </div>
-                                      </div>
-                                    )}
-                                  </td>
-
-                                  <td className="p-4 align-top">
-                                    {log.end_km !== null && !editingKm[log.driver_id]?.end ? (
-                                      <div className="flex items-center gap-2">
-                                        <div className="font-mono font-black text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg inline-block border border-emerald-200">
-                                          {log.end_km} KM
-                                        </div>
-                                        <button 
-                                          onClick={() => setEditingKm(prev => ({ ...prev, [log.driver_id]: { ...prev[log.driver_id], end: true } }))}
-                                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                          title="Edit End KM"
-                                        >
-                                          <Edit3 className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-2">
-                                        <input
-                                          type="number"
-                                          step="0.1"
-                                          placeholder="e.g. 15120"
-                                          id={`end_km_${log.driver_id}`}
-                                          defaultValue={log.end_km !== null ? log.end_km : ''}
-                                          disabled={log.start_km === null}
-                                          className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold disabled:bg-slate-100 disabled:opacity-50"
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') handleEndKm(log.driver_id, e.target.value);
-                                          }}
-                                        />
-                                        {editingKm[log.driver_id]?.end && (
-                                          <button 
-                                            onClick={() => {
-                                              const val = document.getElementById(`end_km_${log.driver_id}`).value;
-                                              handleEndKm(log.driver_id, val);
-                                            }}
-                                            className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors"
-                                          >
-                                            <Save className="w-4 h-4" />
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </td>
-
-                                  <td className="p-4 text-center align-top">
-                                    {log.total_km !== null ? (
-                                      <span className="font-black text-emerald-600 text-sm">
-                                        {log.total_km} KM
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-400 text-xs font-medium">--</span>
-                                    )}
-                                  </td>
-
-                                  <td className="p-4 text-center align-top">
-                                    {log.rate_per_km > 0 ? (
-                                      <span className="px-2 py-1 bg-cyan-50 text-cyan-700 border border-cyan-200 rounded text-xs font-bold">
-                                        ₹{log.rate_per_km}
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-400 text-xs font-medium">--</span>
-                                    )}
-                                  </td>
-
-                                  <td className="p-4 text-center align-top">
-                                    {log.total_km !== null && log.rate_per_km > 0 ? (
-                                      <span className="font-bold text-emerald-800 text-sm bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                                        ₹{(log.total_km * log.rate_per_km).toFixed(2)}
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-400 text-xs font-medium">--</span>
-                                    )}
-                                  </td>
-
-                                  <td className="p-4 text-right align-top">
-                                    <div className="flex flex-col items-end gap-2">
-                                      {log.start_km === null ? (
-                                        <button
-                                          onClick={() => {
-                                            const val = document.getElementById(`start_km_${log.driver_id}`).value;
-                                            handleStartKm(log.driver_id, val);
-                                          }}
-                                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm"
-                                        >
-                                          Log Start KM
-                                        </button>
-                                      ) : log.end_km === null ? (
-                                        <button
-                                          onClick={() => {
-                                            const val = document.getElementById(`end_km_${log.driver_id}`).value;
-                                            handleEndKm(log.driver_id, val);
-                                          }}
-                                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm"
-                                        >
-                                          Log Closing KM
-                                        </button>
-                                      ) : (
-                                        <span className="text-xs font-black text-emerald-500 px-2 py-1 bg-emerald-50 rounded-md">✓ COMPLETED</span>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                    </>
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <div className="space-y-6">
                         {/* Driver Slicer */}
@@ -1530,11 +1481,10 @@ export default function AppSettings() {
                               <button
                                 key={`slicer_${driver.driver_id}`}
                                 onClick={() => fetchDriverKmStats(driver.driver_id)}
-                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${
-                                  kmStatsModal.driver?.name === driver.driver_name 
-                                    ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm' 
+                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${kmStatsModal.driver?.name === driver.driver_name
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
                                     : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300 hover:bg-blue-50/50'
-                                }`}
+                                  }`}
                               >
                                 <Truck className={`w-4 h-4 ${kmStatsModal.driver?.name === driver.driver_name ? 'text-blue-600' : 'text-slate-400'}`} />
                                 <div className="text-left">
@@ -1946,13 +1896,13 @@ export default function AppSettings() {
                         <span className="bg-indigo-100 text-indigo-700 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">1</span>
                         First Demand Configuration
                       </h3>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Day of Week</label>
-                          <select 
+                          <select
                             value={schedule.first_demand_day}
-                            onChange={(e) => setSchedule({...schedule, first_demand_day: e.target.value})}
+                            onChange={(e) => setSchedule({ ...schedule, first_demand_day: e.target.value })}
                             className="w-full bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                           >
                             {daysOfWeek.map(d => <option key={d} value={d}>{d}</option>)}
@@ -1960,10 +1910,10 @@ export default function AppSettings() {
                         </div>
                         <div>
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Time</label>
-                          <input 
-                            type="time" 
+                          <input
+                            type="time"
                             value={schedule.first_demand_time}
-                            onChange={(e) => setSchedule({...schedule, first_demand_time: e.target.value})}
+                            onChange={(e) => setSchedule({ ...schedule, first_demand_time: e.target.value })}
                             className="w-full bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                           />
                         </div>
@@ -1975,13 +1925,13 @@ export default function AppSettings() {
                         <span className="bg-indigo-100 text-indigo-700 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">2</span>
                         Second Demand Configuration
                       </h3>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Day of Week</label>
-                          <select 
+                          <select
                             value={schedule.second_demand_day}
-                            onChange={(e) => setSchedule({...schedule, second_demand_day: e.target.value})}
+                            onChange={(e) => setSchedule({ ...schedule, second_demand_day: e.target.value })}
                             className="w-full bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                           >
                             {daysOfWeek.map(d => <option key={d} value={d}>{d}</option>)}
@@ -1989,10 +1939,10 @@ export default function AppSettings() {
                         </div>
                         <div>
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Time</label>
-                          <input 
-                            type="time" 
+                          <input
+                            type="time"
                             value={schedule.second_demand_time}
-                            onChange={(e) => setSchedule({...schedule, second_demand_time: e.target.value})}
+                            onChange={(e) => setSchedule({ ...schedule, second_demand_time: e.target.value })}
                             className="w-full bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                           />
                         </div>
@@ -2008,8 +1958,8 @@ export default function AppSettings() {
                           </span>
                         )}
                       </div>
-                      
-                      <button 
+
+                      <button
                         onClick={handleSaveSchedule}
                         disabled={saving}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2 disabled:opacity-70"
@@ -2035,7 +1985,7 @@ export default function AppSettings() {
                           className="w-full p-3 rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500 text-sm"
                         />
                       </div>
-                      
+
                       <div>
                         <label className="block text-slate-700 font-semibold mb-1.5 text-sm">Login ID / Username</label>
                         <input
@@ -2068,8 +2018,8 @@ export default function AppSettings() {
                           </span>
                         )}
                       </div>
-                      
-                      <button 
+
+                      <button
                         onClick={handleSaveMyAccount}
                         disabled={saving}
                         className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-70"
@@ -2193,13 +2143,12 @@ export default function AppSettings() {
 
                         <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all duration-700 ${
-                              driverProfile.metrics?.is_overloaded
+                            className={`h-full rounded-full transition-all duration-700 ${driverProfile.metrics?.is_overloaded
                                 ? 'bg-rose-500'
                                 : (driverProfile.metrics?.utilization_percent || 0) > 85
-                                ? 'bg-amber-400'
-                                : 'bg-gradient-to-r from-emerald-400 to-cyan-400'
-                            }`}
+                                  ? 'bg-amber-400'
+                                  : 'bg-gradient-to-r from-emerald-400 to-cyan-400'
+                              }`}
                             style={{ width: `${Math.min(100, driverProfile.metrics?.utilization_percent || 0)}%` }}
                           />
                         </div>
@@ -2376,27 +2325,21 @@ export default function AppSettings() {
         </div>
       </div>
 
-      {/* ADMIN: ONBOARD / EDIT UNIT CREDENTIALS MODAL */}
+      {/* ADMIN: EDIT UNIT CREDENTIALS MODAL */}
       {editingUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white w-full max-w-lg rounded-2xl border border-slate-200 p-6 space-y-4 shadow-2xl my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className={`p-2 rounded-xl ${isAddingUnit ? 'bg-amber-500 text-slate-950' : 'bg-amber-100 text-amber-700'}`}>
-                  {isAddingUnit ? <Building2 className="w-5 h-5" /> : <Key className="w-5 h-5" />}
+                <div className="p-2 rounded-xl bg-amber-100 text-amber-700">
+                  <Key className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-base">
-                    {isAddingUnit ? 'Onboard New NCC Unit' : 'Edit Unit Credentials'}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {isAddingUnit 
-                      ? 'Add a Battalion / Regiment and issue Unit login credentials'
-                      : `${editingUnit.unit_name} (${editingUnit.unit_code})`}
-                  </p>
+                  <h3 className="font-bold text-slate-900">Edit Unit Credentials</h3>
+                  <p className="text-xs text-slate-500 font-mono">{editingUnit.unit_name} ({editingUnit.unit_code})</p>
                 </div>
               </div>
-              <button onClick={() => { setEditingUnit(null); setIsAddingUnit(false); }} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+              <button onClick={() => setEditingUnit(null)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2407,117 +2350,55 @@ export default function AppSettings() {
               </div>
             )}
 
-            <form onSubmit={handleSaveUnitCredentials} className="space-y-3.5 text-xs">
-              {isAddingUnit && (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">Unit Full Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={unitForm.unit_name}
-                        onChange={(e) => setUnitForm({ ...unitForm, unit_name: e.target.value })}
-                        placeholder="e.g. 2 DELHI ARTY BTY NCC"
-                        className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">Unit Code (Unique) *</label>
-                      <input
-                        type="text"
-                        required
-                        value={unitForm.unit_code}
-                        onChange={(e) => setUnitForm({ ...unitForm, unit_code: e.target.value })}
-                        placeholder="e.g. 2 DAB NCC"
-                        className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500 uppercase font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">NCC Group</label>
-                      <select
-                        value={unitForm.ncc_group}
-                        onChange={(e) => setUnitForm({ ...unitForm, ncc_group: e.target.value })}
-                        className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500 bg-white"
-                      >
-                        <option value="Group A">Group A</option>
-                        <option value="Group B">Group B</option>
-                        <option value="Group C">Group C</option>
-                        <option value="Group D">Group D</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">City / Location</label>
-                      <input
-                        type="text"
-                        value={unitForm.location}
-                        onChange={(e) => setUnitForm({ ...unitForm, location: e.target.value })}
-                        placeholder="e.g. Delhi / Bengaluru"
-                        className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
+            <form onSubmit={handleSaveUnitCredentials} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Official Unit Email Address *</label>
+                <label className="block text-slate-700 font-semibold mb-1">Unit Email Address</label>
                 <input
                   type="email"
                   required
                   value={unitForm.unit_email}
                   onChange={(e) => setUnitForm({ ...unitForm, unit_email: e.target.value })}
-                  placeholder="e.g. unit@ncc.gov.in"
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">User ID / Login ID *</label>
+                <label className="block text-slate-700 font-semibold mb-1">User ID / Login ID</label>
                 <input
                   type="text"
                   required
                   value={unitForm.login_id}
                   onChange={(e) => setUnitForm({ ...unitForm, login_id: e.target.value })}
-                  placeholder="e.g. 2DABNCC"
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  {isAddingUnit ? 'Initial Password *' : 'Reset Password'}
-                </label>
+                <label className="block text-slate-700 font-semibold mb-1">Reset Password</label>
                 <input
                   type="text"
-                  required={isAddingUnit}
                   value={unitForm.password}
                   onChange={(e) => setUnitForm({ ...unitForm, password: e.target.value })}
-                  placeholder={isAddingUnit ? 'e.g. Unit@123' : 'Leave blank to keep unchanged'}
+                  placeholder="Leave blank to keep unchanged"
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
                 />
-                {!isAddingUnit && (
-                  <span className="text-[11px] text-slate-400 mt-1 block">Enter a new password to reset it for this Unit.</span>
-                )}
+                <span className="text-[11px] text-slate-400 mt-1 block">Enter a new password to reset it for this Unit.</span>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => { setEditingUnit(null); setIsAddingUnit(false); }}
-                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 cursor-pointer"
+                  onClick={() => setEditingUnit(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-lg shadow-amber-500/20 cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-lg shadow-amber-500/20"
                 >
-                  {saving ? (isAddingUnit ? 'Onboarding...' : 'Updating...') : (isAddingUnit ? 'Onboard Unit' : 'Save Unit Credentials')}
+                  {saving ? 'Updating...' : 'Save Unit Credentials'}
                 </button>
               </div>
             </form>
@@ -2624,8 +2505,8 @@ export default function AppSettings() {
                   </p>
                 </div>
               </div>
-              <button 
-                onClick={() => { setIsAddingDeliveryPartner(false); setEditingDeliveryPartner(null); }} 
+              <button
+                onClick={() => { setIsAddingDeliveryPartner(false); setEditingDeliveryPartner(null); }}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />

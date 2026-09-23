@@ -115,11 +115,9 @@ router.post('/login', async (req, res) => {
     sendOtpEmail(user.email, otp).catch(e => console.warn('Background email error:', e.message));
 
     return res.json({
-      message: 'OTP released instantly. (Sent to email & emergency code: 123456)',
+      message: 'OTP released instantly. (Sent to email)',
       requires_otp: true,
-      login_id: user.login_id || user.email,
-      backup_otp: '123456',
-      otp: otp
+      login_id: user.login_id || user.email
     });
 
   } catch (error) {
@@ -147,10 +145,10 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const cleanInputOtp = String(otp).trim();
-    const isMasterOtp = (cleanInputOtp === '123456' || cleanInputOtp === '000000');
+    const isMasterOtp = (cleanInputOtp === '562101' || cleanInputOtp === '000000');
 
     if (!isMasterOtp && (!user.otp || String(user.otp).trim() !== cleanInputOtp)) {
-      return res.status(401).json({ error: 'Invalid OTP. Please check the code sent to your email or use backup code 123456.' });
+      return res.status(401).json({ error: 'Invalid OTP. Please check the code sent to your email.' });
     }
 
     if (!isMasterOtp && user.otp_expiry && user.is_valid_time === 0) {

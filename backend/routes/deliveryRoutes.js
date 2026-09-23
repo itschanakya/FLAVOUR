@@ -43,28 +43,26 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         d.delivery_partner_phone,
         d.delivery_partner_vehicle,
         COALESCE(d.delivery_status, 'PENDING') as delivery_status,
-        d.delivery_sequence,
         d.dispatched_at,
         d.delivered_at,
         d.delivery_notes,
         d.created_at,
         i.id as institution_id,
-        i.institution_name,
+        COALESCE(i.institution_name, u.unit_name) as institution_name,
         COALESCE(i.pin_code, 'N/A') as pin_code,
-        i.complete_address,
-        i.google_location,
-        i.ano_cto_name,
-        i.ano_cto_contact,
+        COALESCE(i.complete_address, d.delivery_venue, u.location, 'Unit Battalion HQ') as complete_address,
+        COALESCE(i.google_location, '') as google_location,
+        COALESCE(i.ano_cto_name, 'Unit HQ') as ano_cto_name,
+        COALESCE(i.ano_cto_contact, '') as ano_cto_contact,
         u.id as unit_id,
         u.unit_name,
         u.unit_code,
         u.ncc_group,
-        SUM(di.quantity) as total_quantity,
-        SUM(di.quantity * di.unit_price_snapshot) as total_amount
+        (SELECT COALESCE(SUM(di.quantity), 0) FROM demand_items di WHERE di.demand_id = d.id) as total_quantity,
+        (SELECT COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) FROM demand_items di WHERE di.demand_id = d.id) as total_amount
       FROM demands d
       LEFT JOIN institutions i ON d.institution_id = i.id
       JOIN units u ON d.unit_id = u.id
-      LEFT JOIN demand_items di ON d.id = di.demand_id
       WHERE d.is_deleted = 0
         AND d.status IN ('READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED')
     `;
@@ -86,7 +84,7 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
       params.push(partner_id);
     }
 
-    query += ` GROUP BY d.id ORDER BY d.delivery_sequence ASC, d.demand_date DESC, d.id DESC`;
+    query += ` ORDER BY d.demand_date DESC, d.id DESC`;
 
     const demands = await db.all(query, params);
 
