@@ -11,9 +11,9 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER, 
     pass: process.env.SMTP_PASS, 
   },
-  connectionTimeout: 2500, // 2.5s connection timeout
-  greetingTimeout: 2500,
-  socketTimeout: 3000,
+  connectionTimeout: 10000, // 10s connection timeout
+  greetingTimeout: 10000,
+  socketTimeout: 15000,
 });
 
 /**
@@ -47,16 +47,16 @@ async function sendOtpEmail(email, otp) {
           </div>
           
           <p style="color: #ef4444; font-size: 14px; text-align: center; font-weight: bold;">
-            This OTP will expire in 15 minutes. Backup OTP: 123456
+            This OTP will expire in 15 minutes.
           </p>
           <p style="color: #64748b; font-size: 14px;">If you did not request this login, please ignore this email or contact support.</p>
         </div>
       `
     };
 
-    // Guarantee that sending email never hangs longer than 3 seconds
+    // Guarantee that sending email never hangs longer than 15 seconds
     const sendPromise = transporter.sendMail(mailOptions);
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 3000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 15000));
 
     const info = await Promise.race([sendPromise, timeoutPromise]);
     console.log(`Email sent successfully: ${info.messageId}`);
