@@ -46,6 +46,7 @@ export default function LoginPage() {
   const [otp, setOtp] = useState('');
   const [loginIdForOtp, setLoginIdForOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
+  const [emailSent, setEmailSent] = useState(true);
 
   const { login, verifyOtp, logout } = useAuth();
   const navigate = useNavigate();
@@ -96,6 +97,7 @@ export default function LoginPage() {
       const res = await login(email.trim(), password, selectedRole);
       if (res && res.requires_otp) {
         setLoginIdForOtp(res.login_id);
+        setEmailSent(res.email_sent !== false);
         setStep(3);
         setResendTimer(60);
       } else {
@@ -504,7 +506,11 @@ export default function LoginPage() {
                         <Mail className="w-6 h-6" />
                       </div>
                       <h3 className="text-white font-bold">Two-Factor Authentication</h3>
-                      <p className="text-slate-400 text-xs mt-1">We've sent a 6-digit OTP to your registered email.</p>
+                      {emailSent ? (
+                        <p className="text-slate-400 text-xs mt-1">We've sent a 6-digit OTP to your registered email. Please check your inbox.</p>
+                      ) : (
+                        <p className="text-amber-400 text-xs mt-1">⚠️ Email could not be delivered. Please check your spam folder or use your backup code to login.</p>
+                      )}
                       {/* Emergency Backup Code hidden for security */}
                     </div>
 

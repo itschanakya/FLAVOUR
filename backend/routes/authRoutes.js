@@ -111,12 +111,16 @@ router.post('/login', async (req, res) => {
 
     await db.run('UPDATE users SET otp = ?, otp_expiry = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?', [otp, user.id]);
 
-    // Send email asynchronously in the background so slow/blocked SMTP never freezes login
-    sendOtpEmail(user.email, otp).catch(e => console.warn('Background email error:', e.message));
+    // Await email send so we know if it succeeded
+    const emailSent = await sendOtpEmail(user.email, otp);
+    console.log(`[OTP] Email sent to ${user.email}: ${emailSent}`);
 
     return res.json({
-      message: 'OTP released instantly. (Sent to email)',
+      message: emailSent
+        ? `OTP sent to your registered email (${user.email.replace(/(.{2})(.*)(@.*)/, '$1***$3')}).`
+        : 'OTP generated but email could not be delivered. Please use your emergency backup code.',
       requires_otp: true,
+      email_sent: emailSent,
       login_id: user.login_id || user.email
     });
 
