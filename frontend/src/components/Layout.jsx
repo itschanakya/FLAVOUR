@@ -487,81 +487,71 @@ export default function Layout({ children }) {
               </div>
             </div>
 
+            {/* Center: Main Navigation (Visible in Laptop/PC View) */}
+            {!isMobileView && (
+              <nav className="hidden lg:flex items-center justify-center gap-1.5 xl:gap-2.5 mx-4 flex-1">
+                {currentNav.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path ||
+                    (item.path === '/dashboard' && location.pathname === '/') ||
+                    (item.path === '/demand-history' && location.pathname === '/my-demands');
+                  const isSupplyPoint = item.path === '/approved-demands';
+                  const isReviewQueue = item.path === '/review-demands';
+                  const isBills = item.path === '/bills';
+                  const rawBadgeCount = isSupplyPoint ? supplyPointCount : (isReviewQueue ? unitReviewCount : (isBills ? billNoticeCount : 0));
+
+                  const clearedInfo = clearedBadges[item.path];
+                  let isCleared = false;
+                  if (clearedInfo) {
+                    if (typeof clearedInfo === 'object' && clearedInfo.count !== undefined) {
+                      isCleared = rawBadgeCount <= clearedInfo.count;
+                    } else {
+                      isCleared = true;
+                    }
+                  }
+                  const badgeCount = isCleared ? 0 : rawBadgeCount;
+
+                  const colorConfig = itemColorStyles[item.path] || {
+                    active: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 border-blue-600 font-bold',
+                    inactive: 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/90 border-slate-200 bg-white/90',
+                    iconActive: 'text-white',
+                    iconInactive: 'text-slate-500 group-hover:scale-110'
+                  };
+
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => handleClearBadge(item.path)}
+                      className={`group flex items-center gap-1.5 px-2 py-1.5 xl:px-3 xl:py-2 rounded-xl text-[11px] xl:text-xs font-bold border transition-all duration-200 shrink-0 ${isActive ? colorConfig.active : colorConfig.inactive
+                        }`}
+                    >
+                      {Icon && (
+                        <Icon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${isActive ? colorConfig.iconActive : colorConfig.iconInactive
+                          }`} />
+                      )}
+                      <span className="tracking-tight">{item.label}</span>
+                      {badgeCount > 0 && (
+                        <span
+                          onClick={(e) => handleClearBadge(item.path, e)}
+                          title="Click to clear badge"
+                          className={`px-1.5 py-0.5 text-[9px] font-black rounded-full leading-none shadow-xs animate-pulse cursor-pointer hover:opacity-80 transition-opacity ${
+                            isActive ? 'bg-white text-rose-600 ring-1 ring-white/60' : 'bg-rose-500 text-white'
+                          }`}
+                        >
+                          {badgeCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+            )}
+
             {/* Right: Actions & Optional Demo Switcher ONLY for ADMIN */}
             <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
 
-              {/* DEMO SWITCHER - ONLY VISIBLE TO ADMIN */}
-              {role === 'ADMIN' && (
-                <>
-                  <div className="hidden xl:flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/90 shadow-inner">
-                    <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase px-2 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                      Demo:
-                    </span>
-                    <div className="flex items-center gap-0.5">
-                      <button
-                        onClick={() => handleRoleSwitch('ADMIN')}
-                        disabled={switching}
-                        title="Switch to ADMIN Console"
-                        className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all ${role === 'ADMIN'
-                          ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-bold'
-                          : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
-                          }`}
-                      >
-                        ADMIN
-                      </button>
-                      <button
-                        onClick={() => handleRoleSwitch('UNIT')}
-                        disabled={switching}
-                        title="Switch to Unit Console"
-                        className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all ${role === 'UNIT'
-                          ? 'bg-white text-blue-900 shadow-xs border border-slate-200 font-bold'
-                          : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
-                          }`}
-                      >
-                        Unit
-                      </button>
-                      <button
-                        onClick={() => handleRoleSwitch('INSTITUTION')}
-                        disabled={switching}
-                        title="Switch to Institute Console"
-                        className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all ${role === 'INSTITUTION'
-                          ? 'bg-white text-emerald-900 shadow-xs border border-slate-200 font-bold'
-                          : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
-                          }`}
-                      >
-                        Institute
-                      </button>
-                      <button
-                        onClick={() => handleRoleSwitch('DELIVERY')}
-                        disabled={switching}
-                        title="Switch to Delivery Console"
-                        className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all ${role === 'DELIVERY'
-                          ? 'bg-white text-amber-900 shadow-xs border border-slate-200 font-bold'
-                          : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
-                          }`}
-                      >
-                        Delivery
-                      </button>
-                    </div>
-                  </div>
 
-                  <div className="flex xl:hidden items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                    <select
-                      value={role}
-                      onChange={(e) => handleRoleSwitch(e.target.value)}
-                      disabled={switching}
-                      className="bg-transparent text-[10px] sm:text-[11px] font-bold text-slate-700 px-1 py-0.5 focus:outline-none cursor-pointer"
-                      title="Switch Demo Role"
-                    >
-                      <option value="ADMIN">Demo: ADMIN</option>
-                      <option value="UNIT">Demo: Unit</option>
-                      <option value="INSTITUTION">Demo: Institute</option>
-                      <option value="DELIVERY">Demo: Delivery</option>
-                    </select>
-                  </div>
-                </>
-              )}
 
               {/* Laptop / Mobile Device View Switcher */}
               <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/90 shadow-xs" title="Switch between Laptop / PC and Mobile Device View">
@@ -622,70 +612,6 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        {/* Tier 2: Clean, Modern Enterprise Navigation Bar (Visible in Laptop/PC View) */}
-        {!isMobileView && (
-          <div className="border-t border-slate-200/80 bg-slate-50/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 xl:px-10">
-            <div className="w-full flex items-center justify-center overflow-x-auto no-scrollbar py-2">
-              <nav className="flex items-center justify-center gap-1.5 sm:gap-2.5 min-w-max mx-auto px-2">
-                {currentNav.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = location.pathname === item.path ||
-                    (item.path === '/dashboard' && location.pathname === '/') ||
-                    (item.path === '/demand-history' && location.pathname === '/my-demands');
-                  const isSupplyPoint = item.path === '/approved-demands';
-                  const isReviewQueue = item.path === '/review-demands';
-                  const isBills = item.path === '/bills';
-                  const rawBadgeCount = isSupplyPoint ? supplyPointCount : (isReviewQueue ? unitReviewCount : (isBills ? billNoticeCount : 0));
-
-                  const clearedInfo = clearedBadges[item.path];
-                  let isCleared = false;
-                  if (clearedInfo) {
-                    if (typeof clearedInfo === 'object' && clearedInfo.count !== undefined) {
-                      isCleared = rawBadgeCount <= clearedInfo.count;
-                    } else {
-                      isCleared = true;
-                    }
-                  }
-                  const badgeCount = isCleared ? 0 : rawBadgeCount;
-
-                  const colorConfig = itemColorStyles[item.path] || {
-                    active: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 border-blue-600 font-bold',
-                    inactive: 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/90 border-slate-200 bg-white/90',
-                    iconActive: 'text-white',
-                    iconInactive: 'text-slate-500 group-hover:scale-110'
-                  };
-
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => handleClearBadge(item.path)}
-                      className={`group flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold border transition-all duration-200 shrink-0 ${isActive ? colorConfig.active : colorConfig.inactive
-                        }`}
-                    >
-                      {Icon && (
-                        <Icon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${isActive ? colorConfig.iconActive : colorConfig.iconInactive
-                          }`} />
-                      )}
-                      <span className="tracking-tight">{item.label}</span>
-                      {badgeCount > 0 && (
-                        <span
-                          onClick={(e) => handleClearBadge(item.path, e)}
-                          title="Click to clear badge"
-                          className={`px-1.5 py-0.5 text-[9px] font-black rounded-full leading-none shadow-xs animate-pulse cursor-pointer hover:opacity-80 transition-opacity ${
-                            isActive ? 'bg-white text-rose-600 ring-1 ring-white/60' : 'bg-rose-500 text-white'
-                          }`}
-                        >
-                          {badgeCount}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-          </div>
-        )}
       </header>
 
       {/* Main Content Area - Full Width Fluid Canvas */}
