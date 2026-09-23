@@ -609,7 +609,7 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
         d.delivery_partner_phone,
         d.delivery_partner_vehicle,
         COALESCE(d.delivery_status, 'PENDING') as delivery_status,
-        d.delivery_sequence,
+        COALESCE(d.delivery_sequence, 0) as delivery_sequence,
         d.dispatched_at,
         d.delivered_at,
         d.delivery_notes,
@@ -620,21 +620,21 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
         d.delivery_odometer_reading,
         d.created_at,
         i.id as institution_id,
-        i.institution_name,
+        COALESCE(i.institution_name, 'N/A') as institution_name,
         COALESCE(i.pin_code, 'N/A') as pin_code,
-        i.complete_address,
-        i.google_location,
-        i.ano_cto_name,
-        i.ano_cto_contact,
+        COALESCE(i.complete_address, '') as complete_address,
+        COALESCE(i.google_location, '') as google_location,
+        COALESCE(i.ano_cto_name, '') as ano_cto_name,
+        COALESCE(i.ano_cto_contact, '') as ano_cto_contact,
         u.id as unit_id,
-        u.unit_name,
-        u.unit_code,
-        u.ncc_group,
-        SUM(di.quantity) as total_quantity,
-        SUM(di.quantity * di.unit_price_snapshot) as total_amount
+        COALESCE(u.unit_name, 'N/A') as unit_name,
+        COALESCE(u.unit_code, '') as unit_code,
+        COALESCE(u.ncc_group, '') as ncc_group,
+        SUM(COALESCE(di.quantity, 0)) as total_quantity,
+        SUM(COALESCE(di.quantity, 0) * COALESCE(di.unit_price_snapshot, 0)) as total_amount
       FROM demands d
       LEFT JOIN institutions i ON d.institution_id = i.id
-      JOIN units u ON d.unit_id = u.id
+      LEFT JOIN units u ON d.unit_id = u.id
       LEFT JOIN demand_items di ON d.id = di.demand_id
       WHERE d.is_deleted = 0
         AND d.status IN ('READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED')
@@ -652,7 +652,7 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
     }
 
     query += ` GROUP BY d.id ORDER BY 
-        d.delivery_sequence ASC,
+        COALESCE(d.delivery_sequence, 0) ASC,
         CASE COALESCE(d.delivery_status, 'PENDING')
         WHEN 'OUT_FOR_DELIVERY' THEN 1
         WHEN 'ARRIVED' THEN 2
@@ -680,10 +680,11 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
 
     res.json(demands);
   } catch (error) {
-    console.error('Error fetching driver demands:', error);
-    res.status(500).json({ error: 'Failed to fetch assigned delivery demands' });
+    console.error('Error fetching driver demands:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch assigned delivery demands', detail: error.message });
   }
 });
+
 
 // POST /api/delivery/driver/status - Update stage (Delivered, Arrived, Transit, Rejected)
 router.post('/driver/status', authenticateToken, authorizeRoles('DELIVERY', 'ADMIN'), async (req, res) => {
