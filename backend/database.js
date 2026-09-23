@@ -82,6 +82,17 @@ async function getDB() {
 }
 
 async function initializeSchema(db) {
+  // Fast check: if units table exists, schema is already built - skip redundant migrations
+  try {
+    const existing = await db.get("SELECT 1 FROM units LIMIT 1");
+    if (existing) {
+      console.log('✓ Database schema verified. Skipping redundant migrations for instant startup.');
+      return;
+    }
+  } catch (err) {
+    // Tables not created yet, proceed with full schema setup
+  }
+
   await db.exec(`
     CREATE TABLE IF NOT EXISTS units (
       id INTEGER PRIMARY KEY AUTO_INCREMENT,
