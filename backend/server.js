@@ -59,14 +59,17 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve React frontend in production
-if (process.env.NODE_ENV === 'production') {
-  const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
+// Serve React frontend (always, if dist folder exists)
+const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
+const fs = require('fs');
+if (fs.existsSync(frontendBuild)) {
   app.use(express.static(frontendBuild));
-  // All non-API routes → serve React app
   app.get('*', (req, res) => {
     res.sendFile(path.join(frontendBuild, 'index.html'));
   });
+  console.log('Serving frontend from:', frontendBuild);
+} else {
+  console.log('No frontend build found at:', frontendBuild);
 }
 
 // Initialize database and start server
