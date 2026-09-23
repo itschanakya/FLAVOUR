@@ -59,6 +59,16 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Serve React frontend in production
+if (process.env.NODE_ENV === 'production') {
+  const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
+  app.use(express.static(frontendBuild));
+  // All non-API routes → serve React app
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendBuild, 'index.html'));
+  });
+}
+
 // Initialize database and start server
 getDB()
   .then(() => {

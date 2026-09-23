@@ -1,0 +1,249 @@
+Failed to initialize database: Error: BLOB/TEXT column 'month' used in key specification without a key length
+    at DBWrapper.exec (E:\SOFTWARES\REFRESHMENT\backend\database.js:11:37)
+    at initializeSchema (E:\SOFTWARES\REFRESHMENT\backend\database.js:34:12)
+    at getDB (E:\SOFTWARES\REFRESHMENT\backend\database.js:28:9)
+    at Object.<anonymous> (E:\SOFTWARES\REFRESHMENT\backend\server.js:63:1)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5) {
+  code: 'ER_BLOB_KEY_WITHOUT_LENGTH',
+  errno: 1170,
+  sqlState: '42000',
+  sqlMessage: "BLOB/TEXT column 'month' used in key specification without a key length",
+  sql: '\n' +
+    '    CREATE TABLE IF NOT EXISTS units (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      unit_name TEXT NOT NULL,\n' +
+    '      unit_code VARCHAR(255) UNIQUE NOT NULL,\n' +
+    '      location TEXT,\n' +
+    "      ncc_group VARCHAR(255) DEFAULT 'Group B',\n" +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS institutions (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      unit_id INTEGER NOT NULL,\n' +
+    '      institution_name TEXT NOT NULL,\n' +
+    '      ano_cto_name TEXT NOT NULL,\n' +
+    '      ano_cto_contact TEXT,\n' +
+    '      pin_code TEXT,\n' +
+    '      strength_1st_year INTEGER DEFAULT 0,\n' +
+    '      strength_2nd_year INTEGER DEFAULT 0,\n' +
+    '      strength_3rd_year INTEGER DEFAULT 0,\n' +
+    '      google_location TEXT,\n' +
+    '      complete_address TEXT,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS users (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      name TEXT NOT NULL,\n' +
+    '      email VARCHAR(255) UNIQUE NOT NULL,\n' +
+    '      login_id VARCHAR(255) UNIQUE,\n' +
+    '      password_hash TEXT NOT NULL,\n' +
+    "      role VARCHAR(255) CHECK(role IN ('ADMIN', 'UNIT', 'INSTITUTION')) NOT NULL,\n" +
+    '      unit_id INTEGER,\n' +
+    '      institution_id INTEGER,\n' +
+    '      otp TEXT,\n' +
+    '      otp_expiry DATETIME,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL,\n' +
+    '      FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE SET NULL\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS refreshment_items (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      item_name TEXT NOT NULL,\n' +
+    '      unit_price REAL NOT NULL,\n' +
+    '      unit_of_measure TEXT NOT NULL,\n' +
+    '      is_active INTEGER DEFAULT 1,\n' +
+    '      current_stock INTEGER DEFAULT 100,\n' +
+    '      min_threshold INTEGER DEFAULT 10,\n' +
+    '      expiry_date TEXT,\n' +
+    '      image_url TEXT,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS demands (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      demand_number VARCHAR(255) UNIQUE NOT NULL,\n' +
+    '      institution_id INTEGER NOT NULL,\n' +
+    '      unit_id INTEGER NOT NULL,\n' +
+    '      raised_by INTEGER NOT NULL,\n' +
+    '      demand_date TEXT NOT NULL,\n' +
+    "      demand_time VARCHAR(255) DEFAULT '08:00',\n" +
+    '      purpose TEXT NOT NULL,\n' +
+    "      status VARCHAR(255) CHECK(status IN ('PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED', 'CANCELLED', 'FULFILLED')) DEFAULT 'PENDING',\n" +
+    '      reviewed_by INTEGER,\n' +
+    '      review_remarks TEXT,\n' +
+    '      reviewed_at DATETIME,\n' +
+    '      accepted_by INTEGER,\n' +
+    '      accepted_at DATETIME,\n' +
+    '      delivery_receipt_url TEXT,\n' +
+    '      invoice_url TEXT,\n' +
+    '      is_deleted INTEGER DEFAULT 0,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (institution_id) REFERENCES institutions(id),\n' +
+    '      FOREIGN KEY (unit_id) REFERENCES units(id),\n' +
+    '      FOREIGN KEY (raised_by) REFERENCES users(id),\n' +
+    '      FOREIGN KEY (reviewed_by) REFERENCES users(id),\n' +
+    '      FOREIGN KEY (accepted_by) REFERENCES users(id)\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS demand_items (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      demand_id INTEGER NOT NULL,\n' +
+    '      item_id INTEGER NOT NULL,\n' +
+    "      year_group VARCHAR(255) CHECK(year_group IN ('1st Year', '2nd Year', '3rd Year')) NOT NULL,\n" +
+    '      quantity INTEGER NOT NULL,\n' +
+    '      unit_price_snapshot REAL NOT NULL,\n' +
+    '      FOREIGN KEY (demand_id) REFERENCES demands(id) ON DELETE CASCADE,\n' +
+    '      FOREIGN KEY (item_id) REFERENCES refreshment_items(id)\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS demand_activity (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      demand_id INTEGER NOT NULL,\n' +
+    '      user_id INTEGER,\n' +
+    "      action_type VARCHAR(255) NOT NULL CHECK( action_type IN ('STATUS_CHANGE', 'MESSAGE') ),\n" +
+    '      old_status TEXT,\n' +
+    '      new_status TEXT,\n' +
+    '      message TEXT,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (demand_id) REFERENCES demands(id) ON DELETE CASCADE,\n' +
+    '      FOREIGN KEY (user_id) REFERENCES users(id)\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS notifications (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      user_id INTEGER NOT NULL,\n' +
+    '      title TEXT NOT NULL,\n' +
+    '      message TEXT NOT NULL,\n' +
+    '      is_read BOOLEAN DEFAULT 0,\n' +
+    '      link_url TEXT,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS bill_collection_events (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      admin_id INTEGER NOT NULL,\n' +
+    '      event_date DATE NOT NULL,\n' +
+    '      event_time TEXT NOT NULL,\n' +
+    '      message TEXT,\n' +
+    "      status VARCHAR(255) DEFAULT 'SCHEDULED' CHECK( status IN ('SCHEDULED', 'DELAYED', 'COMPLETED', 'CANCELLED') ),\n" +
+    '      target_pin_codes TEXT, \n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (admin_id) REFERENCES users(id)\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS audit_logs (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      entity_type TEXT NOT NULL,\n' +
+    '      entity_id INTEGER NOT NULL,\n' +
+    '      action TEXT NOT NULL,\n' +
+    '      performed_by INTEGER NOT NULL,\n' +
+    '      details TEXT,\n' +
+    '      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (performed_by) REFERENCES users(id)\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS refreshment_bills (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      institution_id INTEGER NOT NULL,\n' +
+    '      month TEXT NOT NULL,\n' +
+    '      bill_submitted INTEGER DEFAULT 0,\n' +
+    '      bill_submitted_date TEXT,\n' +
+    '      bill_amount REAL DEFAULT 0,\n' +
+    '      demand_packets INTEGER DEFAULT 0,\n' +
+    "      payment_status VARCHAR(255) CHECK(payment_status IN ('PENDING', 'PROCESSED', 'PAID')) DEFAULT 'PENDING',\n" +
+    '      payment_date TEXT,\n' +
+    '      payment_ref TEXT,\n' +
+    '      remarks TEXT,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (institution_id) REFERENCES institutions(id),\n' +
+    '      UNIQUE(institution_id, month)\n' +
+    '    );\n' +
+    '    CREATE TABLE IF NOT EXISTS item_stock_logs (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      item_id INTEGER NOT NULL,\n' +
+    "      log_type VARCHAR(255) CHECK(log_type IN ('STOCK_IN', 'CONSUMED', 'ADJUSTMENT')) NOT NULL,\n" +
+    '      quantity INTEGER NOT NULL,\n' +
+    '      balance_after INTEGER NOT NULL,\n' +
+    '      expiry_date TEXT,\n' +
+    '      notes TEXT,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      created_by INTEGER,\n' +
+    '      FOREIGN KEY (item_id) REFERENCES refreshment_items(id) ON DELETE CASCADE,\n' +
+    '      FOREIGN KEY (created_by) REFERENCES users(id)\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS packet_templates (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    "      name VARCHAR(255) NOT NULL DEFAULT 'Standard Refreshment Packet',\n" +
+    '      target_budget REAL DEFAULT 75.0,\n' +
+    '      gst_rate REAL DEFAULT 5.0,\n' +
+    '      is_active INTEGER DEFAULT 1,\n' +
+    '      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS packet_template_items (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      template_id INTEGER NOT NULL,\n' +
+    '      item_id INTEGER NOT NULL,\n' +
+    '      quantity INTEGER NOT NULL DEFAULT 1,\n' +
+    '      expiry_date TEXT,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (template_id) REFERENCES packet_templates(id) ON DELETE CASCADE,\n' +
+    '      FOREIGN KEY (item_id) REFERENCES refreshment_items(id) ON DELETE CASCADE\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS grievances (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      ticket_no VARCHAR(255) UNIQUE NOT NULL,\n' +
+    '      institution_id INTEGER,\n' +
+    '      unit_id INTEGER NOT NULL,\n' +
+    '      demand_id INTEGER,\n' +
+    "      initiated_by VARCHAR(255) NOT NULL DEFAULT 'ANO',\n" +
+    '      created_by_user_id INTEGER NOT NULL,\n' +
+    "      category VARCHAR(255) NOT NULL DEFAULT 'QUALITY',\n" +
+    "      severity VARCHAR(255) NOT NULL DEFAULT 'MEDIUM',\n" +
+    '      subject TEXT NOT NULL,\n' +
+    '      description TEXT NOT NULL,\n' +
+    '      photo_url TEXT,\n' +
+    "      status VARCHAR(255) NOT NULL DEFAULT 'SUBMITTED_TO_UNIT',\n" +
+    '      unit_remarks TEXT,\n' +
+    '      forwarded_to_vendor_at DATETIME,\n' +
+    '      forwarded_by_user_id INTEGER,\n' +
+    '      vendor_remarks TEXT,\n' +
+    '      vendor_action_at DATETIME,\n' +
+    '      resolved_at DATETIME,\n' +
+    '      resolved_by_user_id INTEGER,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE SET NULL,\n' +
+    '      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE,\n' +
+    '      FOREIGN KEY (demand_id) REFERENCES demands(id) ON DELETE SET NULL,\n' +
+    '      FOREIGN KEY (created_by_user_id) REFERENCES users(id),\n' +
+    '      FOREIGN KEY (forwarded_by_user_id) REFERENCES users(id),\n' +
+    '      FOREIGN KEY (resolved_by_user_id) REFERENCES users(id)\n' +
+    '    );\n' +
+    '\n' +
+    '    CREATE TABLE IF NOT EXISTS grievance_activity (\n' +
+    '      id INTEGER PRIMARY KEY AUTO_INCREMENT,\n' +
+    '      grievance_id INTEGER NOT NULL,\n' +
+    '      user_id INTEGER,\n' +
+    '      action_type TEXT NOT NULL,\n' +
+    '      message TEXT NOT NULL,\n' +
+    '      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n' +
+    '      FOREIGN KEY (grievance_id) REFERENCES grievances(id) ON DELETE CASCADE,\n' +
+    '      FOREIGN KEY (user_id) REFERENCES users(id)\n' +
+    '    );\n' +
+    '  '
+}
