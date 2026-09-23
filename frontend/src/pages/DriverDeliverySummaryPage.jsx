@@ -86,10 +86,10 @@ export default function DriverDeliverySummaryPage() {
 
   // Summary Metrics
   const totalStops = demands.length;
-  const totalAssignedPackets = demands.reduce((acc, d) => acc + (d.total_quantity || 0), 0);
+  const totalAssignedPackets = demands.reduce((acc, d) => acc + (Number(d.total_quantity) || 0), 0);
   const deliveredPackets = demands
     .filter(d => d.delivery_status === 'DELIVERED')
-    .reduce((acc, d) => acc + (d.total_quantity || 0), 0);
+    .reduce((acc, d) => acc + (Number(d.total_quantity) || 0), 0);
   const completedStops = demands.filter(d => d.delivery_status === 'DELIVERED').length;
   const pendingStops = demands.filter(d => d.delivery_status !== 'DELIVERED').length;
 

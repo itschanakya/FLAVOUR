@@ -82,7 +82,7 @@ router.get('/periodic', authenticateToken, async (req, res) => {
     // Monthly breakdown
     const monthly = await db.all(
       `SELECT 
-         strftime('%Y-%m', d.demand_date) as month,
+         DATE_FORMAT(d.demand_date, '%Y-%m') as month,
          COUNT(DISTINCT d.id) as demand_count,
          SUM(di.quantity) as total_quantity,
          SUM(di.quantity * di.unit_price_snapshot) as total_cost
@@ -98,7 +98,7 @@ router.get('/periodic', authenticateToken, async (req, res) => {
     // Weekly breakdown
     const weekly = await db.all(
       `SELECT 
-         strftime('%Y-%W', d.demand_date) as week,
+         DATE_FORMAT(d.demand_date, '%Y-%u') as week,
          MIN(d.demand_date) as week_start,
          COUNT(DISTINCT d.id) as demand_count,
          SUM(di.quantity) as total_quantity,
@@ -326,7 +326,7 @@ router.get('/annual-summary', authenticateToken, async (req, res) => {
          LEFT JOIN demand_items di ON d.id = di.demand_id
          WHERE d.institution_id = ? 
            AND d.is_deleted = 0 
-           AND (strftime('%Y', d.demand_date) = ? OR d.demand_date LIKE ?)
+           AND (DATE_FORMAT(d.demand_date, '%Y') = ? OR d.demand_date LIKE ?)
          GROUP BY d.id
          ORDER BY d.demand_date ASC`,
         [inst.id, targetYear, `${targetYear}%`]
@@ -339,7 +339,7 @@ router.get('/annual-summary', authenticateToken, async (req, res) => {
          WHERE d.institution_id = ? 
            AND d.is_deleted = 0 
            AND d.status != 'CANCELLED'
-           AND strftime('%Y', d.demand_date) = ?
+           AND DATE_FORMAT(d.demand_date, '%Y') = ?
          GROUP BY di.year_group`,
         [inst.id, targetYear]
       );
@@ -407,7 +407,7 @@ router.get('/weekly-monthly-summary', authenticateToken, async (req, res) => {
     const db = await getDB();
     const targetYear = year || new Date().getFullYear().toString();
 
-    let scopeWhere = "WHERE d.is_deleted = 0 AND strftime('%Y', d.demand_date) = ?";
+    let scopeWhere = "WHERE d.is_deleted = 0 AND DATE_FORMAT(d.demand_date, '%Y') = ?";
     const params = [targetYear];
 
     if (req.user.role === 'INSTITUTION') {
@@ -421,8 +421,8 @@ router.get('/weekly-monthly-summary', authenticateToken, async (req, res) => {
     // Monthly Summary
     const monthlySummary = await db.all(
       `SELECT 
-         strftime('%m', d.demand_date) as month_num,
-         strftime('%Y-%m', d.demand_date) as month_key,
+         DATE_FORMAT(d.demand_date, '%m') as month_num,
+         DATE_FORMAT(d.demand_date, '%Y-%m') as month_key,
          COUNT(DISTINCT d.id) as demand_count,
          SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END) as pending_count,
          SUM(CASE WHEN d.status IN ('APPROVED', 'ACCEPTED') THEN 1 ELSE 0 END) as approved_count,
@@ -433,7 +433,7 @@ router.get('/weekly-monthly-summary', authenticateToken, async (req, res) => {
        FROM demands d
        JOIN demand_items di ON d.id = di.demand_id
        ${scopeWhere}
-       GROUP BY month_key
+       GROUP BY month_num, month_key
        ORDER BY month_key ASC`,
       params
     );
@@ -441,7 +441,7 @@ router.get('/weekly-monthly-summary', authenticateToken, async (req, res) => {
     // Weekly Summary
     const weeklySummary = await db.all(
       `SELECT 
-         strftime('%W', d.demand_date) as week_num,
+         DATE_FORMAT(d.demand_date, '%u') as week_num,
          MIN(d.demand_date) as week_start,
          MAX(d.demand_date) as week_end,
          COUNT(DISTINCT d.id) as demand_count,

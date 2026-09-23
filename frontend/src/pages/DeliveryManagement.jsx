@@ -94,12 +94,18 @@ export default function DeliveryManagement() {
     return () => clearInterval(interval);
   }, [fetchDeliveryData]);
 
-  // React to SSE demand updates
+  // React to SSE demand updates & instant local cross-tab sync
   useEffect(() => {
-    if (events?.DEMAND_UPDATED) {
+    if (events?.DEMAND_UPDATED || events?.timestamp) {
       fetchDeliveryData();
     }
   }, [events?.DEMAND_UPDATED, events?.timestamp, fetchDeliveryData]);
+
+  useEffect(() => {
+    const handleSync = () => fetchDeliveryData();
+    window.addEventListener('demand-status-changed', handleSync);
+    return () => window.removeEventListener('demand-status-changed', handleSync);
+  }, [fetchDeliveryData]);
 
   // Available PIN Codes
   const availablePins = useMemo(() => {
@@ -142,13 +148,19 @@ export default function DeliveryManagement() {
   }, [demands, selectedPin, selectedStatus, selectedPartner, searchTerm]);
 
   // Metrics
-  const totalPackets = demands.reduce((sum, d) => sum + (d.total_quantity || 0), 0);
+  const totalPackets = demands.reduce((sum, d) => sum + (Number(d.total_quantity) || 0), 0);
   const outForDeliveryCount = demands.filter(d => d.delivery_status === 'OUT_FOR_DELIVERY').length;
   const outForDeliveryPackets = demands
     .filter(d => d.delivery_status === 'OUT_FOR_DELIVERY')
-    .reduce((sum, d) => sum + (d.total_quantity || 0), 0);
+    .reduce((sum, d) => sum + (Number(d.total_quantity) || 0), 0);
   const deliveredCount = demands.filter(d => d.delivery_status === 'DELIVERED').length;
+  const deliveredPackets = demands
+    .filter(d => d.delivery_status === 'DELIVERED')
+    .reduce((sum, d) => sum + (Number(d.total_quantity) || 0), 0);
   const pendingDispatchCount = demands.filter(d => !d.delivery_status || d.delivery_status === 'PENDING').length;
+  const pendingDispatchPackets = demands
+    .filter(d => !d.delivery_status || d.delivery_status === 'PENDING')
+    .reduce((sum, d) => sum + (Number(d.total_quantity) || 0), 0);
 
   // Generate Google Maps URL
   const getGoogleMapsUrl = (dem) => {
@@ -346,8 +358,8 @@ export default function DeliveryManagement() {
         };
       }
       dateMap[dDate].totalDemands += 1;
-      dateMap[dDate].totalPackets += (d.total_quantity || 0);
-      dateMap[dDate].totalAmount += (d.total_amount || 0);
+      dateMap[dDate].totalPackets += (Number(d.total_quantity) || 0);
+      dateMap[dDate].totalAmount += (Number(d.total_amount) || 0);
 
       const unitKey = d.unit_name || 'General Unit';
       if (!dateMap[dDate].units[unitKey]) {
@@ -361,8 +373,8 @@ export default function DeliveryManagement() {
         };
       }
       dateMap[dDate].units[unitKey].demands.push(d);
-      dateMap[dDate].units[unitKey].totalPackets += (d.total_quantity || 0);
-      dateMap[dDate].units[unitKey].totalAmount += (d.total_amount || 0);
+      dateMap[dDate].units[unitKey].totalPackets += (Number(d.total_quantity) || 0);
+      dateMap[dDate].units[unitKey].totalAmount += (Number(d.total_amount) || 0);
     });
 
     // Sort dates so:
@@ -443,7 +455,7 @@ export default function DeliveryManagement() {
         };
       }
 
-      const pkts = d.total_quantity || 0;
+      const pkts = Number(d.total_quantity) || 0;
       const isDelivered = d.delivery_status === 'DELIVERED';
 
       map[pName].totalStops += 1;
@@ -534,9 +546,8 @@ export default function DeliveryManagement() {
   }, [partners, selectedDemandForAssign]);
 
   const displayedDrivers = useMemo(() => {
-    if (filterByPinOnly && pinMatchedDrivers.length > 0) return pinMatchedDrivers;
     return partners;
-  }, [filterByPinOnly, pinMatchedDrivers, partners]);
+  }, [partners]);
 
   const selectedPartnerObj = useMemo(() => {
     if (!assignPartnerId) return null;
@@ -902,127 +913,260 @@ _National Cadet Corps - Supply & Logistics Portal_`;
 
   return (
     <div className="w-full space-y-3.5">
-      {/* Smart Executive Header with Live Interactive KPI Metrics Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs px-4 py-2.5 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+      {/* Smart Executive Header with Action Buttons */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Title & Badge */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="p-1.5 bg-blue-50 rounded-xl border border-blue-100">
-            <Truck className="w-4 h-4 text-blue-600" />
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="p-2 bg-blue-50 rounded-xl border border-blue-100 shadow-2xs">
+            <Truck className="w-5 h-5 text-blue-600" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+              <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
                 Delivery & Route Logistics
               </h1>
-              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
                 Distribution Portal
               </span>
             </div>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Real-time route manifests, driver assignments, and delivery verification
+            </p>
           </div>
         </div>
 
-        {/* Compact Interactive KPI Metric Strip (Acts as fast 1-click status filters) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          {/* All */}
-          <button
-            type="button"
-            onClick={() => setSelectedStatus('ALL')}
-            title="Show all delivery demands"
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-              selectedStatus === 'ALL'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
-            }`}
-          >
-            <Package className={`w-3.5 h-3.5 ${selectedStatus === 'ALL' ? 'text-blue-300' : 'text-blue-600'}`} />
-            <span className="font-black">{totalPackets.toLocaleString()}</span>
-            <span className={`text-[10px] font-semibold ${selectedStatus === 'ALL' ? 'text-slate-300' : 'text-slate-500'}`}>
-              Pkts ({demands.length} Stops)
-            </span>
-          </button>
-
-          {/* Ready for Dispatch */}
-          <button
-            type="button"
-            onClick={() => setSelectedStatus('PENDING')}
-            title="Filter demands ready for dispatch"
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-              selectedStatus === 'PENDING'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'bg-amber-50 hover:bg-amber-100/80 text-amber-800 border border-amber-200/70'
-            }`}
-          >
-            <AlertTriangle className={`w-3.5 h-3.5 ${selectedStatus === 'PENDING' ? 'text-white' : 'text-amber-500'}`} />
-            <span className="font-black">{pendingDispatchCount}</span>
-            <span className={`text-[10px] font-semibold ${selectedStatus === 'PENDING' ? 'text-amber-100' : 'text-amber-700'}`}>
-              Ready
-            </span>
-          </button>
-
-          {/* Out for Delivery */}
-          <button
-            type="button"
-            onClick={() => setSelectedStatus('OUT_FOR_DELIVERY')}
-            title="Filter demands currently out with drivers"
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-              selectedStatus === 'OUT_FOR_DELIVERY'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-blue-50 hover:bg-blue-100/80 text-blue-800 border border-blue-200/70'
-            }`}
-          >
-            <Truck className={`w-3.5 h-3.5 ${selectedStatus === 'OUT_FOR_DELIVERY' ? 'text-white' : 'text-blue-500'}`} />
-            <span className="font-black">{outForDeliveryPackets.toLocaleString()}</span>
-            <span className={`text-[10px] font-semibold ${selectedStatus === 'OUT_FOR_DELIVERY' ? 'text-blue-100' : 'text-blue-700'}`}>
-              Out ({outForDeliveryCount})
-            </span>
-          </button>
-
-          {/* Delivered */}
-          <button
-            type="button"
-            onClick={() => setSelectedStatus('DELIVERED')}
-            title="Filter completed and verified deliveries"
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-              selectedStatus === 'DELIVERED'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200/70'
-            }`}
-          >
-            <CheckCircle2 className={`w-3.5 h-3.5 ${selectedStatus === 'DELIVERED' ? 'text-white' : 'text-emerald-500'}`} />
-            <span className="font-black">{deliveredCount}</span>
-            <span className={`text-[10px] font-semibold ${selectedStatus === 'DELIVERED' ? 'text-emerald-100' : 'text-emerald-700'}`}>
-              Delivered
-            </span>
-          </button>
-        </div>
-
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           <Link
             to="/documentation"
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs shadow-xs transition-all flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs shadow-xs transition-all flex items-center gap-1.5"
             title="Go to Documentation Portal for delivered demands"
           >
-            <FileCheck className="w-3.5 h-3.5" />
+            <FileCheck className="w-4 h-4" />
             <span>Documentation ↗</span>
           </Link>
 
           <button
             onClick={() => setPartnerModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-2xs"
+            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-2xs"
           >
-            <Users className="w-3.5 h-3.5 text-slate-600" />
+            <Users className="w-4 h-4 text-slate-600" />
             Partners ({partners.length})
           </button>
 
           <button
             onClick={() => window.print()}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-xs transition-all flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-xs transition-all flex items-center gap-1.5"
           >
-            <Printer className="w-3.5 h-3.5" />
+            <Printer className="w-4 h-4" />
             Print Sheet
           </button>
         </div>
+      </div>
+
+      {/* FOUR BIG SUMMARY CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Card 1: Total Demand Allocation */}
+        <button
+          type="button"
+          onClick={() => setSelectedStatus('ALL')}
+          title="Click to view all demands and stops"
+          className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group shadow-xs ${
+            selectedStatus === 'ALL'
+              ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white ring-2 ring-slate-900 shadow-md'
+              : 'bg-white hover:bg-slate-50/90 text-slate-800 border-slate-200/90 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className={`text-[11px] font-black uppercase tracking-wider ${
+              selectedStatus === 'ALL' ? 'text-slate-300' : 'text-slate-500'
+            }`}>
+              Total Demands
+            </span>
+            <div className={`p-2 rounded-xl ${
+              selectedStatus === 'ALL'
+                ? 'bg-white/10 text-white'
+                : 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'
+            }`}>
+              <Package className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black tracking-tight">
+              {totalPackets.toLocaleString()}
+            </span>
+            <span className={`text-xs font-bold ${
+              selectedStatus === 'ALL' ? 'text-slate-300' : 'text-slate-500'
+            }`}>
+              Packets
+            </span>
+          </div>
+          <div className={`mt-3 pt-2.5 border-t text-xs font-semibold flex items-center justify-between ${
+            selectedStatus === 'ALL' ? 'border-white/10 text-slate-300' : 'border-slate-100 text-slate-500'
+          }`}>
+            <span>{demands.length} Delivery Stop{demands.length !== 1 ? 's' : ''}</span>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+              selectedStatus === 'ALL'
+                ? 'bg-white/20 text-white'
+                : 'bg-slate-100 text-slate-600'
+            }`}>
+              {selectedStatus === 'ALL' ? 'Active Filter' : 'All Routes'}
+            </span>
+          </div>
+        </button>
+
+        {/* Card 2: Ready for Dispatch */}
+        <button
+          type="button"
+          onClick={() => setSelectedStatus('PENDING')}
+          title="Click to filter demands ready for dispatch"
+          className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group shadow-xs ${
+            selectedStatus === 'PENDING'
+              ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white ring-2 ring-amber-500 shadow-md'
+              : 'bg-white hover:bg-amber-50/40 text-slate-800 border-slate-200/90 hover:border-amber-300'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className={`text-[11px] font-black uppercase tracking-wider ${
+              selectedStatus === 'PENDING' ? 'text-amber-100' : 'text-amber-700'
+            }`}>
+              Ready for Dispatch
+            </span>
+            <div className={`p-2 rounded-xl ${
+              selectedStatus === 'PENDING'
+                ? 'bg-white/20 text-white'
+                : 'bg-amber-100 text-amber-700 group-hover:bg-amber-200'
+            }`}>
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className={`text-2xl sm:text-3xl font-black tracking-tight ${
+              selectedStatus === 'PENDING' ? 'text-white' : 'text-amber-600'
+            }`}>
+              {pendingDispatchPackets.toLocaleString()}
+            </span>
+            <span className={`text-xs font-bold ${
+              selectedStatus === 'PENDING' ? 'text-amber-100' : 'text-slate-500'
+            }`}>
+              Packets
+            </span>
+          </div>
+          <div className={`mt-3 pt-2.5 border-t text-xs font-semibold flex items-center justify-between ${
+            selectedStatus === 'PENDING' ? 'border-white/20 text-amber-100' : 'border-amber-100/70 text-slate-500'
+          }`}>
+            <span>{pendingDispatchCount} Pending Stop{pendingDispatchCount !== 1 ? 's' : ''}</span>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+              selectedStatus === 'PENDING'
+                ? 'bg-white/25 text-white'
+                : 'bg-amber-50 text-amber-700 border border-amber-200'
+            }`}>
+              {selectedStatus === 'PENDING' ? 'Active Filter' : 'Awaiting Load'}
+            </span>
+          </div>
+        </button>
+
+        {/* Card 3: Out for Delivery */}
+        <button
+          type="button"
+          onClick={() => setSelectedStatus('OUT_FOR_DELIVERY')}
+          title="Click to filter demands currently out with drivers"
+          className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group shadow-xs ${
+            selectedStatus === 'OUT_FOR_DELIVERY'
+              ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-2 ring-blue-600 shadow-md'
+              : 'bg-white hover:bg-blue-50/40 text-slate-800 border-slate-200/90 hover:border-blue-300'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className={`text-[11px] font-black uppercase tracking-wider ${
+              selectedStatus === 'OUT_FOR_DELIVERY' ? 'text-blue-100' : 'text-blue-700'
+            }`}>
+              Out for Delivery
+            </span>
+            <div className={`p-2 rounded-xl ${
+              selectedStatus === 'OUT_FOR_DELIVERY'
+                ? 'bg-white/20 text-white'
+                : 'bg-blue-100 text-blue-700 group-hover:bg-blue-200'
+            }`}>
+              <Truck className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className={`text-2xl sm:text-3xl font-black tracking-tight ${
+              selectedStatus === 'OUT_FOR_DELIVERY' ? 'text-white' : 'text-blue-600'
+            }`}>
+              {outForDeliveryPackets.toLocaleString()}
+            </span>
+            <span className={`text-xs font-bold ${
+              selectedStatus === 'OUT_FOR_DELIVERY' ? 'text-blue-100' : 'text-slate-500'
+            }`}>
+              Packets
+            </span>
+          </div>
+          <div className={`mt-3 pt-2.5 border-t text-xs font-semibold flex items-center justify-between ${
+            selectedStatus === 'OUT_FOR_DELIVERY' ? 'border-white/20 text-blue-100' : 'border-blue-100/70 text-slate-500'
+          }`}>
+            <span>{outForDeliveryCount} Active Route{outForDeliveryCount !== 1 ? 's' : ''}</span>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+              selectedStatus === 'OUT_FOR_DELIVERY'
+                ? 'bg-white/25 text-white'
+                : 'bg-blue-50 text-blue-700 border border-blue-200'
+            }`}>
+              {selectedStatus === 'OUT_FOR_DELIVERY' ? 'Active Filter' : 'In Transit'}
+            </span>
+          </div>
+        </button>
+
+        {/* Card 4: Completed & Delivered */}
+        <button
+          type="button"
+          onClick={() => setSelectedStatus('DELIVERED')}
+          title="Click to filter completed and verified deliveries"
+          className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group shadow-xs ${
+            selectedStatus === 'DELIVERED'
+              ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white ring-2 ring-emerald-600 shadow-md'
+              : 'bg-white hover:bg-emerald-50/40 text-slate-800 border-slate-200/90 hover:border-emerald-300'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className={`text-[11px] font-black uppercase tracking-wider ${
+              selectedStatus === 'DELIVERED' ? 'text-emerald-100' : 'text-emerald-700'
+            }`}>
+              Delivered & Completed
+            </span>
+            <div className={`p-2 rounded-xl ${
+              selectedStatus === 'DELIVERED'
+                ? 'bg-white/20 text-white'
+                : 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-200'
+            }`}>
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className={`text-2xl sm:text-3xl font-black tracking-tight ${
+              selectedStatus === 'DELIVERED' ? 'text-white' : 'text-emerald-600'
+            }`}>
+              {deliveredPackets.toLocaleString()}
+            </span>
+            <span className={`text-xs font-bold ${
+              selectedStatus === 'DELIVERED' ? 'text-emerald-100' : 'text-slate-500'
+            }`}>
+              Packets
+            </span>
+          </div>
+          <div className={`mt-3 pt-2.5 border-t text-xs font-semibold flex items-center justify-between ${
+            selectedStatus === 'DELIVERED' ? 'border-white/20 text-emerald-100' : 'border-emerald-100/70 text-slate-500'
+          }`}>
+            <span>{deliveredCount} Completed Stop{deliveredCount !== 1 ? 's' : ''}</span>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+              selectedStatus === 'DELIVERED'
+                ? 'bg-white/25 text-white'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+            }`}>
+              {selectedStatus === 'DELIVERED' ? 'Active Filter' : 'Verified'}
+            </span>
+          </div>
+        </button>
       </div>
 
       {/* Unified Navigation & Controls Strip */}
@@ -1157,7 +1301,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
             </button>
             {availablePins.map(pin => {
               const count = demands.filter(d => d.pin_code === pin).length;
-              const pkts = demands.filter(d => d.pin_code === pin).reduce((s, d) => s + (d.total_quantity || 0), 0);
+              const pkts = demands.filter(d => d.pin_code === pin).reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
               return (
                 <button
                   key={pin}
@@ -1987,24 +2131,6 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                   </span>
                 </div>
               </div>
-
-              {/* Matched Driver Status Indicator */}
-              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-600">
-                  {pinMatchedDrivers.length > 0 
-                    ? `✓ ${pinMatchedDrivers.length} Registered Driver(s) for PIN ${selectedDemandForAssign.pin_code}`
-                    : `No specific drivers mapped for PIN ${selectedDemandForAssign.pin_code}`}
-                </span>
-                {pinMatchedDrivers.length > 0 && pinMatchedDrivers.length < partners.length && (
-                  <button
-                    type="button"
-                    onClick={() => setFilterByPinOnly(!filterByPinOnly)}
-                    className="text-[11px] font-extrabold text-blue-600 hover:underline"
-                  >
-                    {filterByPinOnly ? `Show All Drivers (${partners.length})` : `Show PIN ${selectedDemandForAssign.pin_code} Only (${pinMatchedDrivers.length})`}
-                  </button>
-                )}
-              </div>
             </div>
 
             <form onSubmit={handleSaveAssignment} className="space-y-4">
@@ -2013,10 +2139,10 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-black text-slate-700">
-                      Select Driver {filterByPinOnly && pinMatchedDrivers.length > 0 ? `for PIN ${selectedDemandForAssign.pin_code}` : ''} *
+                      Select Driver *
                     </label>
                     <span className="text-[10px] font-bold text-slate-400">
-                      {displayedDrivers.length} Available
+                      {partners.length} Available
                     </span>
                   </div>
                   <select
@@ -2260,7 +2386,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
 
         <div className="grid grid-cols-3 gap-3 mb-4 text-xs border p-3 rounded">
           <div><strong>Total Stops:</strong> {filteredDemands.length} Institutions</div>
-          <div><strong>Total Refreshments:</strong> {filteredDemands.reduce((s, d) => s + (d.total_quantity || 0), 0)} Packets</div>
+          <div><strong>Total Refreshments:</strong> {filteredDemands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0)} Packets</div>
           <div><strong>PIN Filter:</strong> {selectedPin === 'ALL' ? 'All PINs' : selectedPin}</div>
         </div>
 

@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   CheckCircle2, XCircle, Ban, Trash2, Filter, FileText, FileCheck,
   School, Calendar, ArrowRight, IndianRupee, ChevronDown,
   ChevronUp, Users, Package, MessageSquare, ShieldCheck,
-  AlertTriangle, Clock3, Inbox, RefreshCw, Eye, Truck, Phone
+  AlertTriangle, Clock3, Inbox, RefreshCw, Eye, Truck, Phone,
+  Layers, TrendingUp, Sparkles, LayoutList, LayoutGrid
 } from 'lucide-react';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
 import StandardPacketViewer from '../components/StandardPacketViewer';
@@ -12,7 +13,7 @@ import { useSSE } from '../context/SSEContext';
 
 const STATUS_CONFIG = {
   ALL: { 
-    label: 'All', 
+    label: 'All History', 
     color: 'text-slate-700', 
     bg: 'bg-slate-100', 
     border: 'border-slate-300',
@@ -28,12 +29,20 @@ const STATUS_CONFIG = {
     active: 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/30' 
   },
   APPROVED: { 
-    label: 'Approved', 
+    label: 'Authorized', 
     color: 'text-blue-700', 
     bg: 'bg-blue-50', 
     border: 'border-blue-300',
     badge: 'bg-blue-100 text-blue-800',
     active: 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/30' 
+  },
+  FULFILLED: { 
+    label: 'Fulfilled', 
+    color: 'text-emerald-700', 
+    bg: 'bg-emerald-50', 
+    border: 'border-emerald-300',
+    badge: 'bg-emerald-100 text-emerald-800',
+    active: 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/30' 
   },
   REJECTED: { 
     label: 'Rejected', 
@@ -51,37 +60,322 @@ const STATUS_CONFIG = {
     badge: 'bg-purple-100 text-purple-800',
     active: 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-500/30' 
   },
-  FULFILLED: { 
-    label: 'Fulfilled', 
-    color: 'text-emerald-700', 
-    bg: 'bg-emerald-50', 
-    border: 'border-emerald-300',
-    badge: 'bg-emerald-100 text-emerald-800',
-    active: 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/30' 
-  },
 };
 
-function StatusPill({ status }) {
-  const cfg = {
-    PENDING:   { cls: 'bg-amber-100 text-amber-700 border-amber-200', icon: <Clock3 className="w-3 h-3" />, label: 'Pending Review' },
-    APPROVED:  { cls: 'bg-blue-100 text-blue-700 border-blue-200', icon: <ShieldCheck className="w-3 h-3" />, label: 'Approved' },
-    REJECTED:  { cls: 'bg-rose-100 text-rose-700 border-rose-200', icon: <XCircle className="w-3 h-3" />, label: 'Rejected' },
-    CANCELLED: { cls: 'bg-purple-100 text-purple-700 border-purple-200', icon: <Ban className="w-3 h-3" />, label: 'Cancelled' },
-    FULFILLED: { cls: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: <CheckCircle2 className="w-3 h-3" />, label: 'Fulfilled' },
-  }[status] || { cls: 'bg-slate-100 text-slate-600 border-slate-200', icon: null, label: status };
+/**
+ * Universal matcher that aligns Big Summary Cards with Filter Tabs & Table Views
+ */
+export const matchesDemandStatus = (d, filterKey) => {
+  if (!d) return false;
+  const status = d.status;
+  const deliveryStatus = d.delivery_status;
+  const isDelivered = status === 'DELIVERED' || status === 'FULFILLED' || deliveryStatus === 'DELIVERED';
+
+  if (filterKey === 'ALL') return true;
+  if (filterKey === 'PENDING') return status === 'PENDING';
+  if (filterKey === 'FULFILLED') return isDelivered;
+  if (filterKey === 'APPROVED') {
+    // Authorized demands currently in the supply pipeline (not yet fulfilled/delivered)
+    return (
+      ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY'].includes(status) &&
+      !isDelivered
+    );
+  }
+  if (filterKey === 'REJECTED') return status === 'REJECTED';
+  if (filterKey === 'CANCELLED') return status === 'CANCELLED';
+  return status === filterKey;
+};
+
+function StatusPill({ status, deliveryStatus }) {
+  if (status === 'DELIVERED' || status === 'FULFILLED' || deliveryStatus === 'DELIVERED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-emerald-100 text-emerald-800 border-emerald-200">
+        <CheckCircle2 className="w-3 h-3" /> Fulfilled
+      </span>
+    );
+  }
+  if (['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY'].includes(status)) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-blue-100 text-blue-800 border-blue-200">
+        <ShieldCheck className="w-3 h-3" /> Authorized
+      </span>
+    );
+  }
+  if (status === 'PENDING') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-amber-100 text-amber-800 border-amber-200">
+        <Clock3 className="w-3 h-3" /> Pending Review
+      </span>
+    );
+  }
+  if (status === 'REJECTED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-rose-100 text-rose-800 border-rose-200">
+        <XCircle className="w-3 h-3" /> Rejected
+      </span>
+    );
+  }
+  if (status === 'CANCELLED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-purple-100 text-purple-800 border-purple-200">
+        <Ban className="w-3 h-3" /> Cancelled
+      </span>
+    );
+  }
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${cfg.cls}`}>
-      {cfg.icon} {cfg.label}
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-slate-100 text-slate-600 border-slate-200">
+      {status}
     </span>
+  );
+}
+
+function DeliveryStagePill({ demand }) {
+  const status = demand.status;
+  const delStatus = demand.delivery_status;
+
+  if (status === 'REJECTED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+        <XCircle className="w-3 h-3" /> Rejected
+      </span>
+    );
+  }
+  if (status === 'CANCELLED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+        <Ban className="w-3 h-3" /> Revoked
+      </span>
+    );
+  }
+  if (status === 'PENDING') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+        <Clock3 className="w-3 h-3" /> Awaiting Review
+      </span>
+    );
+  }
+  if (status === 'DELIVERED' || status === 'FULFILLED' || delStatus === 'DELIVERED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Delivered & Verified
+      </span>
+    );
+  }
+  if (delStatus === 'OUT_FOR_DELIVERY' || status === 'OUT_FOR_DELIVERY') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 animate-pulse">
+        <Truck className="w-3 h-3 text-blue-600" /> In Transit
+      </span>
+    );
+  }
+  if (status === 'READY_FOR_DISPATCH') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+        <Package className="w-3 h-3 text-cyan-600" /> Ready for Driver
+      </span>
+    );
+  }
+  if (status === 'PREPARING' || status === 'ACCEPTED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+        <RefreshCw className="w-3 h-3 text-indigo-600 animate-spin" /> In Preparation
+      </span>
+    );
+  }
+  if (status === 'APPROVED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+        <Clock3 className="w-3 h-3 text-amber-600" /> Sent to Admin Vendor
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+      {status}
+    </span>
+  );
+}
+
+/**
+ * Tabular View for Demand Authorization Queue and Historical Records
+ */
+function DemandsTableView({ demands, onAction, onDelete, onClick }) {
+  const totalQty = demands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+  const totalVal = demands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gradient-to-r from-slate-50 via-slate-100 to-slate-50 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-600">
+              <th className="py-3.5 px-4">Demand Ref & Date</th>
+              <th className="py-3.5 px-4">Institution & In-charge</th>
+              <th className="py-3.5 px-4">Event / Purpose</th>
+              <th className="py-3.5 px-4 text-center">Packets</th>
+              <th className="py-3.5 px-4 text-right">Amount (₹)</th>
+              <th className="py-3.5 px-4 text-center">Auth Status</th>
+              <th className="py-3.5 px-4 text-center">Supply Stage</th>
+              <th className="py-3.5 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-xs">
+            {demands.map(dem => {
+              const isPending = dem.status === 'PENDING';
+              const canCancel = ['PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH'].includes(dem.status) && dem.delivery_status !== 'DELIVERED';
+              const qty = Number(dem.total_quantity) || 0;
+              const amt = Number(dem.total_amount) || 0;
+
+              return (
+                <tr
+                  key={dem.id}
+                  onClick={() => onClick(dem)}
+                  className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
+                >
+                  <td className="py-3.5 px-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                        {dem.demand_number}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-semibold mt-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-slate-400" />
+                      {dem.demand_date}
+                      {dem.demand_time && <span className="text-slate-400 font-normal">({dem.demand_time})</span>}
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors line-clamp-1 max-w-[220px]" title={dem.institution_name}>
+                      {dem.institution_name}
+                    </div>
+                    {(dem.ano_cto_name || dem.ano_cto_phone) && (
+                      <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 truncate max-w-[220px]">
+                        <Users className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                        <span>{dem.ano_cto_name || 'ANO'}</span>
+                        {dem.ano_cto_phone && (
+                          <span className="text-slate-400 font-mono">({dem.ano_cto_phone})</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 max-w-[220px]">
+                    <div className="text-slate-700 font-medium line-clamp-2" title={dem.purpose}>
+                      {dem.purpose || 'Refreshment Support'}
+                    </div>
+                    {dem.items && dem.items.length > 0 && (
+                      <span className="inline-block mt-1 text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                        {dem.items.length} item line{dem.items.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 font-black text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      <Package className="w-3.5 h-3.5 text-indigo-500" />
+                      {qty.toLocaleString()}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                    <span className="font-black text-emerald-700 text-sm">
+                      ₹{amt.toLocaleString('en-IN')}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                    <StatusPill status={dem.status} deliveryStatus={dem.delivery_status} />
+                  </td>
+                  <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                    <DeliveryStagePill demand={dem} />
+                  </td>
+                  <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1.5">
+                      {isPending && (
+                        <>
+                          <button
+                            onClick={() => onAction(dem, 'APPROVE')}
+                            title="Authorize Demand"
+                            className="p-1.5 bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white rounded-lg border border-emerald-200 hover:border-emerald-500 transition-all shadow-xs"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onAction(dem, 'REJECT')}
+                            title="Reject Demand"
+                            className="p-1.5 bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white rounded-lg border border-rose-200 hover:border-rose-500 transition-all shadow-xs"
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      {canCancel && !isPending && (
+                        <button
+                          onClick={() => onAction(dem, 'CANCEL')}
+                          title="Revoke / Cancel"
+                          className="p-1.5 bg-amber-50 hover:bg-amber-500 text-amber-700 hover:text-white rounded-lg border border-amber-200 hover:border-amber-500 transition-all shadow-xs"
+                        >
+                          <Ban className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onClick(dem)}
+                        title="View Details"
+                        className="p-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg border border-blue-200 hover:border-blue-600 transition-all shadow-xs"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {dem.delivery_receipt_url && (
+                        <a
+                          href={dem.delivery_receipt_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Delivery Receipt"
+                          className="p-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-lg border border-emerald-200 hover:border-emerald-600 transition-all shadow-xs"
+                        >
+                          <FileCheck className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => onDelete(dem)}
+                        title="Delete"
+                        className="p-1.5 bg-slate-50 hover:bg-rose-50 text-slate-300 hover:text-rose-500 rounded-lg border border-slate-100 hover:border-rose-200 transition-all shadow-xs"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Table Footer with Summary Stats */}
+      <div className="bg-slate-50 px-5 py-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="font-bold text-slate-500">
+          Showing <span className="text-slate-900 font-black">{demands.length}</span> requisitions in history view
+        </div>
+        <div className="flex items-center gap-5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 font-bold uppercase text-[10px]">Total Packets:</span>
+            <span className="font-black text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">{totalQty.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 font-bold uppercase text-[10px]">Total Value:</span>
+            <span className="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">₹{totalVal.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
 function DemandCard({ dem, onAction, onDelete, onClick }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = dem.status === 'PENDING';
-  const canCancel = ['PENDING', 'APPROVED'].includes(dem.status);
-  const total = dem.total_amount || 0;
-  const totalQty = (dem.items || []).reduce((s, i) => s + i.quantity, 0);
+  const canCancel = ['PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH'].includes(dem.status) && dem.delivery_status !== 'DELIVERED';
+  const total = Number(dem.total_amount) || 0;
+  const totalQty = (dem.items && dem.items.length > 0)
+    ? dem.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0)
+    : (Number(dem.total_quantity) || 0);
 
   return (
     <div className={`group relative bg-white rounded-2xl border transition-all duration-300 overflow-hidden
@@ -90,7 +384,7 @@ function DemandCard({ dem, onAction, onDelete, onClick }) {
     >
       {/* Left accent bar */}
       <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl transition-all
-        ${isPending ? 'bg-amber-400' : dem.status === 'APPROVED' ? 'bg-blue-500' : dem.status === 'FULFILLED' ? 'bg-emerald-500' : 'bg-slate-300'}`}
+        ${isPending ? 'bg-amber-400' : ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH'].includes(dem.status) ? 'bg-blue-500' : ['FULFILLED', 'DELIVERED'].includes(dem.status) ? 'bg-emerald-500' : 'bg-slate-300'}`}
       />
 
       <div className="pl-5 pr-5 pt-5 pb-4 cursor-pointer" onClick={() => onClick(dem)}>
@@ -102,7 +396,7 @@ function DemandCard({ dem, onAction, onDelete, onClick }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{dem.demand_number}</span>
-              <StatusPill status={dem.status} />
+              <StatusPill status={dem.status} deliveryStatus={dem.delivery_status} />
             </div>
             <h3 className="text-base font-black text-slate-900 leading-tight truncate">{dem.institution_name}</h3>
             <p className="text-xs text-slate-500 font-medium mt-0.5 line-clamp-1">{dem.purpose}</p>
@@ -259,7 +553,7 @@ function DemandCard({ dem, onAction, onDelete, onClick }) {
               </button>
             </>
           )}
-          {canCancel && (
+          {canCancel && !isPending && (
             <button
               onClick={() => onAction(dem, 'CANCEL')}
               className="px-3 py-2.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-amber-200 transition-all"
@@ -403,19 +697,20 @@ export default function ReviewDemandsQueue() {
   const { token, user } = useAuth();
   const { events } = useSSE();
   const [demands, setDemands] = useState([]);
-  const [statusFilter, setStatusFilter] = useState('PENDING');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [viewMode, setViewMode] = useState('TABLE'); // 'TABLE' (default) or 'CARDS'
   const [selectedDemand, setSelectedDemand] = useState(null);
   const [reviewAction, setReviewAction] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [viewDemand, setViewDemand] = useState(null);
 
+  const [searchTerm, setSearchTerm] = useState('');
+
   const fetchDemands = useCallback(async () => {
     setLoading(true);
     try {
-      let url = '/api/demands';
-      if (statusFilter !== 'ALL') url += `?status=${statusFilter}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch('/api/demands', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       setDemands(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -423,7 +718,7 @@ export default function ReviewDemandsQueue() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, token]);
+  }, [token]);
 
   useEffect(() => {
     fetchDemands();
@@ -514,95 +809,305 @@ export default function ReviewDemandsQueue() {
     }
   };
 
-  const counts = {};
   const safeDemands = Array.isArray(demands) ? demands : [];
-  for (const st of Object.keys(STATUS_CONFIG)) {
-    counts[st] = st === 'ALL' ? safeDemands.length : safeDemands.filter(d => d.status === st).length;
-  }
-  const pendingCount = safeDemands.filter(d => d.status === 'PENDING').length;
+
+  // Dynamic status tab counts computed across all unit demands with unified matching
+  const counts = useMemo(() => {
+    const res = {};
+    for (const st of Object.keys(STATUS_CONFIG)) {
+      res[st] = safeDemands.filter(d => matchesDemandStatus(d, st)).length;
+    }
+    return res;
+  }, [safeDemands]);
+
+  // Comprehensive Metrics for Big Dynamic Summary Cards
+  const totalDemands = safeDemands.length;
+  const totalPackets = safeDemands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+  const totalAmount = safeDemands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
+
+  const pendingList = safeDemands.filter(d => matchesDemandStatus(d, 'PENDING'));
+  const pendingCount = pendingList.length;
+  const pendingPackets = pendingList.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+  const pendingAmount = pendingList.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
+
+  const approvedList = safeDemands.filter(d => matchesDemandStatus(d, 'APPROVED'));
+  const approvedCount = approvedList.length;
+  const approvedPackets = approvedList.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+  const approvedAmount = approvedList.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
+
+  const fulfilledList = safeDemands.filter(d => matchesDemandStatus(d, 'FULFILLED'));
+  const fulfilledCount = fulfilledList.length;
+  const fulfilledPackets = fulfilledList.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+  const fulfilledAmount = fulfilledList.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
+
+  // Filtered demands for the active tab and search query
+  const displayedDemands = useMemo(() => {
+    let list = safeDemands;
+    if (statusFilter !== 'ALL') {
+      list = list.filter(d => matchesDemandStatus(d, statusFilter));
+    }
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(d => 
+        (d.demand_number || '').toLowerCase().includes(q) ||
+        (d.institution_name || '').toLowerCase().includes(q) ||
+        (d.ano_cto_name || '').toLowerCase().includes(q) ||
+        (d.purpose || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [safeDemands, statusFilter, searchTerm]);
 
   return (
     <div className="w-full space-y-5">
       {/* Page Hero */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 mb-5">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-5">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold text-[11px] mb-1.5 border border-blue-200 shadow-sm">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-black text-[11px] mb-2 border border-blue-200 shadow-xs">
               <School className="w-3.5 h-3.5 text-blue-600" /> Unit Command Portal
             </div>
             <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-              Demand Authorization
+              Demand Authorization & History
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Review and authorize refreshment requisitions from institutions under your jurisdiction.
+              Review, authorize, and track refreshment requisitions from institutions under your jurisdiction.
             </p>
           </div>
-          {pendingCount > 0 && (
-            <div className="flex-shrink-0 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 flex items-center gap-3">
-              <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center shadow-sm shadow-amber-500/20">
-                <Inbox className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <div className="text-xl font-black text-amber-800 leading-none">{pendingCount}</div>
-                <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mt-0.5">Awaiting Review</div>
-              </div>
-            </div>
-          )}
+          <div className="flex items-center gap-2 self-stretch sm:self-auto">
+            <button 
+              onClick={fetchDemands} 
+              className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center gap-2 text-xs font-black shadow-xs cursor-pointer active:scale-95"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} /> 
+              <span>Refresh Queue</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Dynamic Big Summary Statistics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Requisitions */}
+        <div 
+          onClick={() => setStatusFilter('ALL')}
+          className={`cursor-pointer group relative p-5 rounded-2xl border transition-all duration-300 bg-white overflow-hidden shadow-xs hover:shadow-md ${
+            statusFilter === 'ALL' ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-blue-600" /> Total Requisitions
+            </span>
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+              Jurisdiction
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-slate-900 tracking-tight">{totalDemands}</span>
+            <span className="text-xs font-bold text-slate-500 uppercase">Demands</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-600 flex items-center gap-1">
+              <Package className="w-3.5 h-3.5 text-indigo-500" /> {totalPackets.toLocaleString()} Packets
+            </span>
+            <span className="font-black text-emerald-600">
+              ₹{Number(totalAmount).toLocaleString('en-IN')}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Awaiting Review (Pending) */}
+        <div 
+          onClick={() => setStatusFilter('PENDING')}
+          className={`cursor-pointer group relative p-5 rounded-2xl border transition-all duration-300 bg-white overflow-hidden shadow-xs hover:shadow-md ${
+            statusFilter === 'PENDING' ? 'border-amber-500 ring-2 ring-amber-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
+              <Inbox className="w-4 h-4 text-amber-600" /> Pending Review
+            </span>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+              pendingCount > 0 ? 'bg-amber-100 text-amber-800 border-amber-200 animate-pulse' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+            }`}>
+              {pendingCount > 0 ? '⚠️ Action Required' : '✓ All Reviewed'}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-amber-700 tracking-tight">{pendingCount}</span>
+            <span className="text-xs font-bold text-amber-600 uppercase">Demands</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-600 flex items-center gap-1">
+              <Clock3 className="w-3.5 h-3.5 text-amber-500" /> {pendingPackets.toLocaleString()} Packets
+            </span>
+            <span className="font-black text-slate-700">
+              ₹{Number(pendingAmount).toLocaleString('en-IN')}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 3: Authorized & In Pipeline */}
+        <div 
+          onClick={() => setStatusFilter('APPROVED')}
+          className={`cursor-pointer group relative p-5 rounded-2xl border transition-all duration-300 bg-white overflow-hidden shadow-xs hover:shadow-md ${
+            statusFilter === 'APPROVED' ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-blue-700 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-blue-600" /> Authorized
+            </span>
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+              In Supply Pipeline
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-blue-700 tracking-tight">{approvedCount}</span>
+            <span className="text-xs font-bold text-blue-600 uppercase">Approved</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-600 flex items-center gap-1">
+              <Truck className="w-3.5 h-3.5 text-blue-500" /> {approvedPackets.toLocaleString()} Packets
+            </span>
+            <span className="font-black text-emerald-600">
+              ₹{Number(approvedAmount).toLocaleString('en-IN')}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Fulfilled / Delivered */}
+        <div 
+          onClick={() => setStatusFilter('FULFILLED')}
+          className={`cursor-pointer group relative p-5 rounded-2xl border transition-all duration-300 bg-white overflow-hidden shadow-xs hover:shadow-md ${
+            statusFilter === 'FULFILLED' ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Fulfilled
+            </span>
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+              Cadets Served
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-emerald-700 tracking-tight">{fulfilledCount}</span>
+            <span className="text-xs font-bold text-emerald-600 uppercase">Completed</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-600 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {fulfilledPackets.toLocaleString()} Packets
+            </span>
+            <span className="font-black text-emerald-700">
+              ₹{Number(fulfilledAmount).toLocaleString('en-IN')}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Official Standard Refreshment Packet (₹75) Specification with Expiry Dates */}
       <StandardPacketViewer defaultOpen={false} />
 
-      <div className="px-0 md:px-0 space-y-6">
-        {/* Filter Tabs */}
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(STATUS_CONFIG).map(([st, cfg]) => (
-            <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider border transition-all duration-200 ${
-                statusFilter === st ? cfg.active : `border-slate-200 ${cfg.color} ${cfg.bg} hover:border-slate-300`
-              }`}
-            >
-              {cfg.label}
-              <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] ${statusFilter === st ? 'bg-white/25' : 'bg-slate-200 text-slate-600'}`}>
-                {st === 'ALL' ? demands.length : demands.filter(d => d.status === st).length}
-              </span>
-            </button>
-          ))}
-          <button onClick={fetchDemands} className="ml-auto px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all flex items-center gap-2 text-xs font-bold">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </button>
+      <div className="px-0 space-y-4">
+        {/* Dynamic Filter Tabs & Search Bar & View Mode Toggle */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+          {/* Tabs */}
+          <div className="flex flex-wrap items-center gap-2">
+            {Object.entries(STATUS_CONFIG).map(([st, cfg]) => {
+              const countVal = counts[st] || 0;
+              return (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider border transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+                    statusFilter === st ? cfg.active : `border-slate-200 ${cfg.color} ${cfg.bg} hover:border-slate-300`
+                  }`}
+                >
+                  <span>{cfg.label}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                    statusFilter === st ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {countVal}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right Tools: View Toggle & Search */}
+          <div className="flex items-center gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                onClick={() => setViewMode('TABLE')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === 'TABLE' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Tabular View"
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Table</span>
+              </button>
+              <button
+                onClick={() => setViewMode('CARDS')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === 'CARDS' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Cards Grid View"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Cards</span>
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative flex-1 sm:w-60">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Search institution, ANO, ref..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner font-medium text-slate-800"
+              />
+              <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            </div>
+          </div>
         </div>
 
-        {/* Demands Grid */}
+        {/* Content View: Table (Default) or Cards */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {[1,2,3].map(i => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3 animate-pulse">
-                <div className="h-4 bg-slate-100 rounded w-1/3" />
-                <div className="h-5 bg-slate-100 rounded w-2/3" />
-                <div className="h-3 bg-slate-100 rounded w-full" />
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="h-14 bg-slate-100 rounded-xl" />
-                  <div className="h-14 bg-slate-100 rounded-xl" />
-                  <div className="h-14 bg-slate-100 rounded-xl" />
-                </div>
-              </div>
-            ))}
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 space-y-4 animate-pulse">
+            <div className="h-6 bg-slate-100 rounded w-1/4" />
+            <div className="h-10 bg-slate-100 rounded" />
+            <div className="h-10 bg-slate-100 rounded" />
+            <div className="h-10 bg-slate-100 rounded" />
           </div>
-        ) : demands.length === 0 ? (
-          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-slate-200">
-            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-5">
-              <CheckCircle2 className="w-10 h-10 text-slate-300" />
+        ) : displayedDemands.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8 text-slate-300" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">All Clear!</h3>
-            <p className="text-slate-500 font-medium">No demands matching <span className="font-bold">'{statusFilter}'</span> status.</p>
+            <h3 className="text-lg font-black text-slate-900 mb-1">Queue Clear</h3>
+            <p className="text-xs text-slate-500 font-medium">
+              {searchTerm.trim() ? (
+                <>No requisitions found matching search <span className="font-bold text-slate-800">"{searchTerm}"</span></>
+              ) : (
+                <>No requisitions currently matching <span className="font-bold text-slate-800">'{STATUS_CONFIG[statusFilter]?.label || statusFilter}'</span> status under your unit.</>
+              )}
+            </p>
           </div>
+        ) : viewMode === 'TABLE' ? (
+          <DemandsTableView
+            demands={displayedDemands}
+            onAction={handleAction}
+            onDelete={handleDelete}
+            onClick={setViewDemand}
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {demands.map(dem => (
+            {displayedDemands.map(dem => (
               <DemandCard
                 key={dem.id}
                 dem={dem}

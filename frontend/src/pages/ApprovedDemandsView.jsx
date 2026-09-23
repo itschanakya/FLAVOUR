@@ -284,7 +284,7 @@ export default function ApprovedDemandsView() {
       const uid = String(d.unit_id);
       if (!stats[uid]) stats[uid] = { total: 0, preparing: 0, accepted: 0, packets: 0 };
       stats[uid].total += 1;
-      stats[uid].packets += (d.total_quantity || 0);
+      stats[uid].packets += (Number(d.total_quantity) || 0);
       if (d.status === 'PREPARING') stats[uid].preparing = (stats[uid].preparing || 0) + 1;
       if (d.status === 'ACCEPTED') stats[uid].accepted += 1;
     });

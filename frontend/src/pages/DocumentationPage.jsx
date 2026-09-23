@@ -159,8 +159,8 @@ export default function DocumentationPage() {
   const totalDelivered = demands.length;
   const balanceCount = demands.filter(d => !d.delivery_receipt_url || !d.invoice_url).length;
   const fullyDocumentedCount = demands.filter(d => d.delivery_receipt_url && d.invoice_url).length;
-  const totalPackets = demands.reduce((sum, d) => sum + (d.total_quantity || 0), 0);
-  const totalAmount = demands.reduce((sum, d) => sum + (d.total_amount || 0), 0);
+  const totalPackets = demands.reduce((sum, d) => sum + (Number(d.total_quantity) || 0), 0);
+  const totalAmount = demands.reduce((sum, d) => sum + (Number(d.total_amount) || 0), 0);
 
   // Document Upload Handler
   const handleUploadDocs = async (e) => {

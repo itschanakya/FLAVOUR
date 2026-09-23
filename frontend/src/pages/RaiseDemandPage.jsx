@@ -232,7 +232,7 @@ export default function RaiseDemandPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className={`grid grid-cols-1 ${Number(s3) > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
           {/* 1st Year */}
           <div className={`p-3.5 rounded-xl border text-center transition-all ${isY1Exceeded ? 'bg-rose-500/10 border-rose-500/40 text-rose-300' : 'bg-white border-slate-200'
             }`}>
@@ -264,19 +264,21 @@ export default function RaiseDemandPage() {
           </div>
 
           {/* 3rd Year */}
-          <div className={`p-3.5 rounded-xl border text-center transition-all ${isY3Exceeded ? 'bg-rose-500/10 border-rose-500/40 text-rose-300' : 'bg-white border-slate-200'
-            }`}>
-            <span className="text-xs font-semibold text-slate-500">3rd Year Cadets</span>
-            <div className="text-xl font-bold text-slate-900 mt-1">
-              <span className={isY3Exceeded ? 'text-rose-600 font-black' : 'text-purple-400'}>{totalRequested['3rd Year']}</span>
-              <span className="text-xs text-slate-500 font-normal"> / {s3} Sanctioned</span>
+          {Number(s3) > 0 && (
+            <div className={`p-3.5 rounded-xl border text-center transition-all ${isY3Exceeded ? 'bg-rose-500/10 border-rose-500/40 text-rose-300' : 'bg-white border-slate-200'
+              }`}>
+              <span className="text-xs font-semibold text-slate-500">3rd Year Cadets</span>
+              <div className="text-xl font-bold text-slate-900 mt-1">
+                <span className={isY3Exceeded ? 'text-rose-600 font-black' : 'text-purple-400'}>{totalRequested['3rd Year']}</span>
+                <span className="text-xs text-slate-500 font-normal"> / {s3} Sanctioned</span>
+              </div>
+              <p className="text-[11px] mt-1 text-slate-500">
+                {s3 - totalRequested['3rd Year'] >= 0
+                  ? `${s3 - totalRequested['3rd Year']} remaining`
+                  : `${Math.abs(s3 - totalRequested['3rd Year'])} OVER LIMIT`}
+              </p>
             </div>
-            <p className="text-[11px] mt-1 text-slate-500">
-              {s3 - totalRequested['3rd Year'] >= 0
-                ? `${s3 - totalRequested['3rd Year']} remaining`
-                : `${Math.abs(s3 - totalRequested['3rd Year'])} OVER LIMIT`}
-            </p>
-          </div>
+          )}
         </div>
       </div>
 

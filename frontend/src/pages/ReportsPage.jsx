@@ -125,19 +125,24 @@ export default function ReportsPage() {
     let fileName = 'NCC_Demand_Report.xlsx';
 
     if (activeTab === 'cumulative') {
-      exportData = cumulative.map((r, idx) => ({
-        'S.NO': idx + 1,
-        'DATE OF SUPPLY': r.demand_date,
-        'UNIT': r.unit_name,
-        'INSTITUTION WITH ADDRESS': `${r.institution_name}${r.complete_address ? ', ' + r.complete_address : (r.google_location ? ', ' + r.google_location : '')}`,
-        'PLACE OF SUPPLY': 'DELHI',
-        'INVOICE DATE': invoiceDates[idx] || '',
-        'INVOICE NO': invoiceNos[idx] || '',
-        'ITEM': 'Refreshment Packet',
-        'QTY': r.quantity,
-        'RATE INCL GST': r.unit_price_snapshot,
-        'AMOUNT': r.line_total
-      }));
+      exportData = cumulative.map((r, idx) => {
+        const item = {
+          'S.NO': idx + 1,
+          'DATE OF SUPPLY': r.demand_date,
+          'UNIT': r.unit_name,
+          'INSTITUTION WITH ADDRESS': `${r.institution_name}${r.complete_address ? ', ' + r.complete_address : (r.google_location ? ', ' + r.google_location : '')}`,
+          'PLACE OF SUPPLY': 'DELHI'
+        };
+        if (user?.role === 'ADMIN') {
+          item['INVOICE DATE'] = invoiceDates[idx] || '';
+          item['INVOICE NO'] = invoiceNos[idx] || '';
+        }
+        item['ITEM'] = 'Refreshment Packet';
+        item['QTY'] = r.quantity;
+        item['RATE INCL GST'] = r.unit_price_snapshot;
+        item['AMOUNT'] = r.line_total;
+        return item;
+      });
       fileName = 'NCC_Cumulative_Demand_Report.xlsx';
     } else if (activeTab === 'utilization') {
       exportData = utilization.map(u => ({
@@ -453,8 +458,12 @@ export default function ReportsPage() {
                       <th className="p-3 whitespace-nowrap">UNIT</th>
                       <th className="p-3">INSTITUTION WITH ADDRESS</th>
                       <th className="p-3 text-center whitespace-nowrap">PLACE OF SUPPLY</th>
-                      <th className="p-3 text-center whitespace-nowrap">INVOICE DATE</th>
-                      <th className="p-3 text-center whitespace-nowrap">INVOICE NO</th>
+                      {user?.role === 'ADMIN' && (
+                        <>
+                          <th className="p-3 text-center whitespace-nowrap">INVOICE DATE</th>
+                          <th className="p-3 text-center whitespace-nowrap">INVOICE NO</th>
+                        </>
+                      )}
                       <th className="p-3 whitespace-nowrap">ITEM</th>
                       <th className="p-3 text-right whitespace-nowrap">QTY</th>
                       <th className="p-3 text-right whitespace-nowrap">RATE INCL GST</th>
@@ -464,7 +473,7 @@ export default function ReportsPage() {
                   <tbody className="divide-y divide-slate-800/60">
                     {cumulative.length === 0 ? (
                       <tr>
-                        <td colSpan="11" className="p-8 text-center text-slate-500 font-medium text-sm">
+                        <td colSpan={user?.role === 'ADMIN' ? 11 : 9} className="p-8 text-center text-slate-500 font-medium text-sm">
                           No demands found matching current filters.
                         </td>
                       </tr>
@@ -479,16 +488,20 @@ export default function ReportsPage() {
                             <div className="text-[9px] text-slate-400 font-normal leading-tight mt-0.5">{row.complete_address || row.google_location || 'Address not provided'}</div>
                           </td>
                           <td className="p-3 text-slate-700 text-center font-semibold">DELHI</td>
-                          <td className="p-3 text-center min-w-[130px]">
-                            <CustomDateInput
-                              compact
-                              value={invoiceDates[idx] || ''}
-                              onChange={val => setInvoiceDates({...invoiceDates, [idx]: val})}
-                            />
-                          </td>
-                          <td className="p-3 text-center min-w-[110px]">
-                            <input type="text" value={invoiceNos[idx] || ''} onChange={e => setInvoiceNos({...invoiceNos, [idx]: e.target.value})} className="p-1.5 border border-slate-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none w-full" placeholder="Inv No." />
-                          </td>
+                          {user?.role === 'ADMIN' && (
+                            <>
+                              <td className="p-3 text-center min-w-[130px]">
+                                <CustomDateInput
+                                  compact
+                                  value={invoiceDates[idx] || ''}
+                                  onChange={val => setInvoiceDates({...invoiceDates, [idx]: val})}
+                                />
+                              </td>
+                              <td className="p-3 text-center min-w-[110px]">
+                                <input type="text" value={invoiceNos[idx] || ''} onChange={e => setInvoiceNos({...invoiceNos, [idx]: e.target.value})} className="p-1.5 border border-slate-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none w-full" placeholder="Inv No." />
+                              </td>
+                            </>
+                          )}
                           <td className="p-3 text-slate-800 whitespace-nowrap font-medium">Refreshment Packet</td>
                           <td className="p-3 font-bold text-slate-900 text-right">{row.quantity}</td>
                           <td className="p-3 font-bold text-slate-600 text-right">₹{row.unit_price_snapshot}</td>

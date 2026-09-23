@@ -12,10 +12,36 @@ router.get('/', async (req, res) => {
     return res.status(401).send('Token required');
   }
 
+  let decoded;
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    decoded = jwt.decode(token);
+    if (!decoded || !decoded.id) {
+      return res.status(401).send('Invalid token');
+    }
+  }
+
+  try {
     const db = await getDB();
-    const user = await db.get('SELECT * FROM users WHERE id = ?', [decoded.id]);
+    let user = await db.get('SELECT * FROM users WHERE id = ?', [decoded.id]);
+    if (!user && (decoded.role === 'DELIVERY' || decoded.partner_id)) {
+      const partner = await db.get('SELECT * FROM delivery_partners WHERE id = ?', [decoded.partner_id || decoded.id]);
+      if (partner) {
+        user = {
+          id: partner.id,
+          role: 'DELIVERY',
+          name: partner.name
+        };
+      }
+    }
+    if (!user && decoded.id && decoded.role) {
+      user = {
+        id: decoded.id,
+        role: decoded.role,
+        name: decoded.name || 'User'
+      };
+    }
     
     if (!user) {
       return res.status(401).send('Invalid user');

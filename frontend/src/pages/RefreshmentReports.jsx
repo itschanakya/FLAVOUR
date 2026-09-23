@@ -261,6 +261,7 @@ export default function RefreshmentReports() {
   };
 
   const AuditTrailView = () => {
+    const isAdmin = user?.role === 'ADMIN';
     const groupBy = 'UNIT';
     const [unitFilter, setUnitFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
@@ -353,8 +354,8 @@ export default function RefreshmentReports() {
     }, [demands, selectedGroup, unitFilter, searchQuery, invoiceNos]);
 
     const totalDemandsCount = filteredDemands.length;
-    const totalPacketsCount = filteredDemands.reduce((s, d) => s + (d.total_quantity || 0), 0);
-    const totalCostAmount = filteredDemands.reduce((s, d) => s + (d.total_amount || 0), 0);
+    const totalPacketsCount = filteredDemands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+    const totalCostAmount = filteredDemands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
 
     // Grouping into sections by Unit
     const groupedSections = useMemo(() => {
@@ -613,20 +614,23 @@ export default function RefreshmentReports() {
         const invNo = invoiceNos[r.id] !== undefined ? invoiceNos[r.id] : (r.invoice_no || '');
         const invDate = invoiceDates[r.id] !== undefined ? invoiceDates[r.id] : (r.invoice_date || r.demand_date || '');
 
-        return {
+        const rowObj = {
           'S.NO': idx + 1,
           'DATE OF SUPPLY': formatDDMMYYYY(r.demand_date),
           'DEMAND REF': r.demand_number || '',
           'UNIT': r.unit_name || '',
           'INSTITUTION WITH ADDRESS': fullAddress,
-          'PLACE OF SUPPLY': 'DELHI',
-          'INVOICE DATE': formatDDMMYYYY(invDate),
-          'INVOICE NO': invNo,
-          'ITEM': itemLabel,
-          'QTY': r.total_quantity || 0,
-          'RATE INCL GST': rate,
-          'AMOUNT': r.total_amount || 0
+          'PLACE OF SUPPLY': 'DELHI'
         };
+        if (isAdmin) {
+          rowObj['INVOICE DATE'] = formatDDMMYYYY(invDate);
+          rowObj['INVOICE NO'] = invNo;
+        }
+        rowObj['ITEM'] = itemLabel;
+        rowObj['QTY'] = r.total_quantity || 0;
+        rowObj['RATE INCL GST'] = rate;
+        rowObj['AMOUNT'] = r.total_amount || 0;
+        return rowObj;
       });
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -659,7 +663,7 @@ export default function RefreshmentReports() {
     return (
       <div className="space-y-6 animate-in fade-in duration-500 w-full">
         {/* Duplicate Warning Banner */}
-        {duplicateInvoices.size > 0 && (
+        {isAdmin && duplicateInvoices.size > 0 && (
           <div className="bg-red-50 border-2 border-red-400 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-red-900 text-xs shadow-md print:hidden animate-in fade-in duration-300">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 font-bold">
@@ -694,7 +698,9 @@ export default function RefreshmentReports() {
                 <History size={16} />
               </div>
               <div>
-                <h3 className="font-black text-sm text-slate-900 uppercase tracking-tight">FLAVOUR BASE INDIA • Monthly Refreshment Summary</h3>
+                <h3 className="font-black text-sm text-slate-900 uppercase tracking-tight">
+                  {isAdmin ? 'FLAVOUR BASE INDIA • Monthly Refreshment Summary' : 'Monthly Refreshment Summary'}
+                </h3>
                 <p className="text-[10px] text-slate-500 font-medium">Summary records grouped by NCC Unit</p>
               </div>
             </div>
@@ -713,44 +719,49 @@ export default function RefreshmentReports() {
                 <button onClick={() => setPaperSize('Legal')} className={`px-2 py-1 rounded-md font-bold transition-all ${paperSize === 'Legal' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>Legal</button>
               </div>
 
-              {/* 1-Click Auto Generate Serials Button */}
-              <button
-                type="button"
-                onClick={handleAutoGenerateInvoices}
-                disabled={savingInvoices}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
-                title="Automatically generate sequential invoice numbers for all visible demands and save to database"
-              >
-                <Zap size={14} className="fill-current text-slate-950 shrink-0" />
-                <span className="drop-shadow-xs">Auto-Generate Serials</span>
-              </button>
+              {/* Admin Invoice Controls: Auto-Generate Serials, Invoice Settings, Save Invoices */}
+              {isAdmin && (
+                <>
+                  {/* 1-Click Auto Generate Serials Button */}
+                  <button
+                    type="button"
+                    onClick={handleAutoGenerateInvoices}
+                    disabled={savingInvoices}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
+                    title="Automatically generate sequential invoice numbers for all visible demands and save to database"
+                  >
+                    <Zap size={14} className="fill-current text-slate-950 shrink-0" />
+                    <span className="drop-shadow-xs">Auto-Generate Serials</span>
+                  </button>
 
-              {/* Invoice Generator Settings Drawer Toggle */}
-              <button
-                type="button"
-                onClick={() => setShowInvoiceGenerator(!showInvoiceGenerator)}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border cursor-pointer ${
-                  showInvoiceGenerator
-                    ? 'bg-slate-900 text-amber-400 border-slate-700 shadow-inner'
-                    : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
-                }`}
-                title="Configure Invoice Prefix, Starting Serial Number, and Overwrite Options"
-              >
-                <Sparkles size={14} className={showInvoiceGenerator ? 'text-amber-400' : 'text-amber-500'} />
-                <span>{showInvoiceGenerator ? 'Close Settings' : 'Invoice Settings'}</span>
-              </button>
+                  {/* Invoice Generator Settings Drawer Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setShowInvoiceGenerator(!showInvoiceGenerator)}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border cursor-pointer ${
+                      showInvoiceGenerator
+                        ? 'bg-slate-900 text-amber-400 border-slate-700 shadow-inner'
+                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
+                    }`}
+                    title="Configure Invoice Prefix, Starting Serial Number, and Overwrite Options"
+                  >
+                    <Sparkles size={14} className={showInvoiceGenerator ? 'text-amber-400' : 'text-amber-500'} />
+                    <span>{showInvoiceGenerator ? 'Close Settings' : 'Invoice Settings'}</span>
+                  </button>
 
-              {/* Save Invoices Button */}
-              <button
-                type="button"
-                onClick={() => handleSaveAllInvoices(invoiceNos, invoiceDates, false, true)}
-                disabled={savingInvoices}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
-                title="Save all invoice numbers and dates to database"
-              >
-                <Save size={15} className="fill-current text-white shrink-0" /> 
-                <span className="drop-shadow-xs">{savingInvoices ? 'Saving...' : 'Save Invoices'}</span>
-              </button>
+                  {/* Save Invoices Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSaveAllInvoices(invoiceNos, invoiceDates, false, true)}
+                    disabled={savingInvoices}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
+                    title="Save all invoice numbers and dates to database"
+                  >
+                    <Save size={15} className="fill-current text-white shrink-0" /> 
+                    <span className="drop-shadow-xs">{savingInvoices ? 'Saving...' : 'Save Invoices'}</span>
+                  </button>
+                </>
+              )}
 
               {/* Export Excel */}
               <button
@@ -774,8 +785,8 @@ export default function RefreshmentReports() {
             </div>
           </div>
 
-          {/* Optional Visible Invoice Generator Panel */}
-          {showInvoiceGenerator && (
+          {/* Optional Visible Invoice Generator Panel (Admin Only) */}
+          {isAdmin && showInvoiceGenerator && (
             <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-4 rounded-xl shadow-lg border border-blue-800/80 space-y-3 print:hidden animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-blue-800/50 pb-2">
                 <div className="flex items-center gap-2">
@@ -935,8 +946,8 @@ export default function RefreshmentReports() {
           </div>
         ) : (
           groupedSections.map((sec, secIdx) => {
-            const secTotalPackets = sec.items.reduce((s, v) => s + (v.total_quantity || 0), 0);
-            const secTotalCost = sec.items.reduce((s, v) => s + (v.total_amount || 0), 0);
+            const secTotalPackets = sec.items.reduce((s, v) => s + (Number(v.total_quantity) || 0), 0);
+            const secTotalCost = sec.items.reduce((s, v) => s + (Number(v.total_amount) || 0), 0);
 
             const secItems = sec.items || [];
             const dateFrom = secItems.length > 0 ? formatDDMMYYYY(secItems[0].demand_date) : '';
@@ -1020,8 +1031,12 @@ export default function RefreshmentReports() {
                         <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black whitespace-nowrap">UNIT</th>
                         <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">INSTITUTION WITH ADDRESS</th>
                         <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black whitespace-nowrap">PLACE OF SUPPLY</th>
-                        <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black whitespace-nowrap min-w-[130px]">INVOICE DATE</th>
-                        <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black whitespace-nowrap min-w-[140px]">INVOICE NO</th>
+                        {isAdmin && (
+                          <>
+                            <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black whitespace-nowrap min-w-[130px]">INVOICE DATE</th>
+                            <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black whitespace-nowrap min-w-[140px]">INVOICE NO</th>
+                          </>
+                        )}
                         <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black whitespace-nowrap">ITEM</th>
                         <th className="px-3 py-3.5 text-center print:text-black text-emerald-600 border border-slate-200 print:border-black">QTY</th>
                         <th className="px-3 py-3.5 text-right print:text-black text-emerald-600 border border-slate-200 print:border-black">RATE INCL GST</th>
@@ -1056,47 +1071,51 @@ export default function RefreshmentReports() {
                             </td>
                             <td className="px-3 py-3 text-center font-normal text-slate-700 border border-slate-200 print:border-black">DELHI</td>
                             
-                            {/* INVOICE DATE INPUT (DD/MM/YYYY) */}
-                            <td className="px-2 py-2 text-center border border-slate-200 print:border-black min-w-[130px]">
-                              <span className="hidden print:inline font-mono font-medium text-xs text-black">
-                                {formatDDMMYYYY(invDate)}
-                              </span>
-                              <div className="print:hidden">
-                                <CustomDateInput
-                                  compact
-                                  value={invDate}
-                                  onChange={(newIso) => handleDateChange(row.id, newIso)}
-                                />
-                              </div>
-                            </td>
-
-                            {/* INVOICE NO INPUT */}
-                            {(() => {
-                              const isDuplicate = Boolean(invNo && duplicateInvoices.has(String(invNo).trim().toUpperCase()));
-                              return (
-                                <td className={`px-2 py-2 text-center border ${isDuplicate ? 'bg-red-50/80 border-red-500' : 'border-slate-200'} print:border-black`}>
-                                  <span className="hidden print:inline font-mono font-bold text-xs text-black">
-                                    {invNo || '-'}
+                            {isAdmin && (
+                              <>
+                                {/* INVOICE DATE INPUT (DD/MM/YYYY) */}
+                                <td className="px-2 py-2 text-center border border-slate-200 print:border-black min-w-[130px]">
+                                  <span className="hidden print:inline font-mono font-medium text-xs text-black">
+                                    {formatDDMMYYYY(invDate)}
                                   </span>
-                                  <input
-                                    type="text"
-                                    placeholder="Enter Inv No..."
-                                    value={invNo}
-                                    onChange={(e) => handleManualInvoiceChange(row.id, e.target.value)}
-                                    className={`w-full border rounded-lg px-2 py-1 text-xs font-mono font-bold text-center outline-none print:hidden ${
-                                      isDuplicate
-                                        ? 'bg-red-100 border-red-500 text-red-700 focus:ring-2 focus:ring-red-400'
-                                        : 'bg-slate-50 border-slate-200 text-blue-700 focus:border-blue-500'
-                                    }`}
-                                  />
-                                  {isDuplicate && (
-                                    <span className="text-[9px] font-black text-red-600 block mt-0.5 print:hidden animate-pulse">
-                                      ⚠️ Duplicate!
-                                    </span>
-                                  )}
+                                  <div className="print:hidden">
+                                    <CustomDateInput
+                                      compact
+                                      value={invDate}
+                                      onChange={(newIso) => handleDateChange(row.id, newIso)}
+                                    />
+                                  </div>
                                 </td>
-                              );
-                            })()}
+
+                                {/* INVOICE NO INPUT */}
+                                {(() => {
+                                  const isDuplicate = Boolean(invNo && duplicateInvoices.has(String(invNo).trim().toUpperCase()));
+                                  return (
+                                    <td className={`px-2 py-2 text-center border ${isDuplicate ? 'bg-red-50/80 border-red-500' : 'border-slate-200'} print:border-black`}>
+                                      <span className="hidden print:inline font-mono font-bold text-xs text-black">
+                                        {invNo || '-'}
+                                      </span>
+                                      <input
+                                        type="text"
+                                        placeholder="Enter Inv No..."
+                                        value={invNo}
+                                        onChange={(e) => handleManualInvoiceChange(row.id, e.target.value)}
+                                        className={`w-full border rounded-lg px-2 py-1 text-xs font-mono font-bold text-center outline-none print:hidden ${
+                                          isDuplicate
+                                            ? 'bg-red-100 border-red-500 text-red-700 focus:ring-2 focus:ring-red-400'
+                                            : 'bg-slate-50 border-slate-200 text-blue-700 focus:border-blue-500'
+                                        }`}
+                                      />
+                                      {isDuplicate && (
+                                        <span className="text-[9px] font-black text-red-600 block mt-0.5 print:hidden animate-pulse">
+                                          ⚠️ Duplicate!
+                                        </span>
+                                      )}
+                                    </td>
+                                  );
+                                })()}
+                              </>
+                            )}
 
                             {/* ITEM */}
                             <td className="px-3 py-3 text-slate-700 font-normal whitespace-nowrap border border-slate-200 print:border-black">
@@ -1105,7 +1124,7 @@ export default function RefreshmentReports() {
 
                             {/* QTY */}
                             <td className="px-3 py-3 text-center font-normal text-slate-900 print:text-black border border-slate-200 print:border-black">
-                              {row.total_quantity}
+                              {Number(row.total_quantity) || 0}
                             </td>
 
                             {/* RATE INCL GST */}
@@ -1127,7 +1146,7 @@ export default function RefreshmentReports() {
                     >
                       <tr className="font-bold text-slate-800 text-xs">
                         <td 
-                          colSpan={9} 
+                          colSpan={isAdmin ? 9 : 7} 
                           className="px-4 py-3.5 text-right uppercase tracking-wider text-slate-700 print:text-black border border-slate-200 print:border-black font-bold"
                         >
                           SUBTOTAL ({sec.title.toUpperCase()})
@@ -1207,8 +1226,8 @@ export default function RefreshmentReports() {
         });
 
         const classesHeld = instDemands.length;
-        const packetsDemanded = instDemands.reduce((sum, d) => sum + (d.total_quantity || 0), 0);
-        const totalAmount = instDemands.reduce((sum, d) => sum + (d.total_amount || 0), 0);
+        const packetsDemanded = instDemands.reduce((sum, d) => sum + (Number(d.total_quantity) || 0), 0);
+        const totalAmount = instDemands.reduce((sum, d) => sum + (Number(d.total_amount) || 0), 0);
         const balanceClasses = Math.max(0, authClasses - classesHeld);
         const balancePackets = authPackets - packetsDemanded;
         const utilizationPct = authPackets > 0 ? Math.round((packetsDemanded / authPackets) * 100) : 0;
@@ -1457,8 +1476,8 @@ export default function RefreshmentReports() {
         const dMonth = new Date(d.demand_date).toISOString().slice(0, 7);
         if (dMonth === month && d.status !== 'CANCELLED' && d.status !== 'REJECTED') {
           if (!agg[d.institution_id]) agg[d.institution_id] = { packets: 0, amount: 0 };
-          agg[d.institution_id].packets += d.total_quantity || 0;
-          agg[d.institution_id].amount += d.total_amount || 0;
+          agg[d.institution_id].packets += (Number(d.total_quantity) || 0);
+          agg[d.institution_id].amount += (Number(d.total_amount) || 0);
         }
       });
       return agg;

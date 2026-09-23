@@ -34,6 +34,137 @@ router.get('/', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve institutions.' });
   }
 });
+// POST /api/institutions/bulk - Batch import or update institutions via Excel
+router.post('/bulk', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (req, res) => {
+  try {
+    const { institutions } = req.body;
+    if (!Array.isArray(institutions) || institutions.length === 0) {
+      return res.status(400).json({ error: 'No institution data provided in upload.' });
+    }
+
+    const unit_id = req.user.role === 'UNIT' ? req.user.unit_id : (req.body.unit_id || req.user.unit_id);
+    if (!unit_id) {
+      return res.status(400).json({ error: 'User is not assigned to a valid NCC Unit.' });
+    }
+
+    const db = await getDB();
+    const defaultPasswordHash = await bcrypt.hash('Inst@123', 10);
+
+    let added = 0;
+    let updated = 0;
+    const errors = [];
+
+    for (let i = 0; i < institutions.length; i++) {
+      const row = institutions[i];
+      const instName = (row.institution_name || row['INSTITUTION NAME'] || row.name || '').toString().trim();
+      if (!instName) continue;
+
+      const pinCode = (row.pin_code || row['PIN CODE'] || row.pin || '').toString().replace(/\D/g, '').slice(0, 6);
+      const anoName = (row.ano_cto_name || row['ANO / CTO INCHARGE'] || row.ano_name || row['ANO NAME'] || 'ANO Incharge').toString().trim();
+      const anoContact = (row.ano_cto_contact || row['ANO CONTACT'] || row.contact || row.phone || '').toString().trim();
+      let email = (row.ano_cto_email || row['ANO EMAIL'] || row.email || '').toString().trim().toLowerCase();
+      let loginId = (row.login_id || row['LOGIN ID'] || row.login || '').toString().trim();
+      const s1 = parseInt(row.strength_1st_year ?? row['1ST YR STRENGTH'] ?? row.year_1 ?? 0, 10) || 0;
+      const s2 = parseInt(row.strength_2nd_year ?? row['2ND YR STRENGTH'] ?? row.year_2 ?? 0, 10) || 0;
+      const s3 = parseInt(row.strength_3rd_year ?? row['3RD YR STRENGTH'] ?? row.year_3 ?? 0, 10) || 0;
+      const address = (row.complete_address || row['COMPLETE ADDRESS'] || row.address || '').toString().trim();
+      const googleLoc = (row.google_location || row['GOOGLE LOCATION'] || row.location || '').toString().trim();
+      const password = (row.password || row['PASSWORD'] || 'Inst@123').toString().trim();
+
+      const cleanSlug = instName.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'inst';
+      if (!email) {
+        email = `${cleanSlug}_${unit_id}@ncc.gov.in`;
+      }
+      if (!loginId) {
+        loginId = email;
+      }
+
+      try {
+        // Check if institution already exists under this unit (case-insensitive name match)
+        const existingInst = await db.get(
+          'SELECT id FROM institutions WHERE unit_id = ? AND LOWER(institution_name) = LOWER(?)',
+          [unit_id, instName]
+        );
+
+        if (existingInst) {
+          // UPDATE institution strength and contact details
+          await db.run(
+            `UPDATE institutions 
+             SET ano_cto_name = COALESCE(?, ano_cto_name),
+                 ano_cto_contact = COALESCE(?, ano_cto_contact),
+                 pin_code = CASE WHEN ? <> '' THEN ? ELSE pin_code END,
+                 strength_1st_year = ?,
+                 strength_2nd_year = ?,
+                 strength_3rd_year = ?,
+                 complete_address = CASE WHEN ? <> '' THEN ? ELSE complete_address END,
+                 google_location = CASE WHEN ? <> '' THEN ? ELSE google_location END
+             WHERE id = ?`,
+            [anoName, anoContact, pinCode, pinCode, s1, s2, s3, address, address, googleLoc, googleLoc, existingInst.id]
+          );
+
+          // Update linked user if present
+          const existingUser = await db.get('SELECT id FROM users WHERE institution_id = ?', [existingInst.id]);
+          if (existingUser) {
+            await db.run(
+              'UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), login_id = COALESCE(?, login_id) WHERE id = ?',
+              [anoName, email, loginId, existingUser.id]
+            );
+          }
+          updated++;
+        } else {
+          // INSERT new institution
+          const instRes = await db.run(
+            `INSERT INTO institutions (unit_id, institution_name, ano_cto_name, ano_cto_contact, pin_code, strength_1st_year, strength_2nd_year, strength_3rd_year, google_location, complete_address)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [unit_id, instName, anoName, anoContact, pinCode, s1, s2, s3, googleLoc, address]
+          );
+          const newInstId = instRes.lastID;
+
+          // Ensure unique email and login_id
+          let finalEmail = email;
+          let finalLogin = loginId;
+          let counter = 1;
+          while (await db.get('SELECT id FROM users WHERE email = ?', [finalEmail])) {
+            finalEmail = `${cleanSlug}_${counter}@ncc.gov.in`;
+            counter++;
+          }
+          counter = 1;
+          while (await db.get('SELECT id FROM users WHERE login_id = ?', [finalLogin])) {
+            finalLogin = `${cleanSlug}_${counter}`;
+            counter++;
+          }
+
+          const passwordHash = password === 'Inst@123' ? defaultPasswordHash : await bcrypt.hash(password, 10);
+          await db.run(
+            `INSERT INTO users (name, email, login_id, password_hash, role, unit_id, institution_id)
+             VALUES (?, ?, ?, ?, 'INSTITUTION', ?, ?)`,
+            [anoName, finalEmail, finalLogin, passwordHash, unit_id, newInstId]
+          );
+          added++;
+        }
+      } catch (rowErr) {
+        console.error(`Error processing row ${i + 1} (${instName}):`, rowErr);
+        errors.push({ row: i + 1, institution: instName, error: rowErr.message });
+      }
+    }
+
+    await db.run(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
+      ['INSTITUTION', 0, 'BULK_UPLOAD', req.user.id, `Excel bulk import: Added ${added}, Updated ${updated}, Errors: ${errors.length}`]
+    );
+
+    res.json({
+      message: `Successfully processed institutions: ${added} added, ${updated} updated.`,
+      added,
+      updated,
+      total: institutions.length,
+      errors
+    });
+  } catch (err) {
+    console.error('Bulk upload error:', err);
+    res.status(500).json({ error: 'Failed to process bulk upload: ' + err.message });
+  }
+});
 
 // POST /api/institutions - NCC Unit adds institution under it + creates ANO/CTO login + sets strength
 router.post('/', authenticateToken, authorizeRoles('UNIT'), async (req, res) => {
@@ -174,22 +305,23 @@ router.put('/:id', authenticateToken, authorizeRoles('UNIT', 'INSTITUTION', 'ADM
     );
 
     // Update User credentials if provided
+    const instId = parseInt(req.params.id);
     if (ano_cto_email || login_id || password) {
       if (ano_cto_email) {
         const existingEmail = await db.get('SELECT id, institution_id FROM users WHERE email = ?', [ano_cto_email]);
-        if (existingEmail && existingEmail.institution_id != req.params.id) {
+        if (existingEmail && existingEmail.institution_id !== instId) {
           return res.status(400).json({ error: 'Email already registered to another user.' });
         }
       }
       
       if (login_id) {
         const existingLoginId = await db.get('SELECT id, institution_id FROM users WHERE login_id = ?', [login_id]);
-        if (existingLoginId && existingLoginId.institution_id != req.params.id) {
+        if (existingLoginId && existingLoginId.institution_id !== instId) {
           return res.status(400).json({ error: 'Login ID already registered to another user.' });
         }
       }
 
-      const existingInstUser = await db.get('SELECT id FROM users WHERE institution_id = ? AND role = "INSTITUTION"', [req.params.id]);
+      const existingInstUser = await db.get('SELECT id FROM users WHERE institution_id = ? AND role = "INSTITUTION"', [instId]);
       if (existingInstUser) {
         if (password && password.trim().length > 0) {
           const passwordHash = await bcrypt.hash(password, 10);

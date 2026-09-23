@@ -88,8 +88,10 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
 
     const demands = await db.all(query, params);
 
-    // Fetch items for each demand
+    // Fetch items for each demand and coerce quantities to numbers
     for (const dem of demands) {
+      dem.total_quantity = Number(dem.total_quantity) || 0;
+      dem.total_amount = Number(dem.total_amount) || 0;
       const items = await db.all(
         `SELECT di.*, 
                 COALESCE(di.unit_price_snapshot, 0) AS unit_price,
@@ -236,7 +238,7 @@ router.delete('/partners/:id', authenticateToken, authorizeRoles('ADMIN'), async
   try {
     const partnerId = req.params.id;
     const db = await getDB();
-    
+
     // Check if demands are assigned to this driver
     const assignedCount = await db.get(
       'SELECT COUNT(*) as count FROM demands WHERE delivery_partner_id = ? AND delivery_status IN ("PENDING", "OUT_FOR_DELIVERY")',
@@ -259,12 +261,12 @@ router.delete('/partners/:id', authenticateToken, authorizeRoles('ADMIN'), async
 // POST /api/delivery/assign - Assign delivery partner & vehicle to demands
 router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
-    const { 
-      demandIds, 
-      partnerId, 
-      partnerName, 
-      partnerPhone, 
-      partnerVehicle, 
+    const {
+      demandIds,
+      partnerId,
+      partnerName,
+      partnerPhone,
+      partnerVehicle,
       deliveryNotes,
       startKm,
       closingKm,
@@ -302,12 +304,12 @@ router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, r
              total_km = ?
          WHERE id = ?`,
         [
-          partnerId || null, 
-          partnerName, 
-          partnerPhone || '', 
-          partnerVehicle || '', 
-          now, 
-          deliveryNotes || '', 
+          partnerId || null,
+          partnerName,
+          partnerPhone || '',
+          partnerVehicle || '',
+          now,
+          deliveryNotes || '',
           sKm,
           cKm,
           tKm,
@@ -363,9 +365,9 @@ router.post('/reorder', authenticateToken, authorizeRoles('ADMIN'), async (req, 
     }
 
     // Trigger SSE for connected clients (driver and admin)
-    broadcastToAll({
+    broadcastToAll('DEMAND_UPDATED', {
       type: 'DEMAND_UPDATED',
-      timestamp: new Date().toISOString()
+      timestamp: Date.now()
     });
 
     res.json({ message: 'Sequence updated successfully' });
@@ -422,7 +424,7 @@ router.post('/status', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
         [demandId, activityUserId, 'STATUS_CHANGE', 'ACCEPTED', deliveryStatus, `Live logistics update: ${stageLabels[deliveryStatus] || deliveryStatus}`]
       );
-    } catch (e) {}
+    } catch (e) { }
 
     // Audit log
     try {
@@ -435,7 +437,7 @@ router.post('/status', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
         ['DEMAND', demandId, 'DELIVERY_STATUS', auditUserId, `Physical logistics updated to ${deliveryStatus}`]
       );
-    } catch (e) {}
+    } catch (e) { }
 
     // Real-time broadcast
     broadcastToAll('DEMAND_UPDATED', {
@@ -615,27 +617,28 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
         d.delivery_notes,
         d.delivery_rejection_reason,
         d.bill_collection_status,
-        d.bill_collection_notes,
-        d.start_odometer_reading,
-        d.delivery_odometer_reading,
+        COALESCE(d.start_km_reading, 0) as start_odometer_reading,
+        COALESCE(d.closing_km_reading, 0) as delivery_odometer_reading,
+        d.start_km_reading,
+        d.closing_km_reading,
+        d.total_km,
         d.created_at,
         i.id as institution_id,
-        COALESCE(i.institution_name, 'N/A') as institution_name,
+        COALESCE(i.institution_name, u.unit_name, 'N/A') as institution_name,
         COALESCE(i.pin_code, 'N/A') as pin_code,
-        COALESCE(i.complete_address, '') as complete_address,
+        COALESCE(i.complete_address, d.delivery_venue, u.location, '') as complete_address,
         COALESCE(i.google_location, '') as google_location,
-        COALESCE(i.ano_cto_name, '') as ano_cto_name,
+        COALESCE(i.ano_cto_name, 'Unit HQ') as ano_cto_name,
         COALESCE(i.ano_cto_contact, '') as ano_cto_contact,
         u.id as unit_id,
         COALESCE(u.unit_name, 'N/A') as unit_name,
         COALESCE(u.unit_code, '') as unit_code,
         COALESCE(u.ncc_group, '') as ncc_group,
-        SUM(COALESCE(di.quantity, 0)) as total_quantity,
-        SUM(COALESCE(di.quantity, 0) * COALESCE(di.unit_price_snapshot, 0)) as total_amount
+        (SELECT COALESCE(SUM(di.quantity), 0) FROM demand_items di WHERE di.demand_id = d.id) as total_quantity,
+        (SELECT COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) FROM demand_items di WHERE di.demand_id = d.id) as total_amount
       FROM demands d
       LEFT JOIN institutions i ON d.institution_id = i.id
       LEFT JOIN units u ON d.unit_id = u.id
-      LEFT JOIN demand_items di ON d.id = di.demand_id
       WHERE d.is_deleted = 0
         AND d.status IN ('READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED')
     `;
@@ -651,7 +654,7 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
       params.push(req.query.partner_id);
     }
 
-    query += ` GROUP BY d.id ORDER BY 
+    query += ` ORDER BY 
         COALESCE(d.delivery_sequence, 0) ASC,
         CASE COALESCE(d.delivery_status, 'PENDING')
         WHEN 'OUT_FOR_DELIVERY' THEN 1
@@ -665,6 +668,8 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
     const demands = await db.all(query, params);
 
     for (const dem of demands) {
+      dem.total_quantity = Number(dem.total_quantity) || 0;
+      dem.total_amount = Number(dem.total_amount) || 0;
       const items = await db.all(
         `SELECT di.*, 
                 COALESCE(di.unit_price_snapshot, 0) AS unit_price,
@@ -713,15 +718,15 @@ router.post('/driver/status', authenticateToken, authorizeRoles('DELIVERY', 'ADM
       query += `, delivered_at = ?, status = 'DELIVERED'`;
       params.push(now);
       if (delivery_odometer) {
-        query += `, delivery_odometer_reading = ?`;
-        params.push(parseInt(delivery_odometer, 10));
+        query += `, closing_km_reading = ?`;
+        params.push(parseFloat(delivery_odometer));
       }
     } else if (status === 'OUT_FOR_DELIVERY') {
       query += `, dispatched_at = COALESCE(dispatched_at, ?)`;
       params.push(now);
       if (start_odometer) {
-        query += `, start_odometer_reading = ?`;
-        params.push(parseInt(start_odometer, 10));
+        query += `, start_km_reading = ?`;
+        params.push(parseFloat(start_odometer));
       }
     } else if (status === 'REJECTED') {
       query += `, delivery_rejection_reason = ?`;
@@ -729,8 +734,8 @@ router.post('/driver/status', authenticateToken, authorizeRoles('DELIVERY', 'ADM
     }
 
     if (notes) {
-      const updatedNotes = demand.delivery_notes 
-        ? `${demand.delivery_notes}\n[Driver: ${notes}]` 
+      const updatedNotes = demand.delivery_notes
+        ? `${demand.delivery_notes}\n[Driver: ${notes}]`
         : `[Driver: ${notes}]`;
       query += `, delivery_notes = ?`;
       params.push(updatedNotes);
@@ -882,7 +887,7 @@ router.post('/driver/bill-collection', authenticateToken, authorizeRoles('DELIVE
     try {
       const inst = await db.get('SELECT institution_name FROM institutions WHERE id = ?', [demand.institution_id]);
       const instName = inst ? inst.institution_name : 'Institution';
-      
+
       await db.run(
         'INSERT INTO notifications (user_id, title, message, link_url) SELECT id, ?, ?, ? FROM users WHERE role = ?',
         [
@@ -892,7 +897,7 @@ router.post('/driver/bill-collection', authenticateToken, authorizeRoles('DELIVE
           'ADMIN'
         ]
       );
-    } catch (e) {}
+    } catch (e) { }
 
     broadcastToAll('DEMAND_UPDATED', {
       id: demandId,
@@ -918,32 +923,32 @@ router.get('/km-logs', authenticateToken, async (req, res) => {
   const date = req.query.date || new Date().toISOString().split('T')[0];
   try {
     const db = await getDB();
-    // Get all active drivers and their log for the specified date
-    const drivers = await db.all('SELECT id, name, vehicle_no, phone, rate_per_km FROM delivery_partners WHERE is_active = 1');
+    // Get ALL drivers (active and inactive) and their log for the specified date
+    const drivers = await db.all('SELECT id, name, vehicle_no, phone, rate_per_km, is_active FROM delivery_partners ORDER BY name ASC');
     const logs = await db.all('SELECT * FROM driver_daily_logs WHERE log_date = ?', [date]);
-    
-    // Also get the latest end_km for all drivers for suggestions
-    const latestLogs = await db.all(`
-      SELECT driver_id, log_date, end_km 
-      FROM driver_daily_logs 
-      WHERE end_km IS NOT NULL 
-      GROUP BY driver_id 
-      HAVING MAX(log_date)
-    `);
+
+    // Also get the latest end_km for all drivers for suggestions safely
+    const allLatest = await db.all('SELECT driver_id, end_km, log_date FROM driver_daily_logs WHERE end_km IS NOT NULL ORDER BY log_date DESC');
+    const latestLogsMap = {};
+    for (const row of allLatest) {
+      if (latestLogsMap[row.driver_id] === undefined) {
+        latestLogsMap[row.driver_id] = row.end_km;
+      }
+    }
 
     const result = drivers.map(d => {
       const todayLog = logs.find(l => l.driver_id === d.id);
-      const lastLog = latestLogs.find(l => l.driver_id === d.id);
       return {
         driver_id: d.id,
         driver_name: d.name,
         vehicle_no: d.vehicle_no,
+        is_active: d.is_active,
         rate_per_km: d.rate_per_km || 0,
         log_date: date,
         start_km: todayLog ? todayLog.start_km : null,
         end_km: todayLog ? todayLog.end_km : null,
         total_km: todayLog ? todayLog.total_km : null,
-        suggested_start_km: lastLog ? lastLog.end_km : 0
+        suggested_start_km: latestLogsMap[d.id] !== undefined ? latestLogsMap[d.id] : 0
       };
     });
 
@@ -961,11 +966,11 @@ router.post('/km-logs/start', authenticateToken, async (req, res) => {
   if (!driver_id || !log_date || start_km === undefined) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-  
+
   try {
     const db = await getDB();
     const existing = await db.get('SELECT id, end_km FROM driver_daily_logs WHERE driver_id = ? AND log_date = ?', [driver_id, log_date]);
-    
+
     if (existing) {
       let total_km = null;
       if (existing.end_km !== null) {
@@ -996,15 +1001,15 @@ router.post('/km-logs/end', authenticateToken, async (req, res) => {
   if (!driver_id || !log_date || end_km === undefined) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-  
+
   try {
     const db = await getDB();
     const existing = await db.get('SELECT id, start_km FROM driver_daily_logs WHERE driver_id = ? AND log_date = ?', [driver_id, log_date]);
-    
+
     if (!existing) {
       return res.status(400).json({ error: 'Start KM not recorded for this day yet.' });
     }
-    
+
     if (parseFloat(end_km) < parseFloat(existing.start_km)) {
       return res.status(400).json({ error: 'End KM cannot be less than Start KM' });
     }
@@ -1015,7 +1020,7 @@ router.post('/km-logs/end', authenticateToken, async (req, res) => {
       'UPDATE driver_daily_logs SET end_km = ?, total_km = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [end_km, total_km, existing.id]
     );
-    
+
     res.json({ message: 'End KM recorded successfully', total_km });
   } catch (error) {
     console.error('Error saving end km:', error);
@@ -1027,34 +1032,50 @@ router.post('/km-logs/end', authenticateToken, async (req, res) => {
 router.get('/driver/:id/km-stats', authenticateToken, async (req, res) => {
   if (req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Access denied' });
   const driverId = req.params.id;
-  
+
   try {
     const db = await getDB();
     const driver = await db.get('SELECT name, vehicle_no, rate_per_km FROM delivery_partners WHERE id = ?', [driverId]);
     if (!driver) return res.status(404).json({ error: 'Driver not found' });
-    
-    // Using sqlite date functions to aggregate based on log_date (YYYY-MM-DD)
-    const stats = await db.get(`
-      SELECT 
-        SUM(CASE WHEN log_date = date('now', 'localtime') THEN total_km ELSE 0 END) as today_km,
-        SUM(CASE WHEN log_date >= date('now', 'localtime', '-7 days') THEN total_km ELSE 0 END) as week_km,
-        SUM(CASE WHEN strftime('%Y-%m', log_date) = strftime('%Y-%m', 'now', 'localtime') THEN total_km ELSE 0 END) as month_km,
-        SUM(CASE WHEN strftime('%Y', log_date) = strftime('%Y', 'now', 'localtime') THEN total_km ELSE 0 END) as year_km,
-        SUM(total_km) as all_time_km
-      FROM driver_daily_logs 
-      WHERE driver_id = ? AND total_km IS NOT NULL
-    `, [driverId]);
-    
+
+    // Fetch driver's logs and calculate aggregates in JavaScript for cross-database compatibility
+    const allDriverLogs = await db.all(
+      'SELECT log_date, total_km FROM driver_daily_logs WHERE driver_id = ? AND total_km IS NOT NULL',
+      [driverId]
+    );
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const currentMonthPrefix = todayStr.substring(0, 7); // YYYY-MM
+    const currentYearPrefix = todayStr.substring(0, 4); // YYYY
+
+    let todayKm = 0;
+    let weekKm = 0;
+    let monthKm = 0;
+    let yearKm = 0;
+    let allTimeKm = 0;
+
+    for (const l of allDriverLogs) {
+      const km = parseFloat(l.total_km) || 0;
+      const logD = typeof l.log_date === 'string' ? l.log_date.split('T')[0] : '';
+      allTimeKm += km;
+      if (logD === todayStr) todayKm += km;
+      if (logD >= sevenDaysAgo) weekKm += km;
+      if (logD.startsWith(currentMonthPrefix)) monthKm += km;
+      if (logD.startsWith(currentYearPrefix)) yearKm += km;
+    }
+
     const recentLogs = await db.all('SELECT log_date, start_km, end_km, total_km FROM driver_daily_logs WHERE driver_id = ? ORDER BY log_date DESC LIMIT 5', [driverId]);
-    
+
     res.json({
       driver,
       stats: {
-        today: stats.today_km || 0,
-        week: stats.week_km || 0,
-        month: stats.month_km || 0,
-        year: stats.year_km || 0,
-        allTime: stats.all_time_km || 0
+        today: Math.round(todayKm * 100) / 100,
+        week: Math.round(weekKm * 100) / 100,
+        month: Math.round(monthKm * 100) / 100,
+        year: Math.round(yearKm * 100) / 100,
+        allTime: Math.round(allTimeKm * 100) / 100
       },
       recentLogs
     });

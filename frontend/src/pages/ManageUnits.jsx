@@ -23,18 +23,28 @@ export default function ManageUnits({ embedded = false }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchUnits();
-  }, []);
+    if (token) {
+      fetchUnits();
+    }
+  }, [token]);
 
   const fetchUnits = async () => {
     try {
+      setLoading(true);
       const res = await fetch('/api/units', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
-      setUnits(data);
+      if (res.ok && Array.isArray(data)) {
+        setUnits(data);
+        setError('');
+      } else {
+        setUnits([]);
+        if (data?.error) setError(data.error);
+      }
     } catch (err) {
       console.error(err);
+      setUnits([]);
     } finally {
       setLoading(false);
     }
@@ -210,40 +220,48 @@ export default function ManageUnits({ embedded = false }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {units.map((unit) => (
-                <tr key={unit.id} className="hover:bg-white/50 transition-colors">
-                  <td className="p-4 font-bold text-slate-900 flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-amber-400" />
-                    {unit.unit_name}
-                  </td>
-                  <td className="p-4 font-semibold text-slate-700">{unit.ncc_group || 'Group B'}</td>
-                  <td className="p-4 font-mono font-bold text-blue-600">{unit.unit_code}</td>
-                  <td className="p-4 text-slate-700">
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                      {unit.location || 'N/A'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-slate-800 font-semibold">{unit.institution_count || 0} Institutions under jurisdiction</td>
-                  <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleOpenEdit(unit)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold inline-flex items-center gap-1 transition-all"
-                      >
-                        <Edit2 className="w-3.5 h-3.5 text-amber-500" /> Edit Unit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUnit(unit)}
-                        className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 text-xs font-semibold inline-flex items-center gap-1 transition-all active:scale-95"
-                        title="Delete NCC Unit"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-600" /> Delete
-                      </button>
-                    </div>
+              {Array.isArray(units) && units.length > 0 ? (
+                units.map((unit) => (
+                  <tr key={unit.id} className="hover:bg-white/50 transition-colors">
+                    <td className="p-4 font-bold text-slate-900 flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-amber-400" />
+                      {unit.unit_name}
+                    </td>
+                    <td className="p-4 font-semibold text-slate-700">{unit.ncc_group || 'Group B'}</td>
+                    <td className="p-4 font-mono font-bold text-blue-600">{unit.unit_code}</td>
+                    <td className="p-4 text-slate-700">
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                        {unit.location || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-slate-800 font-semibold">{unit.institution_count || 0} Institutions under jurisdiction</td>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleOpenEdit(unit)}
+                          className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold inline-flex items-center gap-1 transition-all"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-amber-500" /> Edit Unit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUnit(unit)}
+                          className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 text-xs font-semibold inline-flex items-center gap-1 transition-all active:scale-95"
+                          title="Delete NCC Unit"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" /> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="p-8 text-center text-slate-500 font-bold">
+                    No units found.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

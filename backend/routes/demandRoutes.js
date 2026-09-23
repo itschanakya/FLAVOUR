@@ -118,8 +118,11 @@ router.get('/', authenticateToken, async (req, res) => {
 
     const demands = await db.all(baseQuery, params);
 
-    // Fetch items for each demand
+    // Fetch items for each demand and coerce quantities to numbers
     for (const d of demands) {
+      d.total_quantity = Number(d.total_quantity) || 0;
+      d.total_amount = Number(d.total_amount) || 0;
+      d.avg_unit_price = Number(d.avg_unit_price) || 0;
       const items = await db.all(
         `SELECT di.*, ri.item_name, ri.unit_of_measure 
          FROM demand_items di
@@ -407,10 +410,10 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
       [instId, yearStart, yearEnd]
     );
 
-    const existingYearlyQuantity = yearlyDemands.total_quantity || 0;
-    const newQuantity = totalByYear['1st Year'] + totalByYear['2nd Year'] + totalByYear['3rd Year'];
+    const existingYearlyQuantity = Number(yearlyDemands?.total_quantity || 0);
+    const newQuantity = Number(totalByYear['1st Year'] || 0) + Number(totalByYear['2nd Year'] || 0) + Number(totalByYear['3rd Year'] || 0);
 
-    const totalSanctionedStrength = inst.strength_1st_year + inst.strength_2nd_year + inst.strength_3rd_year;
+    const totalSanctionedStrength = Number(inst.strength_1st_year || 0) + Number(inst.strength_2nd_year || 0) + Number(inst.strength_3rd_year || 0);
     const maxYearlyPackets = totalSanctionedStrength * 35;
 
     if (existingYearlyQuantity + newQuantity > maxYearlyPackets) {

@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import ManageCatalog from './ManageCatalog';
 import ManageUnits from './ManageUnits';
+import CustomDateInput from '../components/CustomDateInput';
 
 export const VEHICLE_PRESETS = {
   ECO: {
@@ -77,6 +78,17 @@ export const VEHICLE_PRESETS = {
     color: 'from-slate-700 to-slate-900',
     description: 'Custom vehicle specifications configured manually by the driver or logistics administrator.'
   }
+};
+
+export const formatDDMMYYYY = (isoDate) => {
+  if (!isoDate) return '';
+  const clean = typeof isoDate === 'string' ? isoDate.split('T')[0] : '';
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  return isoDate;
 };
 
 export default function AppSettings() {
@@ -386,17 +398,18 @@ export default function AppSettings() {
   const fetchKmLogs = async (date) => {
     try {
       setLoading(true);
+      setError('');
       const res = await fetch(`/api/delivery/km-logs?date=${date}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && Array.isArray(data)) {
         setKmLogs(data);
       } else {
-        setError(data.error || 'Failed to fetch KM logs');
+        console.error('KM Logs error:', data?.error);
       }
     } catch (err) {
-      setError('Error fetching KM logs');
+      console.error('Error fetching KM logs:', err);
     } finally {
       setLoading(false);
     }
@@ -956,20 +969,6 @@ export default function AppSettings() {
               </>
             )}
           </div>
-
-          {/* LAN / Wi-Fi Access Quick Guide Card */}
-          <div className="mt-6 p-3 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl">
-            <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs mb-1">
-              <Wifi className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
-              <span>Same Wi-Fi / LAN Access</span>
-            </div>
-            <p className="text-[11px] text-slate-600 mb-2 leading-relaxed">
-              Access system from phones or PCs on this network:
-            </p>
-            <div className="bg-white px-2 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 font-mono text-[11px] font-bold select-all flex items-center justify-between">
-              <span>http://192.168.1.4:3001</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1262,15 +1261,17 @@ export default function AppSettings() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <label className="text-sm font-bold text-slate-700">Select Date:</label>
-                            <input
-                              type="date"
-                              value={kmLogDate}
-                              onChange={(e) => {
-                                setKmLogDate(e.target.value);
-                                fetchKmLogs(e.target.value);
-                              }}
-                              className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 bg-white focus:outline-none focus:border-emerald-500 shadow-sm"
-                            />
+                            <div className="w-44">
+                              <CustomDateInput
+                                value={kmLogDate}
+                                onChange={(newDate) => {
+                                  setKmLogDate(newDate);
+                                  fetchKmLogs(newDate);
+                                }}
+                                compact={true}
+                                className="!text-sm !font-bold !py-2 !px-3 !bg-white !border-slate-300 shadow-sm"
+                              />
+                            </div>
                           </div>
                           <button
                             onClick={() => fetchKmLogs(kmLogDate)}
@@ -1299,7 +1300,7 @@ export default function AppSettings() {
                                 {kmLogs.length === 0 ? (
                                   <tr>
                                     <td colSpan="7" className="p-8 text-center text-slate-500 font-bold">
-                                      No drivers active or no logs found.
+                                      No drivers found.
                                     </td>
                                   </tr>
                                 ) : (
@@ -1309,6 +1310,11 @@ export default function AppSettings() {
                                         <div className="font-bold text-slate-900 flex items-center gap-2">
                                           <Truck className="w-4 h-4 text-emerald-500" />
                                           {log.driver_name}
+                                          {log.is_active === 0 && (
+                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                                              Inactive
+                                            </span>
+                                          )}
                                         </div>
                                         <div className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-2">
                                           <span>{log.vehicle_no || 'No Vehicle'}</span>
@@ -1482,8 +1488,8 @@ export default function AppSettings() {
                                 key={`slicer_${driver.driver_id}`}
                                 onClick={() => fetchDriverKmStats(driver.driver_id)}
                                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${kmStatsModal.driver?.name === driver.driver_name
-                                    ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
-                                    : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300 hover:bg-blue-50/50'
+                                  ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300 hover:bg-blue-50/50'
                                   }`}
                               >
                                 <Truck className={`w-4 h-4 ${kmStatsModal.driver?.name === driver.driver_name ? 'text-blue-600' : 'text-slate-400'}`} />
@@ -1591,7 +1597,7 @@ export default function AppSettings() {
                                       ) : (
                                         kmStatsModal.recentLogs.map((log, idx) => (
                                           <tr key={idx} className="hover:bg-slate-50 transition-colors text-[11px]">
-                                            <td className="px-3 py-2 font-medium text-slate-700">{new Date(log.log_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</td>
+                                            <td className="px-3 py-2 font-mono font-medium text-slate-700">{formatDDMMYYYY(log.log_date)}</td>
                                             <td className="px-3 py-2 font-mono text-slate-600">{log.start_km !== null ? log.start_km : '--'}</td>
                                             <td className="px-3 py-2 font-mono text-slate-600">{log.end_km !== null ? log.end_km : '--'}</td>
                                             <td className="px-3 py-2 text-right">
@@ -2144,10 +2150,10 @@ export default function AppSettings() {
                         <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-700 ${driverProfile.metrics?.is_overloaded
-                                ? 'bg-rose-500'
-                                : (driverProfile.metrics?.utilization_percent || 0) > 85
-                                  ? 'bg-amber-400'
-                                  : 'bg-gradient-to-r from-emerald-400 to-cyan-400'
+                              ? 'bg-rose-500'
+                              : (driverProfile.metrics?.utilization_percent || 0) > 85
+                                ? 'bg-amber-400'
+                                : 'bg-gradient-to-r from-emerald-400 to-cyan-400'
                               }`}
                             style={{ width: `${Math.min(100, driverProfile.metrics?.utilization_percent || 0)}%` }}
                           />

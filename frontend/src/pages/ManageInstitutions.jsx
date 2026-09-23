@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Building, Plus, MapPin, Edit2, ShieldAlert, FileText, CheckCircle2, Clock, Map, Mail, Phone, Trash2, Eye, EyeOff, Key } from 'lucide-react';
+import { Building, Plus, MapPin, Edit2, ShieldAlert, FileText, CheckCircle2, Clock, Map, Mail, Phone, Trash2, Eye, EyeOff, Key, School, Download, Upload, FileSpreadsheet, Check, AlertCircle } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function ManageInstitutions() {
   const { token } = useAuth();
@@ -28,6 +29,13 @@ export default function ManageInstitutions() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Excel Bulk Import & Export state
+  const fileInputRef = useRef(null);
+  const [excelPreviewData, setExcelPreviewData] = useState([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   useEffect(() => {
     fetchInstitutions();
@@ -82,10 +90,215 @@ export default function ManageInstitutions() {
     setShowPassword(false);
     setResetPassword(false);
     setS1(inst.strength_1st_year || 0);
-    setS2(inst.strength_2nd_year);
-    setS3(inst.strength_3rd_year);
+    setS2(inst.strength_2nd_year || 0);
+    setS3(inst.strength_3rd_year || 0);
     setError('');
     setShowModal(true);
+  };
+
+  // -------------------------------------------------------------
+  // EXCEL DOWNLOAD / EXPORT
+  // -------------------------------------------------------------
+  const handleDownloadExcel = () => {
+    const rows = institutions.length > 0
+      ? institutions.map(inst => ({
+          'INSTITUTION NAME': inst.institution_name || '',
+          'PIN CODE': inst.pin_code || '',
+          'ANO / CTO INCHARGE': inst.ano_cto_name || '',
+          'ANO CONTACT': inst.ano_cto_contact || '',
+          'ANO EMAIL': inst.ano_email || '',
+          'LOGIN ID': inst.login_id || '',
+          '1ST YR STRENGTH': Number(inst.strength_1st_year) || 0,
+          '2ND YR STRENGTH': Number(inst.strength_2nd_year) || 0,
+          '3RD YR STRENGTH': Number(inst.strength_3rd_year) || 0,
+          'TOTAL VACANCY': (Number(inst.strength_1st_year) || 0) + (Number(inst.strength_2nd_year) || 0) + (Number(inst.strength_3rd_year) || 0),
+          'COMPLETE ADDRESS': inst.complete_address || '',
+          'GOOGLE LOCATION': inst.google_location || ''
+        }))
+      : [
+          {
+            'INSTITUTION NAME': 'APS SHANKAR VIHAR',
+            'PIN CODE': '110010',
+            'ANO / CTO INCHARGE': 'MUKESH RAUTELA (ANO)',
+            'ANO CONTACT': '+91 9876543210',
+            'ANO EMAIL': 'mukesh@gmail.com',
+            'LOGIN ID': 'mukesh@gmail.com',
+            '1ST YR STRENGTH': 50,
+            '2ND YR STRENGTH': 50,
+            '3RD YR STRENGTH': 0,
+            'TOTAL VACANCY': 100,
+            'COMPLETE ADDRESS': 'Peripheral Rd, opp. Metro Station, Shankar Vihar, New Delhi',
+            'GOOGLE LOCATION': 'https://maps.google.com'
+          }
+        ];
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+      { wch: 32 }, { wch: 12 }, { wch: 25 }, { wch: 18 }, { wch: 28 }, { wch: 20 },
+      { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 45 }, { wch: 30 }
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Institutions');
+    const filename = `NCC_Institutions_List_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, filename);
+  };
+
+  // -------------------------------------------------------------
+  // EXCEL SAMPLE TEMPLATE DOWNLOAD
+  // -------------------------------------------------------------
+  const handleDownloadTemplate = () => {
+    const templateRows = [
+      {
+        'INSTITUTION NAME': 'ARMY PUBLIC SCHOOL SHANKAR VIHAR',
+        'PIN CODE': '110010',
+        'ANO / CTO INCHARGE': 'Lt. Rajesh Kumar',
+        'ANO CONTACT': '+91 9876543210',
+        'ANO EMAIL': 'ano.aps@ncc.gov.in',
+        'LOGIN ID': 'ano_aps',
+        '1ST YR STRENGTH': 50,
+        '2ND YR STRENGTH': 50,
+        '3RD YR STRENGTH': 0,
+        'TOTAL VACANCY': 100,
+        'COMPLETE ADDRESS': 'Near Shankar Vihar Metro Station, New Delhi 110010',
+        'GOOGLE LOCATION': ''
+      },
+      {
+        'INSTITUTION NAME': 'DELHI PUBLIC SCHOOL RK PURAM',
+        'PIN CODE': '110022',
+        'ANO / CTO INCHARGE': 'Chief Officer A. K. Sharma',
+        'ANO CONTACT': '+91 9811223344',
+        'ANO EMAIL': 'ano.dps@ncc.gov.in',
+        'LOGIN ID': 'ano_dps',
+        '1ST YR STRENGTH': 50,
+        '2ND YR STRENGTH': 40,
+        '3RD YR STRENGTH': 30,
+        'TOTAL VACANCY': 120,
+        'COMPLETE ADDRESS': 'Sector XII, R. K. Puram, New Delhi 110022',
+        'GOOGLE LOCATION': ''
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateRows);
+    worksheet['!cols'] = [
+      { wch: 35 }, { wch: 12 }, { wch: 28 }, { wch: 18 }, { wch: 26 }, { wch: 18 },
+      { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 45 }, { wch: 30 }
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Institution_Template');
+    XLSX.writeFile(workbook, 'NCC_Institutions_Upload_Template.xlsx');
+  };
+
+  // -------------------------------------------------------------
+  // EXCEL FILE UPLOAD & PARSE
+  // -------------------------------------------------------------
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadError('');
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const workbook = XLSX.read(bstr, { type: 'binary' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        if (!rawJson || rawJson.length === 0) {
+          alert('The uploaded Excel file has no data rows.');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+
+        const parsed = rawJson.map((row, idx) => {
+          const getVal = (possibleKeys) => {
+            for (const key of possibleKeys) {
+              const matchedKey = Object.keys(row).find(k => k.trim().toLowerCase() === key.toLowerCase());
+              if (matchedKey && row[matchedKey] !== undefined && row[matchedKey] !== null) {
+                return String(row[matchedKey]).trim();
+              }
+            }
+            return '';
+          };
+
+          const instName = getVal(['INSTITUTION NAME', 'Institution Name', 'Institution', 'School Name', 'College Name', 'Name']);
+          const pin = getVal(['PIN CODE', 'Pin Code', 'PIN', 'Pincode', 'Postal Code']).replace(/\D/g, '').slice(0, 6);
+          const ano = getVal(['ANO / CTO INCHARGE', 'ANO / CTO Incharge', 'ANO Name', 'ANO / CTO Name', 'Incharge', 'ANO']);
+          const contact = getVal(['ANO CONTACT', 'Ano Contact', 'Contact', 'Phone', 'Mobile', 'Contact Phone']);
+          const email = getVal(['ANO EMAIL', 'Ano Email', 'Email', 'Login Email']);
+          const loginId = getVal(['LOGIN ID', 'Login Id', 'Login', 'Username', 'User ID']);
+          const s1 = parseInt(getVal(['1ST YR STRENGTH', '1st Yr Strength', '1st Year', 'Strength 1st Year', 'Year 1']) || 0, 10) || 0;
+          const s2 = parseInt(getVal(['2ND YR STRENGTH', '2nd Yr Strength', '2nd Year', 'Strength 2nd Year', 'Year 2']) || 0, 10) || 0;
+          const s3 = parseInt(getVal(['3RD YR STRENGTH', '3rd Yr Strength', '3rd Year', 'Strength 3rd Year', 'Year 3']) || 0, 10) || 0;
+          const address = getVal(['COMPLETE ADDRESS', 'Complete Address', 'Address', 'Institution Address']);
+          const googleLoc = getVal(['GOOGLE LOCATION', 'Google Location', 'Location Link', 'Map Link', 'Google Map']);
+
+          return {
+            rowNum: idx + 2,
+            institution_name: instName,
+            pin_code: pin,
+            ano_cto_name: ano || 'ANO Incharge',
+            ano_cto_contact: contact,
+            ano_cto_email: email,
+            login_id: loginId,
+            strength_1st_year: s1,
+            strength_2nd_year: s2,
+            strength_3rd_year: s3,
+            total_vacancy: s1 + s2 + s3,
+            complete_address: address,
+            google_location: googleLoc
+          };
+        }).filter(r => r.institution_name.length > 0);
+
+        if (parsed.length === 0) {
+          alert('Could not find valid institutions in the uploaded sheet. Please make sure the sheet includes an "INSTITUTION NAME" column.');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+
+        setExcelPreviewData(parsed);
+        setShowUploadModal(true);
+      } catch (err) {
+        console.error('Failed to parse Excel file:', err);
+        alert('Failed to parse Excel file. Please ensure it is a valid .xlsx or .xls file.');
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // -------------------------------------------------------------
+  // CONFIRM BULK IMPORT
+  // -------------------------------------------------------------
+  const handleConfirmBulkImport = async () => {
+    if (!excelPreviewData || excelPreviewData.length === 0) return;
+    setImporting(true);
+    setUploadError('');
+
+    try {
+      const res = await fetch('/api/institutions/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ institutions: excelPreviewData })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Bulk upload failed');
+
+      alert(`✅ Excel Import Completed!\n\n${data.message}`);
+      setShowUploadModal(false);
+      setExcelPreviewData([]);
+      fetchInstitutions();
+    } catch (err) {
+      console.error('Import error:', err);
+      setUploadError(err.message);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -164,19 +377,55 @@ export default function ManageInstitutions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Institutions & Cadet Vacancy Strengths</h2>
           <p className="text-sm text-slate-500">Add institutions under your NCC Unit, set 1st/2nd/3rd year cadet quotas & issue ANO login</p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-slate-900 font-bold text-sm shadow-lg shadow-blue-600/20 transition-all inline-flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Add Institution & ANO Login
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Download Excel Export */}
+          <button
+            onClick={handleDownloadExcel}
+            className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-slate-700 hover:text-emerald-700 font-bold text-xs shadow-sm transition-all inline-flex items-center gap-2"
+            title="Download list of institutions in Excel (.xlsx) with same columns"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span>Export Excel</span>
+          </button>
+
+          {/* Download Sample Template */}
+          <button
+            onClick={handleDownloadTemplate}
+            className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 font-bold text-xs shadow-sm transition-all inline-flex items-center gap-2"
+            title="Download blank sample Excel template with columns pre-configured"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+            <span>Sample Template</span>
+          </button>
+
+          {/* Upload Excel Button */}
+          <label className="cursor-pointer px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all inline-flex items-center gap-2">
+            <Upload className="w-4 h-4" />
+            <span>Upload Excel</span>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".xlsx, .xls, .csv"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
+
+          {/* Manual Add Institution Button */}
+          <button
+            onClick={handleOpenCreate}
+            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/20 transition-all inline-flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Institution
+          </button>
+        </div>
       </div>
 
       {/* PIN Filter Bar */}
@@ -497,6 +746,109 @@ export default function ManageInstitutions() {
               </div>
             </form>
           </div>
+          </div>
+        </div>
+      )}
+
+      {/* EXCEL UPLOAD PREVIEW & CONFIRMATION MODAL */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="glass-panel w-full max-w-4xl rounded-2xl border border-slate-200 p-6 space-y-5 my-6 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                <div>
+                  <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+                    <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                    Review Excel Import ({excelPreviewData.length} Institution{excelPreviewData.length === 1 ? '' : 's'} Found)
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Existing institutions will have their quota strengths and ANO contact updated; new institutions will be onboarded automatically.
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                  {excelPreviewData.length} Rows Ready
+                </span>
+              </div>
+
+              {uploadError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {uploadError}
+                </div>
+              )}
+
+              {/* Preview Table */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[380px] overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200 sticky top-0">
+                    <tr>
+                      <th className="p-3">#</th>
+                      <th className="p-3">Institution Name</th>
+                      <th className="p-3">PIN</th>
+                      <th className="p-3">ANO Incharge</th>
+                      <th className="p-3">ANO Contact / Email</th>
+                      <th className="p-3 text-center">1st Yr</th>
+                      <th className="p-3 text-center">2nd Yr</th>
+                      <th className="p-3 text-center">3rd Yr</th>
+                      <th className="p-3 text-center font-bold text-emerald-700">Total Vacancy</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {excelPreviewData.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
+                        <td className="p-3 font-bold text-slate-900">{row.institution_name}</td>
+                        <td className="p-3 font-mono text-slate-600">{row.pin_code || '—'}</td>
+                        <td className="p-3 text-slate-800">{row.ano_cto_name}</td>
+                        <td className="p-3 text-slate-500">
+                          <div>{row.ano_cto_contact || 'No phone'}</div>
+                          <div className="text-[10px] text-blue-600 font-mono">{row.ano_cto_email || 'Auto-generated'}</div>
+                        </td>
+                        <td className="p-3 text-center font-bold text-blue-600">{row.strength_1st_year}</td>
+                        <td className="p-3 text-center font-bold text-indigo-500">{row.strength_2nd_year}</td>
+                        <td className="p-3 text-center font-bold text-purple-500">{row.strength_3rd_year}</td>
+                        <td className="p-3 text-center font-black text-emerald-600">{row.total_vacancy}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+                <span className="text-xs text-slate-400">
+                  Ensure cadet strength quotas align with sanctioned battalion authorization.
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={importing}
+                    onClick={() => { setShowUploadModal(false); setExcelPreviewData([]); }}
+                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 text-xs transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={importing}
+                    onClick={handleConfirmBulkImport}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 inline-flex items-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {importing ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Importing {excelPreviewData.length} Institutions...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Confirm & Import ({excelPreviewData.length})
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

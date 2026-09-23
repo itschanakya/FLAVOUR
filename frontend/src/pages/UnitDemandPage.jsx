@@ -437,7 +437,9 @@ export default function UnitDemandPage() {
                       <span className="text-slate-400">|</span>
                       <span className="font-semibold text-slate-500">1st: {selectedInst?.strength_1st_year || 0}</span>
                       <span className="font-semibold text-slate-500">2nd: {selectedInst?.strength_2nd_year || 0}</span>
-                      <span className="font-semibold text-slate-500">3rd: {selectedInst?.strength_3rd_year || 0}</span>
+                      {Number(selectedInst?.strength_3rd_year || 0) > 0 && (
+                        <span className="font-semibold text-slate-500">3rd: {selectedInst?.strength_3rd_year}</span>
+                      )}
                     </div>
                     <span className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border shadow-inner ${
                       instTotalQty > 0 ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'
@@ -446,7 +448,7 @@ export default function UnitDemandPage() {
                     </span>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className={`grid grid-cols-1 ${Number(selectedInst?.strength_3rd_year || 0) > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
                   <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
                       <span>1ST YEAR</span>
@@ -479,21 +481,23 @@ export default function UnitDemandPage() {
                     />
                   </div>
 
-                  <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
-                      <span>3RD YEAR</span>
-                      <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_3rd_year || 0}</span>
+                  {Number(selectedInst?.strength_3rd_year || 0) > 0 && (
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
+                        <span>3RD YEAR</span>
+                        <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_3rd_year || 0}</span>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        max={selectedInst?.strength_3rd_year || 0}
+                        value={year3}
+                        onChange={e => setYear3(e.target.value)}
+                        placeholder="0"
+                        className="w-full text-lg font-black text-slate-900 focus:outline-none"
+                      />
                     </div>
-                    <input
-                      type="number"
-                      min="0"
-                      max={selectedInst?.strength_3rd_year || 0}
-                      value={year3}
-                      onChange={e => setYear3(e.target.value)}
-                      placeholder="0"
-                      className="w-full text-lg font-black text-slate-900 focus:outline-none"
-                    />
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -19,7 +19,7 @@ export default function DeliveryDashboard() {
   const [demands, setDemands] = useState([]);
   const [driverProfile, setDriverProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState('PENDING'); // Changed from ALL to PENDING (Warehouse)
+  const [filterStatus, setFilterStatus] = useState('ALL'); // Default to ALL stops so driver sees their full manifest
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDemands, setExpandedDemands] = useState({});
   const [showSummary, setShowSummary] = useState(() => searchParams.get('tab') === 'summary' || searchParams.get('summary') === 'true');
@@ -76,12 +76,17 @@ export default function DeliveryDashboard() {
     fetchDriverDemands();
   }, [fetchDriverDemands]);
 
-  // Real-time SSE updates
   useEffect(() => {
     if (events?.DEMAND_UPDATED || events?.timestamp) {
       fetchDriverDemands();
     }
   }, [events?.DEMAND_UPDATED, events?.timestamp, fetchDriverDemands]);
+
+  useEffect(() => {
+    const handleSync = () => fetchDriverDemands();
+    window.addEventListener('demand-status-changed', handleSync);
+    return () => window.removeEventListener('demand-status-changed', handleSync);
+  }, [fetchDriverDemands]);
 
   // Toggle Items Expand
   const toggleExpand = (id) => {
@@ -303,10 +308,10 @@ export default function DeliveryDashboard() {
   };
 
   // Metrics Calculations
-  const totalAssignedPackets = demands.reduce((acc, d) => acc + (d.total_quantity || 0), 0);
+  const totalAssignedPackets = demands.reduce((acc, d) => acc + (Number(d.total_quantity) || 0), 0);
   const deliveredPackets = demands
     .filter(d => d.delivery_status === 'DELIVERED')
-    .reduce((acc, d) => acc + (d.total_quantity || 0), 0);
+    .reduce((acc, d) => acc + (Number(d.total_quantity) || 0), 0);
   const remainingPackets = totalAssignedPackets - deliveredPackets;
   const totalStops = demands.length;
   const completedStops = demands.filter(d => d.delivery_status === 'DELIVERED').length;
@@ -717,6 +722,16 @@ export default function DeliveryDashboard() {
 
         {/* Quick Filter Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+          <button
+            onClick={() => setFilterStatus('ALL')}
+            className={`px-3 py-1.5 rounded-xl font-black whitespace-nowrap transition-all ${
+              filterStatus === 'ALL'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            📋 All Stops ({demands.length})
+          </button>
           <button
             onClick={() => setFilterStatus('PENDING')}
             className={`px-3 py-1.5 rounded-xl font-black whitespace-nowrap transition-all ${

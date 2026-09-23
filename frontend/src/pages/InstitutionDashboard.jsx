@@ -155,12 +155,12 @@ export default function InstitutionDashboard() {
       if (instData && instData.length > 0) {
         const inst = instData[0];
         setInstDetails(inst);
-        setVenue(inst.institution_name || '');
+        setVenue(inst.complete_address || inst.institution_name || '');
         
         // Auto-fetch 1st, 2nd, and 3rd year strengths directly from vacancy
         const y1 = inst.strength_1st_year !== undefined && inst.strength_1st_year !== null ? inst.strength_1st_year : 0;
         const y2 = inst.strength_2nd_year !== undefined && inst.strength_2nd_year !== null ? inst.strength_2nd_year : 0;
-        const y3 = inst.strength_3rd_year !== undefined && inst.strength_3rd_year !== null ? inst.strength_3rd_year : 0;
+        const y3 = Number(inst.strength_3rd_year || 0) > 0 ? inst.strength_3rd_year : 0;
         setYear1(y1);
         setYear2(y2);
         setYear3(y3);
@@ -191,9 +191,9 @@ export default function InstitutionDashboard() {
     }
   };
 
-  const s1 = instDetails?.strength_1st_year || 0;
-  const s2 = instDetails?.strength_2nd_year || 0;
-  const s3 = instDetails?.strength_3rd_year || 0;
+  const s1 = Number(instDetails?.strength_1st_year) || 0;
+  const s2 = Number(instDetails?.strength_2nd_year) || 0;
+  const s3 = Number(instDetails?.strength_3rd_year) || 0;
   const totalSanctioned = s1 + s2 + s3;
   
   // Mocking quotas based on sanctioned strength (usually 25 days)
@@ -203,8 +203,8 @@ export default function InstitutionDashboard() {
   let totalCost = 0;
   const safeDemands = Array.isArray(recentDemands) ? recentDemands : [];
   safeDemands.forEach(d => {
-    consumedQuota += (d.total_quantity || 0);
-    totalCost += (d.total_amount || 0);
+    consumedQuota += (Number(d.total_quantity) || 0);
+    totalCost += (Number(d.total_amount) || 0);
   });
   const remainingQuota = annualQuota - consumedQuota;
 
@@ -238,7 +238,7 @@ export default function InstitutionDashboard() {
     // Distribute proportionally across sanctioned vacancies
     let y1 = Math.min(s1, Math.round(target * (s1 / totalSanctioned)));
     let y2 = Math.min(s2, Math.round(target * (s2 / totalSanctioned)));
-    let y3 = Math.min(s3, Math.round(target * (s3 / totalSanctioned)));
+    let y3 = s3 > 0 ? Math.min(s3, Math.round(target * (s3 / totalSanctioned))) : 0;
 
     let diff = target - (y1 + y2 + y3);
 
@@ -246,12 +246,12 @@ export default function InstitutionDashboard() {
       while (diff > 0) {
         if (y1 < s1) { y1++; diff--; }
         else if (y2 < s2) { y2++; diff--; }
-        else if (y3 < s3) { y3++; diff--; }
+        else if (s3 > 0 && y3 < s3) { y3++; diff--; }
         else break;
       }
     } else if (diff < 0) {
       while (diff < 0) {
-        if (y3 > 0) { y3--; diff++; }
+        if (s3 > 0 && y3 > 0) { y3--; diff++; }
         else if (y2 > 0) { y2--; diff++; }
         else if (y1 > 0) { y1--; diff++; }
         else break;
@@ -260,7 +260,7 @@ export default function InstitutionDashboard() {
 
     setYear1(y1);
     setYear2(y2);
-    setYear3(y3);
+    setYear3(s3 > 0 ? y3 : 0);
   };
 
   const adjustTotal = (delta) => {
@@ -304,7 +304,7 @@ export default function InstitutionDashboard() {
       setError(`2nd Year quantity (${year2}) exceeds sanctioned strength (${s2}).`);
       return;
     }
-    if ((parseInt(year3) || 0) > s3) {
+    if (s3 > 0 && (parseInt(year3) || 0) > s3) {
       setError(`3rd Year quantity (${year3}) exceeds sanctioned strength (${s3}).`);
       return;
     }
@@ -333,7 +333,7 @@ export default function InstitutionDashboard() {
           quantity: parseInt(year2)
         });
       }
-      if (parseInt(year3) > 0) {
+      if (s3 > 0 && parseInt(year3) > 0) {
         items.push({
           item_id: defaultItem.id,
           year_group: '3rd Year',
@@ -376,7 +376,7 @@ export default function InstitutionDashboard() {
       if (instDetails) {
         const y1 = instDetails.strength_1st_year ?? 0;
         const y2 = instDetails.strength_2nd_year ?? 0;
-        const y3 = instDetails.strength_3rd_year ?? 0;
+        const y3 = Number(instDetails.strength_3rd_year || 0) > 0 ? (instDetails.strength_3rd_year ?? 0) : 0;
         setYear1(y1);
         setYear2(y2);
         setYear3(y3);
@@ -394,14 +394,14 @@ export default function InstitutionDashboard() {
   const handleClear = () => {
     const y1 = instDetails?.strength_1st_year ?? 0;
     const y2 = instDetails?.strength_2nd_year ?? 0;
-    const y3 = instDetails?.strength_3rd_year ?? 0;
+    const y3 = Number(instDetails?.strength_3rd_year || 0) > 0 ? (instDetails?.strength_3rd_year ?? 0) : 0;
     setYear1(y1);
     setYear2(y2);
     setYear3(y3);
     setTotalDemanded(y1 + y2 + y3);
     setDemandDate(new Date().toISOString().split('T')[0]);
     setDemandTime('08:00');
-    setVenue(instDetails?.institution_name || '');
+    setVenue(instDetails?.complete_address || instDetails?.institution_name || '');
     setError('');
   };
 
@@ -433,7 +433,7 @@ export default function InstitutionDashboard() {
           </div>
           <div>
             <div className="text-[10px] sm:text-[11px] font-black tracking-widest text-indigo-100 uppercase mb-0.5 sm:mb-1">TOTAL PACKETS</div>
-            <div className="text-xl sm:text-3xl font-black">{consumedQuota || 5539}</div>
+            <div className="text-xl sm:text-3xl font-black">{(consumedQuota || 0).toLocaleString('en-IN')}</div>
           </div>
         </div>
 
@@ -444,7 +444,7 @@ export default function InstitutionDashboard() {
           </div>
           <div>
             <div className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase mb-0.5 sm:mb-1">TOTAL COST</div>
-            <div className="text-xl sm:text-3xl font-black text-slate-800 truncate">₹{(totalCost || 415425).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+            <div className="text-xl sm:text-3xl font-black text-slate-800 truncate">₹{(totalCost || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
           </div>
         </div>
 
@@ -455,7 +455,7 @@ export default function InstitutionDashboard() {
           </div>
           <div>
             <div className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase mb-0.5 sm:mb-1">TOTAL ENTRIES</div>
-            <div className="text-xl sm:text-3xl font-black text-slate-800">{recentDemands.length || 170}</div>
+            <div className="text-xl sm:text-3xl font-black text-slate-800">{recentDemands.length}</div>
           </div>
         </div>
 
@@ -475,10 +475,12 @@ export default function InstitutionDashboard() {
               <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">2nd</div>
               <div className="text-xs sm:text-sm font-black text-slate-700">{instDetails?.strength_2nd_year || 0}</div>
             </div>
-            <div className="text-center">
-              <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">3rd</div>
-              <div className="text-xs sm:text-sm font-black text-slate-700">{instDetails?.strength_3rd_year || 0}</div>
-            </div>
+            {s3 > 0 && (
+              <div className="text-center">
+                <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">3rd</div>
+                <div className="text-xs sm:text-sm font-black text-slate-700">{instDetails?.strength_3rd_year || 0}</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -583,8 +585,8 @@ export default function InstitutionDashboard() {
                   onClick={() => {
                     setYear1(s1);
                     setYear2(s2);
-                    setYear3(s3);
-                    setTotalDemanded(s1 + s2 + s3);
+                    setYear3(s3 > 0 ? s3 : 0);
+                    setTotalDemanded(s1 + s2 + (s3 > 0 ? s3 : 0));
                   }}
                   className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1"
                   title="Auto-fill quantities directly from sanctioned cadet vacancy"
@@ -592,7 +594,7 @@ export default function InstitutionDashboard() {
                   <RefreshCw className="w-3 h-3" /> Fetch From Vacancy
                 </button>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className={`grid ${s3 > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
                 <div className="bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100 focus-within:border-indigo-500 transition-all">
                   <div className="flex justify-between items-center mb-1.5">
                     <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">1ST YEAR</label>
@@ -606,7 +608,7 @@ export default function InstitutionDashboard() {
                     onChange={(e) => {
                       const val = e.target.value;
                       setYear1(val);
-                      setTotalDemanded((parseInt(val) || 0) + (parseInt(year2) || 0) + (parseInt(year3) || 0));
+                      setTotalDemanded((parseInt(val) || 0) + (parseInt(year2) || 0) + (s3 > 0 ? (parseInt(year3) || 0) : 0));
                     }}
                     className="w-full px-2 py-2 bg-white border-2 border-slate-100 rounded-xl text-base font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500 transition-all"
                   />
@@ -625,97 +627,100 @@ export default function InstitutionDashboard() {
                     onChange={(e) => {
                       const val = e.target.value;
                       setYear2(val);
-                      setTotalDemanded((parseInt(year1) || 0) + (parseInt(val) || 0) + (parseInt(year3) || 0));
+                      setTotalDemanded((parseInt(year1) || 0) + (parseInt(val) || 0) + (s3 > 0 ? (parseInt(year3) || 0) : 0));
                     }}
                     className="w-full px-2 py-2 bg-white border-2 border-slate-100 rounded-xl text-base font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500 transition-all"
                   />
                 </div>
 
-                <div className="bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100 focus-within:border-indigo-500 transition-all">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">3RD YEAR</label>
-                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Vac: {s3}</span>
+                {s3 > 0 && (
+                  <div className="bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100 focus-within:border-indigo-500 transition-all">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">3RD YEAR</label>
+                      <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Vac: {s3}</span>
+                    </div>
+                    <input 
+                      type="number" 
+                      min="0" 
+                      max={s3}
+                      value={year3}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setYear3(val);
+                        setTotalDemanded((parseInt(year1) || 0) + (parseInt(year2) || 0) + (parseInt(val) || 0));
+                      }}
+                      className="w-full px-2 py-2 bg-white border-2 border-slate-100 rounded-xl text-base font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500 transition-all"
+                    />
                   </div>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    max={s3}
-                    value={year3}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setYear3(val);
-                      setTotalDemanded((parseInt(year1) || 0) + (parseInt(year2) || 0) + (parseInt(val) || 0));
-                    }}
-                    className="w-full px-2 py-2 bg-white border-2 border-slate-100 rounded-xl text-base font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500 transition-all"
-                  />
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Live Demand Summary: TOTAL QTY & TOTAL AMOUNT on left side, PER PKT AMOUNT on right side */}
-            <div className="bg-gradient-to-br from-slate-50 to-indigo-50/50 rounded-2xl p-4 border border-indigo-100/90 shadow-2xs space-y-2.5">
-              <div className="flex items-center justify-between gap-3">
-                {/* LEFT SIDE: TOTAL QTY AND TOTAL AMOUNT */}
-                <div className="flex items-center gap-4 sm:gap-5">
-                  {/* TOTAL QTY */}
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                      TOTAL QTY
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input 
-                        type="number" 
-                        min="0" 
-                        max={totalSanctioned}
-                        value={totalDemanded}
-                        onChange={(e) => handleTotalDemandedChange(e.target.value)}
-                        className="w-20 px-2 py-1.5 bg-white border-2 border-indigo-200 focus:border-indigo-600 rounded-xl text-base font-black text-indigo-700 text-center focus:outline-none shadow-2xs transition-all"
-                        title="Edit total demanded packets directly"
-                      />
-                      <span className="text-xs font-bold text-slate-500">Pkts</span>
-                    </div>
-                  </div>
-
-                  <div className="h-9 w-px bg-slate-200"></div>
-
-                  {/* TOTAL AMOUNT */}
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                      TOTAL AMOUNT
-                    </label>
-                    <div className="text-base sm:text-lg font-black text-emerald-600 py-1">
-                      ₹{demandTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
+            {/* Live Demand Summary: Compact single-row layout */}
+            <div className="bg-gradient-to-br from-slate-50 to-indigo-50/60 rounded-2xl p-3 sm:p-3.5 border border-indigo-100/90 shadow-2xs space-y-2">
+              <div className="grid grid-cols-12 items-center gap-2">
+                {/* 1. TOTAL QTY */}
+                <div className="col-span-4">
+                  <label className="block text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 truncate">
+                    TOTAL QTY
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input 
+                      type="number" 
+                      min="0" 
+                      max={totalSanctioned}
+                      value={totalDemanded}
+                      onChange={(e) => handleTotalDemandedChange(e.target.value)}
+                      className="w-18 sm:w-20 px-2 py-1 bg-white border-2 border-indigo-400 focus:border-indigo-600 rounded-xl text-lg sm:text-xl font-black text-indigo-700 text-center focus:outline-none shadow-2xs transition-all"
+                      title="Edit total demanded packets directly"
+                    />
+                    <span className="text-xs font-bold text-slate-500">Pkts</span>
                   </div>
                 </div>
 
-                {/* RIGHT SIDE: PER PKT AMOUNT */}
-                <div className="text-right shrink-0">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                {/* 2. TOTAL AMOUNT */}
+                <div className="col-span-4 border-l border-slate-200 pl-2 sm:pl-3">
+                  <label className="block text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 truncate">
+                    TOTAL AMOUNT
+                  </label>
+                  <div className="text-sm sm:text-base font-black text-emerald-600 truncate">
+                    ₹{demandTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+
+                {/* 3. PER PKT AMOUNT INCLUDING GST */}
+                <div className="col-span-4 border-l border-slate-200 pl-2 sm:pl-3 text-right">
+                  <label className="block text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5 truncate" title="Per Packet Amount Including GST">
                     PER PKT AMOUNT
                   </label>
-                  <div className="text-base sm:text-lg font-black text-slate-800 py-1">
+                  <div className="text-sm sm:text-base font-black text-slate-800">
                     ₹{perPacketPrice.toFixed(2)}
                   </div>
+                  <span className="text-[8px] sm:text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 inline-block tracking-tight">
+                    INCL. GST
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[10px] text-slate-400 font-medium">
-                <span>Editable directly or adjusted via year strengths</span>
-                <span>Max Sanctioned: <strong className="text-slate-600 font-bold">{totalSanctioned}</strong></span>
+              <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60 text-[10px] text-slate-400 font-medium">
+                <span>Editable directly or via year strengths</span>
+                <span>Max: <strong className="text-slate-600 font-bold">{totalSanctioned}</strong></span>
               </div>
             </div>
 
             {/* Training Venue */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">TRAINING VENUE</label>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                TRAINING VENUE (COMPLETE ADDRESS)
+              </label>
               <div className="relative group">
                 <MapPin className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" />
                 <input 
                   type="text" 
                   value={venue}
                   onChange={(e) => setVenue(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3.5 bg-white border-2 border-slate-100 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 uppercase transition-all hover:border-slate-200"
+                  placeholder="Enter complete address of institution..."
+                  className="w-full pl-11 pr-4 py-3.5 bg-white border-2 border-slate-100 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 transition-all hover:border-slate-200"
                 />
               </div>
             </div>

@@ -626,80 +626,10 @@ async function seedDefaultData(db) {
     itemMap[item.name] = res.lastID;
   }
 
-  // 5. Create Sample Demands
-  // Demand 1: St. Joseph - PENDING
-  const d1 = await db.run(
-    `INSERT INTO demands (demand_number, institution_id, unit_id, raised_by, demand_date, purpose, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ['DEM-2026-001', inst1Id, unit1Id, inst1User.lastID, '2026-08-28', 'Institutional Drill Parade Refreshments', 'PENDING']
-  );
-  await db.run(
-    `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot) VALUES (?, ?, ?, ?, ?)`,
-    [d1.lastID, itemMap['Glucose Biscuit Packet (100g)'], '1st Year', 45, 15.0]
-  );
-  await db.run(
-    `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot) VALUES (?, ?, ?, ?, ?)`,
-    [d1.lastID, itemMap['Fruit Juice Pack (200ml)'], '1st Year', 45, 25.0]
-  );
-  await db.run(
-    `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot) VALUES (?, ?, ?, ?, ?)`,
-    [d1.lastID, itemMap['Glucose Biscuit Packet (100g)'], '2nd Year', 35, 15.0]
-  );
-  await db.run(
-    `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot) VALUES (?, ?, ?, ?, ?)`,
-    [d1.lastID, itemMap['Fruit Juice Pack (200ml)'], '2nd Year', 35, 25.0]
-  );
-
-  // Demand 2: APS SHANKAR VIHAR - APPROVED
-  const d2 = await db.run(
-    `INSERT INTO demands (demand_number, institution_id, unit_id, raised_by, demand_date, purpose, status, reviewed_by, review_remarks, reviewed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['DEM-2026-002', inst1Id, unit1Id, inst1User.lastID, '2026-08-20', 'Combined Annual Training Camp (CATC) Day 1', 'APPROVED', unit1User.lastID, 'Verified strength and purpose. Approved for procurement.', '2026-08-21 10:30:00']
-  );
-  await db.run(
-    `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot) VALUES (?, ?, ?, ?, ?)`,
-    [d2.lastID, itemMap['Cadet Packed Refreshment Lunch Box'], '1st Year', 50, 75.0]
-  );
-  await db.run(
-    `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot) VALUES (?, ?, ?, ?, ?)`,
-    [d2.lastID, itemMap['Cadet Packed Refreshment Lunch Box'], '2nd Year', 40, 75.0]
-  );
-  await db.run(
-    `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot) VALUES (?, ?, ?, ?, ?)`,
-    [d2.lastID, itemMap['Cadet Packed Refreshment Lunch Box'], '3rd Year', 30, 75.0]
-  );
-
-  // Demand 3: APS SHANKAR VIHAR - FULFILLED
-  const d3 = await db.run(
-    `INSERT INTO demands (demand_number, institution_id, unit_id, raised_by, demand_date, purpose, status, reviewed_by, review_remarks, reviewed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['DEM-2026-003', inst1Id, unit1Id, inst1User.lastID, '2026-08-15', 'Independence Day Cadets Contingent Refreshments', 'FULFILLED', unit1User.lastID, 'Approved full quota.', '2026-08-16 11:00:00']
-  );
-  await db.run(
-    `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot) VALUES (?, ?, ?, ?, ?)`,
-    [d3.lastID, itemMap['Fresh Vegetable Samosa & Tea'], '1st Year', 60, 30.0]
-  );
-  await db.run(
-    `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot) VALUES (?, ?, ?, ?, ?)`,
-    [d3.lastID, itemMap['Fresh Vegetable Samosa & Tea'], '2nd Year', 50, 30.0]
-  );
-
   // Audit Logs
   await db.run(
     `INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
-    ['SYSTEM', 0, 'SYSTEM_INITIALIZED', adminId, 'Database schema and demo seed data created', '2026-08-28 09:00:00']
-  );
-  await db.run(
-    `INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
-    ['DEMAND', d1.lastID, 'CREATED', inst1User.lastID, 'Initiated demand DEM-2026-001', '2026-08-28 14:00:00']
-  );
-  await db.run(
-    `INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
-    ['DEMAND', d2.lastID, 'APPROVED', unit1User.lastID, 'Approved demand DEM-2026-002 with remarks: Verified strength', '2026-08-21 10:30:00']
-  );
-  await db.run(
-    `INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
-    ['DEMAND', d3.lastID, 'FULFILLED', adminId, 'Marked demand DEM-2026-003 as FULFILLED (delivered)', '2026-08-17 15:45:00']
+    ['SYSTEM', 0, 'SYSTEM_INITIALIZED', adminId, 'Database schema initialized', new Date().toISOString().slice(0, 19).replace('T', ' ')]
   );
 
   console.log('Seed completed successfully!');
