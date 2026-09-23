@@ -1,38 +1,25 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 require('dotenv').config();
 
-// Create a transporter using SMTP transport with aggressive timeouts
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT, 10) || 587,
-  secure: process.env.SMTP_PORT == 465,
-  auth: {
-    user: process.env.SMTP_USER, 
-    pass: process.env.SMTP_PASS, 
-  },
-  connectionTimeout: 10000, // 10s connection timeout
-  greetingTimeout: 10000,
-  socketTimeout: 15000,
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
- * Sends an OTP email to the specified user
+ * Sends an OTP email to the specified user via Resend API
  * @param {string} email - The recipient email address
  * @param {string} otp - The 6-digit OTP
  * @returns {Promise<boolean>} - True if sent successfully, false otherwise
  */
 async function sendOtpEmail(email, otp) {
-  // If no SMTP credentials are provided, log OTP mock
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.log(`[OTP MOCK] Sending OTP ${otp} to ${email}`);
-    return true; 
+  // If no Resend API key, log OTP mock (local dev fallback)
+  if (!process.env.RESEND_API_KEY) {
+    console.log(`[OTP MOCK] No RESEND_API_KEY found. OTP for ${email}: ${otp}`);
+    return true;
   }
 
   try {
-    const mailOptions = {
-      from: `"NCC Refreshment Portal" <${process.env.SMTP_USER}>`,
-      to: email,
+    const { data, error } = await resend.emails.send({
+      from: 'NCC Refreshment Portal <onboarding@resend.dev>',
+      to: [email],
       subject: 'Your Login OTP - NCC Refreshment Portal',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
@@ -52,17 +39,17 @@ async function sendOtpEmail(email, otp) {
           <p style="color: #64748b; font-size: 14px;">If you did not request this login, please ignore this email or contact support.</p>
         </div>
       `
-    };
+    });
 
-    // Guarantee that sending email never hangs longer than 15 seconds
-    const sendPromise = transporter.sendMail(mailOptions);
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 15000));
+    if (error) {
+      console.error('Resend error:', error);
+      return false;
+    }
 
-    const info = await Promise.race([sendPromise, timeoutPromise]);
-    console.log(`Email sent successfully: ${info.messageId}`);
+    console.log(`[OTP] Email sent successfully via Resend. ID: ${data.id}`);
     return true;
-  } catch (error) {
-    console.error('Error sending OTP email (non-fatal):', error.message);
+  } catch (err) {
+    console.error('Error sending OTP email:', err.message);
     return false;
   }
 }
