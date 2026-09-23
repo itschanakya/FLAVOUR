@@ -419,17 +419,8 @@ async function initializeSchema(db) {
     const dCols = await db.all("SHOW COLUMNS FROM demands");
     const instCol = dCols.find(c => c.Field === 'institution_id');
     if (instCol && instCol.Null === 'NO') {
-      
-      const tableSqlRes = await db.get("SELECT COLUMN_TYPE as `sql` FROM information_schema.COLUMNS WHERE TABLE_NAME='demands' AND COLUMN_NAME='status'");
-      if (tableSqlRes && tableSqlRes.sql) {
-        let newSql = tableSqlRes.sql.replace('institution_id INTEGER NOT NULL', 'institution_id INTEGER');
-        await db.run("ALTER TABLE demands RENAME TO demands_old_notnull");
-        await db.run(newSql);
-        const colNames = dCols.map(c => c.name).join(', ');
-        await db.run(`INSERT INTO demands (${colNames}) SELECT ${colNames} FROM demands_old_notnull`);
-        await db.run("DROP TABLE demands_old_notnull");
-      }
-      await db.run('PRAGMA foreign_keys = ON');
+      // TiDB/MySQL: use ALTER TABLE MODIFY COLUMN directly
+      await db.run("ALTER TABLE demands MODIFY COLUMN institution_id INTEGER NULL");
     }
   } catch (err) {
     console.error('Error migrating demands institution_id to nullable:', err);
