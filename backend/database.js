@@ -37,7 +37,7 @@ async function initializeSchema(db) {
       unit_name TEXT NOT NULL,
       unit_code VARCHAR(255) UNIQUE NOT NULL,
       location TEXT,
-      ncc_group TEXT DEFAULT 'Group B',
+      ncc_group VARCHAR(255) DEFAULT 'Group B',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -63,7 +63,7 @@ async function initializeSchema(db) {
       email VARCHAR(255) UNIQUE NOT NULL,
       login_id VARCHAR(255) UNIQUE,
       password_hash TEXT NOT NULL,
-      role TEXT CHECK(role IN ('ADMIN', 'UNIT', 'INSTITUTION')) NOT NULL,
+      role VARCHAR(255) CHECK(role IN ('ADMIN', 'UNIT', 'INSTITUTION')) NOT NULL,
       unit_id INTEGER,
       institution_id INTEGER,
       otp TEXT,
@@ -93,9 +93,9 @@ async function initializeSchema(db) {
       unit_id INTEGER NOT NULL,
       raised_by INTEGER NOT NULL,
       demand_date TEXT NOT NULL,
-      demand_time TEXT DEFAULT '08:00',
+      demand_time VARCHAR(255) DEFAULT '08:00',
       purpose TEXT NOT NULL,
-      status TEXT CHECK(status IN ('PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED', 'CANCELLED', 'FULFILLED')) DEFAULT 'PENDING',
+      status VARCHAR(255) CHECK(status IN ('PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED', 'CANCELLED', 'FULFILLED')) DEFAULT 'PENDING',
       reviewed_by INTEGER,
       review_remarks TEXT,
       reviewed_at DATETIME,
@@ -116,7 +116,7 @@ async function initializeSchema(db) {
       id INTEGER PRIMARY KEY AUTO_INCREMENT,
       demand_id INTEGER NOT NULL,
       item_id INTEGER NOT NULL,
-      year_group TEXT CHECK(year_group IN ('1st Year', '2nd Year', '3rd Year')) NOT NULL,
+      year_group VARCHAR(255) CHECK(year_group IN ('1st Year', '2nd Year', '3rd Year')) NOT NULL,
       quantity INTEGER NOT NULL,
       unit_price_snapshot REAL NOT NULL,
       FOREIGN KEY (demand_id) REFERENCES demands(id) ON DELETE CASCADE,
@@ -127,7 +127,7 @@ async function initializeSchema(db) {
       id INTEGER PRIMARY KEY AUTO_INCREMENT,
       demand_id INTEGER NOT NULL,
       user_id INTEGER,
-      action_type TEXT NOT NULL CHECK( action_type IN ('STATUS_CHANGE', 'MESSAGE') ),
+      action_type VARCHAR(255) NOT NULL CHECK( action_type IN ('STATUS_CHANGE', 'MESSAGE') ),
       old_status TEXT,
       new_status TEXT,
       message TEXT,
@@ -153,7 +153,7 @@ async function initializeSchema(db) {
       event_date DATE NOT NULL,
       event_time TEXT NOT NULL,
       message TEXT,
-      status TEXT DEFAULT 'SCHEDULED' CHECK( status IN ('SCHEDULED', 'DELAYED', 'COMPLETED', 'CANCELLED') ),
+      status VARCHAR(255) DEFAULT 'SCHEDULED' CHECK( status IN ('SCHEDULED', 'DELAYED', 'COMPLETED', 'CANCELLED') ),
       target_pin_codes TEXT, 
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (admin_id) REFERENCES users(id)
@@ -173,12 +173,12 @@ async function initializeSchema(db) {
     CREATE TABLE IF NOT EXISTS refreshment_bills (
       id INTEGER PRIMARY KEY AUTO_INCREMENT,
       institution_id INTEGER NOT NULL,
-      month TEXT NOT NULL,
+      month VARCHAR(255) NOT NULL,
       bill_submitted INTEGER DEFAULT 0,
       bill_submitted_date TEXT,
       bill_amount REAL DEFAULT 0,
       demand_packets INTEGER DEFAULT 0,
-      payment_status TEXT CHECK(payment_status IN ('PENDING', 'PROCESSED', 'PAID')) DEFAULT 'PENDING',
+      payment_status VARCHAR(255) CHECK(payment_status IN ('PENDING', 'PROCESSED', 'PAID')) DEFAULT 'PENDING',
       payment_date TEXT,
       payment_ref TEXT,
       remarks TEXT,
@@ -190,7 +190,7 @@ async function initializeSchema(db) {
     CREATE TABLE IF NOT EXISTS item_stock_logs (
       id INTEGER PRIMARY KEY AUTO_INCREMENT,
       item_id INTEGER NOT NULL,
-      log_type TEXT CHECK(log_type IN ('STOCK_IN', 'CONSUMED', 'ADJUSTMENT')) NOT NULL,
+      log_type VARCHAR(255) CHECK(log_type IN ('STOCK_IN', 'CONSUMED', 'ADJUSTMENT')) NOT NULL,
       quantity INTEGER NOT NULL,
       balance_after INTEGER NOT NULL,
       expiry_date TEXT,
@@ -203,7 +203,7 @@ async function initializeSchema(db) {
 
     CREATE TABLE IF NOT EXISTS packet_templates (
       id INTEGER PRIMARY KEY AUTO_INCREMENT,
-      name TEXT NOT NULL DEFAULT 'Standard Refreshment Packet',
+      name VARCHAR(255) NOT NULL DEFAULT 'Standard Refreshment Packet',
       target_budget REAL DEFAULT 75.0,
       gst_rate REAL DEFAULT 5.0,
       is_active INTEGER DEFAULT 1,
@@ -228,14 +228,14 @@ async function initializeSchema(db) {
       institution_id INTEGER,
       unit_id INTEGER NOT NULL,
       demand_id INTEGER,
-      initiated_by TEXT NOT NULL DEFAULT 'ANO',
+      initiated_by VARCHAR(255) NOT NULL DEFAULT 'ANO',
       created_by_user_id INTEGER NOT NULL,
-      category TEXT NOT NULL DEFAULT 'QUALITY',
-      severity TEXT NOT NULL DEFAULT 'MEDIUM',
+      category VARCHAR(255) NOT NULL DEFAULT 'QUALITY',
+      severity VARCHAR(255) NOT NULL DEFAULT 'MEDIUM',
       subject TEXT NOT NULL,
       description TEXT NOT NULL,
       photo_url TEXT,
-      status TEXT NOT NULL DEFAULT 'SUBMITTED_TO_UNIT',
+      status VARCHAR(255) NOT NULL DEFAULT 'SUBMITTED_TO_UNIT',
       unit_remarks TEXT,
       forwarded_to_vendor_at DATETIME,
       forwarded_by_user_id INTEGER,
@@ -306,7 +306,7 @@ async function initializeSchema(db) {
 
   // Ensure demand_time column exists in demands table
   try {
-    await db.run("ALTER TABLE demands ADD COLUMN demand_time TEXT DEFAULT '08:00'");
+    await db.run("ALTER TABLE demands ADD COLUMN demand_time VARCHAR(255) DEFAULT '08:00'");
   } catch (err) {
     // Column already exists or freshly created
   }
@@ -320,7 +320,7 @@ async function initializeSchema(db) {
 
   // Ensure demands status CHECK constraint includes 'ACCEPTED'
   try {
-    const tbl = await db.get("SELECT COLUMN_TYPE as sql FROM information_schema.COLUMNS WHERE TABLE_NAME='demands' AND COLUMN_NAME='status'");
+    const tbl = await db.get("SELECT COLUMN_TYPE as `sql` FROM information_schema.COLUMNS WHERE TABLE_NAME='demands' AND COLUMN_NAME='status'");
     if (tbl && tbl.sql && !tbl.sql.includes("'ACCEPTED'")) {
       
       await db.run(`
@@ -331,9 +331,9 @@ async function initializeSchema(db) {
           unit_id INTEGER NOT NULL,
           raised_by INTEGER NOT NULL,
           demand_date TEXT NOT NULL,
-          demand_time TEXT DEFAULT '08:00',
+          demand_time VARCHAR(255) DEFAULT '08:00',
           purpose TEXT NOT NULL,
-          status TEXT CHECK(status IN ('PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED', 'CANCELLED', 'FULFILLED')) DEFAULT 'PENDING',
+          status VARCHAR(255) CHECK(status IN ('PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED', 'CANCELLED', 'FULFILLED')) DEFAULT 'PENDING',
           reviewed_by INTEGER,
           review_remarks TEXT,
           reviewed_at DATETIME,
@@ -391,7 +391,7 @@ async function initializeSchema(db) {
     "ALTER TABLE demands ADD COLUMN delivery_partner_name TEXT",
     "ALTER TABLE demands ADD COLUMN delivery_partner_phone TEXT",
     "ALTER TABLE demands ADD COLUMN delivery_partner_vehicle TEXT",
-    "ALTER TABLE demands ADD COLUMN delivery_status TEXT DEFAULT 'PENDING'",
+    "ALTER TABLE demands ADD COLUMN delivery_status VARCHAR(255) DEFAULT 'PENDING'",
     "ALTER TABLE demands ADD COLUMN dispatched_at DATETIME",
     "ALTER TABLE demands ADD COLUMN delivered_at DATETIME",
     "ALTER TABLE demands ADD COLUMN delivery_notes TEXT",
@@ -403,8 +403,8 @@ async function initializeSchema(db) {
     "ALTER TABLE demands ADD COLUMN start_km_reading REAL",
     "ALTER TABLE demands ADD COLUMN closing_km_reading REAL",
     "ALTER TABLE demands ADD COLUMN total_km REAL",
-    "ALTER TABLE demands ADD COLUMN demand_type TEXT DEFAULT 'INSTITUTION'",
-    "ALTER TABLE demands ADD COLUMN packet_type TEXT DEFAULT 'REGULAR'",
+    "ALTER TABLE demands ADD COLUMN demand_type VARCHAR(255) DEFAULT 'INSTITUTION'",
+    "ALTER TABLE demands ADD COLUMN packet_type VARCHAR(255) DEFAULT 'REGULAR'",
     "ALTER TABLE demands ADD COLUMN custom_unit_rate REAL",
     "ALTER TABLE demands ADD COLUMN delivery_venue TEXT"
   ];
@@ -420,7 +420,7 @@ async function initializeSchema(db) {
     const instCol = dCols.find(c => c.Field === 'institution_id');
     if (instCol && instCol.Null === 'NO') {
       
-      const tableSqlRes = await db.get("SELECT COLUMN_TYPE as sql FROM information_schema.COLUMNS WHERE TABLE_NAME='demands' AND COLUMN_NAME='status'");
+      const tableSqlRes = await db.get("SELECT COLUMN_TYPE as `sql` FROM information_schema.COLUMNS WHERE TABLE_NAME='demands' AND COLUMN_NAME='status'");
       if (tableSqlRes && tableSqlRes.sql) {
         let newSql = tableSqlRes.sql.replace('institution_id INTEGER NOT NULL', 'institution_id INTEGER');
         await db.run("ALTER TABLE demands RENAME TO demands_old_notnull");
@@ -443,10 +443,10 @@ async function initializeSchema(db) {
     await db.run("ALTER TABLE delivery_partners ADD COLUMN password_hash TEXT");
   } catch (e) { }
   try {
-    await db.run("ALTER TABLE delivery_partners ADD COLUMN vehicle_type TEXT DEFAULT 'ECO'");
+    await db.run("ALTER TABLE delivery_partners ADD COLUMN vehicle_type VARCHAR(255) DEFAULT 'ECO'");
   } catch (e) { }
   try {
-    await db.run("ALTER TABLE delivery_partners ADD COLUMN vehicle_model TEXT DEFAULT 'Maruti Eeco Cargo'");
+    await db.run("ALTER TABLE delivery_partners ADD COLUMN vehicle_model VARCHAR(255) DEFAULT 'Maruti Eeco Cargo'");
   } catch (e) { }
   try {
     await db.run("ALTER TABLE delivery_partners ADD COLUMN load_capacity_packets INTEGER DEFAULT 750");
