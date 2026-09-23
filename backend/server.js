@@ -59,17 +59,20 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve React frontend (always, if dist folder exists)
-const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
+// Serve React frontend (check frontend/dist then backend/public)
 const fs = require('fs');
-if (fs.existsSync(frontendBuild)) {
-  app.use(express.static(frontendBuild));
+const primaryBuild = path.join(__dirname, '..', 'frontend', 'dist');
+const fallbackBuild = path.join(__dirname, 'public');
+const activeBuild = fs.existsSync(primaryBuild) ? primaryBuild : (fs.existsSync(fallbackBuild) ? fallbackBuild : null);
+
+if (activeBuild) {
+  app.use(express.static(activeBuild));
   app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendBuild, 'index.html'));
+    res.sendFile(path.join(activeBuild, 'index.html'));
   });
-  console.log('Serving frontend from:', frontendBuild);
+  console.log('Serving frontend from:', activeBuild);
 } else {
-  console.log('No frontend build found at:', frontendBuild);
+  console.log('No frontend build found at:', primaryBuild, 'or', fallbackBuild);
 }
 
 // Start HTTP server immediately so Render detects port and serves frontend without delay
