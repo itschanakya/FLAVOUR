@@ -353,7 +353,7 @@ async function initializeSchema(db) {
       await db.run(`INSERT INTO demands_new SELECT id, demand_number, institution_id, unit_id, raised_by, demand_date, COALESCE(demand_time, '08:00'), purpose, status, reviewed_by, review_remarks, reviewed_at, accepted_by, accepted_at, delivery_receipt_url, invoice_url, is_deleted, created_at FROM demands`);
       await db.run('DROP TABLE demands');
       await db.run('ALTER TABLE demands_new RENAME TO demands');
-      await db.run('PRAGMA foreign_keys = ON');
+      await db.run('SET FOREIGN_KEY_CHECKS = 1');
     }
   } catch (err) {
     console.error('Migration error for demands status check:', err);
