@@ -1061,7 +1061,7 @@ export default function AppSettings() {
                   />
                 </div>
               )}
-              {(activeTab === 'unit-credentials' || activeTab === 'units') && (
+              {activeTab === 'unit-credentials' && (
                 <button
                   onClick={handleOpenAddUnit}
                   className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all whitespace-nowrap cursor-pointer"
