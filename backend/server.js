@@ -72,17 +72,15 @@ if (fs.existsSync(frontendBuild)) {
   console.log('No frontend build found at:', frontendBuild);
 }
 
-// Initialize database and start server
-getDB()
-  .then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`=======================================================`);
-      console.log(` NCC Refreshment API Server running on port ${PORT} (LAN 0.0.0.0)`);
-      console.log(` Health check: http://localhost:${PORT}/api/health`);
-      console.log(`=======================================================`);
-    });
-  })
-  .catch((err) => {
-    console.error('Failed to initialize database:', err);
-    process.exit(1);
-  });
+// Start HTTP server immediately so Render detects port and serves frontend without delay
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`=======================================================`);
+  console.log(` NCC Refreshment API Server running on port ${PORT} (LAN 0.0.0.0)`);
+  console.log(` Health check: http://localhost:${PORT}/api/health`);
+  console.log(`=======================================================`);
+});
+
+// Initialize database schema in background
+getDB().catch((err) => {
+  console.error('Failed to initialize database:', err);
+});

@@ -150,7 +150,8 @@ export default function AdminDashboard() {
   const approvedVal = summary?.financials?.approved_amount || 0;
 
   // Filter units by search keyword
-  const filteredUnits = onboardUnits.filter(u => {
+  const safeUnits = Array.isArray(onboardUnits) ? onboardUnits : [];
+  const filteredUnits = safeUnits.filter(u => {
     const q = unitSearch.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -162,7 +163,8 @@ export default function AdminDashboard() {
   });
 
   // Filter demands by unit, status, and time
-  const displayedDemands = approvedDemands.filter(d => {
+  const safeDemands = Array.isArray(approvedDemands) ? approvedDemands : [];
+  const displayedDemands = safeDemands.filter(d => {
     if (selectedUnitId !== 'ALL' && d.unit_id !== selectedUnitId) return false;
 
     // Status filter (Vendor sees APPROVED as PENDING action)

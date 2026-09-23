@@ -54,25 +54,31 @@ class DBWrapper {
   }
 }
 
+let initPromise = null;
+
 async function getDB() {
   if (dbInstance) return dbInstance;
+  if (initPromise) return initPromise;
 
-  const pool = mysql.createPool({
-    uri: process.env.DATABASE_URL || 'mysql://root:password@127.0.0.1:4000/test',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    multipleStatements: true,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 10000,
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: true } : undefined
-  });
+  initPromise = (async () => {
+    const pool = mysql.createPool({
+      uri: process.env.DATABASE_URL || 'mysql://root:password@127.0.0.1:4000/test',
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      multipleStatements: true,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
+      ssl: process.env.DATABASE_URL ? { rejectUnauthorized: true } : undefined
+    });
 
-  dbInstance = new DBWrapper(pool);
+    const instance = new DBWrapper(pool);
+    await initializeSchema(instance);
+    dbInstance = instance;
+    return dbInstance;
+  })();
 
-  await initializeSchema(dbInstance);
-
-  return dbInstance;
+  return initPromise;
 }
 
 async function initializeSchema(db) {

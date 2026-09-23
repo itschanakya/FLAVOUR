@@ -70,8 +70,10 @@ export default function RefreshmentReports() {
         fetch('/api/institutions', { headers })
       ]);
       
-      setDemands(await demandsRes.json());
-      setInstitutions(await instRes.json());
+      const dJson = await demandsRes.json();
+      const iJson = await instRes.json();
+      setDemands(Array.isArray(dJson) ? dJson : []);
+      setInstitutions(Array.isArray(iJson) ? iJson : []);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load data');
@@ -1172,21 +1174,24 @@ export default function RefreshmentReports() {
     const [search, setSearch] = useState('');
     const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
     
+    const safeDemands = Array.isArray(demands) ? demands : [];
+    const safeInstitutions = Array.isArray(institutions) ? institutions : [];
+
     const availableYears = useMemo(() => {
       const yrs = new Set();
-      const filteredDemands = demands.filter(d => selectedGroup === 'All' || d.ncc_group === selectedGroup);
+      const filteredDemands = safeDemands.filter(d => selectedGroup === 'All' || d.ncc_group === selectedGroup);
       filteredDemands.forEach(d => {
         if (d.demand_date) yrs.add(new Date(d.demand_date).getFullYear().toString());
       });
       return Array.from(yrs).sort().reverse();
-    }, [demands, selectedGroup]);
+    }, [safeDemands, selectedGroup]);
     
     if (!availableYears.includes(yearFilter) && availableYears.length > 0) {
       setYearFilter(availableYears[0]);
     }
 
     const schoolStats = useMemo(() => {
-      const filteredInstitutions = institutions.filter(i => selectedGroup === 'All' || i.ncc_group === selectedGroup);
+      const filteredInstitutions = safeInstitutions.filter(i => selectedGroup === 'All' || i.ncc_group === selectedGroup);
       
       return filteredInstitutions.map(inst => {
         const cadetStr = (inst.strength_1st_year || 0) + (inst.strength_2nd_year || 0) + (inst.strength_3rd_year || 0);
@@ -1194,7 +1199,7 @@ export default function RefreshmentReports() {
         const authClasses = 35;
         const authPackets = vacancy * authClasses;
         
-        const instDemands = demands.filter(d => {
+        const instDemands = safeDemands.filter(d => {
           if (d.institution_id !== inst.id) return false;
           if (d.status === 'CANCELLED' || d.status === 'REJECTED') return false;
           const dYear = new Date(d.demand_date).getFullYear().toString();
@@ -1214,7 +1219,7 @@ export default function RefreshmentReports() {
           vacancy, authClasses, authPackets, classesHeld, packetsDemanded, totalAmount, balanceClasses, balancePackets, utilizationPct, isOverQuota
         };
       }).sort((a, b) => a.institution_name.localeCompare(b.institution_name));
-    }, [institutions, demands, yearFilter]);
+    }, [safeInstitutions, safeDemands, yearFilter]);
 
     const filtered = schoolStats.filter(s => 
       s.institution_name.toLowerCase().includes(search.toLowerCase()) || 
@@ -1337,15 +1342,116 @@ export default function RefreshmentReports() {
     );
   };
 
+  const BillTableRow = ({ inst, sysAgg, billRecord, onSave, isAdmin }) => {
+    const [editData, setEditData] = useState({
+      id: billRecord?.id,
+      billSubmitted: billRecord?.bill_submitted === 1,
+      billSubmittedDate: billRecord?.bill_submitted_date || '',
+      demandPackets: billRecord?.demand_packets || sysAgg.packets,
+      billAmount: billRecord?.bill_amount || sysAgg.amount,
+      paymentStatus: billRecord?.payment_status || 'PENDING',
+      remarks: billRecord?.remarks || ''
+    });
+
+    useEffect(() => {
+      setEditData({
+        id: billRecord?.id,
+        billSubmitted: billRecord?.bill_submitted === 1,
+        billSubmittedDate: billRecord?.bill_submitted_date || '',
+        demandPackets: billRecord?.demand_packets || sysAgg.packets,
+        billAmount: billRecord?.bill_amount || sysAgg.amount,
+        paymentStatus: billRecord?.payment_status || 'PENDING',
+        remarks: billRecord?.remarks || ''
+      });
+    }, [
+      billRecord?.id, billRecord?.bill_submitted, billRecord?.bill_submitted_date, 
+      billRecord?.demand_packets, billRecord?.bill_amount, billRecord?.payment_status, billRecord?.remarks,
+      sysAgg.packets, sysAgg.amount
+    ]);
+
+    return (
+      <tr className="hover:bg-slate-100/40 print:bg-white">
+        <td className="px-4 py-4">
+          <div className="font-black text-xs text-slate-800 uppercase print:text-black truncate">{inst.institution_name}</div>
+          <div className="text-[10px] font-bold text-slate-500 uppercase print:text-slate-700">{inst.ano_cto_name || '-'}</div>
+        </td>
+        <td className="px-4 py-4 text-center font-black text-blue-600 border-l border-slate-200 print:text-black print:border-black bg-slate-50/50 print:bg-slate-100">{sysAgg.packets}</td>
+        <td className="px-4 py-4 text-right font-black text-emerald-600 border-r border-slate-200 print:text-black print:border-black bg-slate-50/50 print:bg-slate-100">₹{formatAmount(sysAgg.amount)}</td>
+        
+        <td className="px-4 py-4 text-center">
+          {isAdmin ? (
+            <div className="flex flex-col gap-1 items-center">
+              <input type="checkbox" checked={editData.billSubmitted} onChange={e => setEditData({...editData, billSubmitted: e.target.checked})} className="w-4 h-4 bg-white border-slate-300 rounded" />
+              {editData.billSubmitted && <input type="date" value={editData.billSubmittedDate} onChange={e => setEditData({...editData, billSubmittedDate: e.target.value})} className="bg-slate-50 border border-slate-300 text-[10px] rounded px-1" />}
+            </div>
+          ) : (
+            <span className={`px-2 py-1 rounded text-[10px] font-black ${billRecord?.bill_submitted ? 'bg-emerald-900/50 text-emerald-600' : 'bg-rose-900/50 text-rose-600'} print:text-black print:bg-transparent`}>
+              {billRecord?.bill_submitted ? `YES (${formatDate(billRecord.bill_submitted_date)})` : 'NO'}
+            </span>
+          )}
+        </td>
+        
+        <td className="px-4 py-4 text-center border-l border-slate-200 print:border-black">
+          {isAdmin ? (
+            <input type="number" value={editData.demandPackets} onChange={e => setEditData({...editData, demandPackets: Number(e.target.value)})} className="bg-slate-50 border border-slate-300 rounded px-2 py-1 w-16 text-center text-xs font-black text-slate-800" />
+          ) : (
+            <span className="font-black text-xs print:text-black">{billRecord?.demand_packets || '-'}</span>
+          )}
+        </td>
+        
+        <td className="px-4 py-4 text-right">
+          {isAdmin ? (
+            <input type="number" value={editData.billAmount} onChange={e => setEditData({...editData, billAmount: Number(e.target.value)})} className="bg-slate-50 border border-slate-300 rounded px-2 py-1 w-24 text-right text-xs font-black text-slate-800" />
+          ) : (
+            <span className="font-black text-xs print:text-black">{billRecord?.bill_amount ? `₹${formatAmount(billRecord.bill_amount)}` : '-'}</span>
+          )}
+        </td>
+        
+        <td className="px-4 py-4 text-center border-l border-slate-200 print:border-black">
+          {isAdmin ? (
+            <select value={editData.paymentStatus} onChange={e => setEditData({...editData, paymentStatus: e.target.value})} className={`bg-slate-50 border border-slate-300 rounded px-2 py-1 text-[10px] font-black outline-none ${editData.paymentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-400'}`}>
+              <option value="PENDING">PENDING</option>
+              <option value="PAID">PAID</option>
+            </select>
+          ) : (
+            <span className={`px-2 py-1 rounded text-[10px] font-black ${billRecord?.payment_status === 'PAID' ? 'bg-emerald-900/50 text-emerald-600' : 'bg-amber-900/50 text-amber-400'} print:text-black print:bg-transparent`}>
+              {billRecord?.payment_status || 'PENDING'}
+            </span>
+          )}
+        </td>
+        
+        <td className="px-4 py-4">
+          {isAdmin ? (
+            <input type="text" value={editData.remarks} onChange={e => setEditData({...editData, remarks: e.target.value})} className="bg-slate-50 border border-slate-300 rounded px-2 py-1 w-full text-[10px] text-slate-700" placeholder="Remarks..." />
+          ) : (
+            <span className="text-[10px] text-slate-500 print:text-slate-700">{billRecord?.remarks || '-'}</span>
+          )}
+        </td>
+        
+        {isAdmin && (
+          <td className="px-4 py-4 text-center border-l border-slate-200 print:hidden">
+            <button onClick={() => onSave(inst.id, inst.institution_name, editData)} className="p-1.5 bg-blue-600/20 hover:bg-blue-600/50 text-blue-600 rounded-lg transition-all" title="Save Bill Data">
+              <Save size={14} />
+            </button>
+          </td>
+        )}
+      </tr>
+    );
+  };
+
   const BillTrackerView = () => {
     const [month, setMonth] = useState(getLocalYearMonth());
     const [bills, setBills] = useState([]);
     const [loadingBills, setLoadingBills] = useState(false);
     
+    const safeDemands = Array.isArray(demands) ? demands : [];
+    const safeInstitutions = Array.isArray(institutions) ? institutions : [];
+    const safeBills = Array.isArray(bills) ? bills : [];
+
     // Derived aggregates from demands for the selected month to aid billing
     const monthDemandsAgg = useMemo(() => {
       const agg = {};
-      const filteredDemands = demands.filter(d => selectedGroup === 'All' || d.ncc_group === selectedGroup);
+      const filteredDemands = safeDemands.filter(d => selectedGroup === 'All' || d.ncc_group === selectedGroup);
       filteredDemands.forEach(d => {
         if (!d.demand_date) return;
         const dMonth = new Date(d.demand_date).toISOString().slice(0, 7);
@@ -1356,16 +1462,17 @@ export default function RefreshmentReports() {
         }
       });
       return agg;
-    }, [demands, month]);
+    }, [safeDemands, month, selectedGroup]);
 
     const fetchBills = async () => {
       setLoadingBills(true);
       try {
         const res = await fetch(`/api/refreshment-bills?month=${month}`, { headers: { Authorization: `Bearer ${token}` } });
         const data = await res.json();
-        setBills(data);
+        setBills(Array.isArray(data) ? data : []);
       } catch (err) {
         toast.error('Failed to load bills');
+        setBills([]);
       } finally {
         setLoadingBills(false);
       }
@@ -1396,6 +1503,8 @@ export default function RefreshmentReports() {
         toast.error('Failed to save bill');
       }
     };
+
+    const displayedInstitutions = safeInstitutions.filter(i => selectedGroup === 'All' || i.ncc_group === selectedGroup);
 
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
@@ -1431,106 +1540,18 @@ export default function RefreshmentReports() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 print:divide-black">
-                {institutions.filter(i => selectedGroup === 'All' || i.ncc_group === selectedGroup).map(inst => {
+                {displayedInstitutions.map(inst => {
                   const sysAgg = monthDemandsAgg[inst.id] || { packets: 0, amount: 0 };
-                  const billRecord = bills.find(b => b.institution_id === inst.id) || {};
-                  
-                  // Local state for inline editing by ADMIN
-                  const [editData, setEditData] = useState({
-                    id: billRecord.id,
-                    billSubmitted: billRecord.bill_submitted === 1,
-                    billSubmittedDate: billRecord.bill_submitted_date || '',
-                    demandPackets: billRecord.demand_packets || sysAgg.packets,
-                    billAmount: billRecord.bill_amount || sysAgg.amount,
-                    paymentStatus: billRecord.payment_status || 'PENDING',
-                    remarks: billRecord.remarks || ''
-                  });
-
-                  // Only update state when critical source fields change, 
-                  // using primitives in dependency array to avoid infinite loops
-                  useEffect(() => {
-                     setEditData({
-                      id: billRecord.id,
-                      billSubmitted: billRecord.bill_submitted === 1,
-                      billSubmittedDate: billRecord.bill_submitted_date || '',
-                      demandPackets: billRecord.demand_packets || sysAgg.packets,
-                      billAmount: billRecord.bill_amount || sysAgg.amount,
-                      paymentStatus: billRecord.payment_status || 'PENDING',
-                      remarks: billRecord.remarks || ''
-                     });
-                  }, [
-                    billRecord.id, billRecord.bill_submitted, billRecord.bill_submitted_date, 
-                    billRecord.demand_packets, billRecord.bill_amount, billRecord.payment_status, billRecord.remarks,
-                    sysAgg.packets, sysAgg.amount
-                  ]);
-
+                  const billRecord = safeBills.find(b => b.institution_id === inst.id) || {};
                   return (
-                    <tr key={inst.id} className="hover:bg-slate-100/40 print:bg-white">
-                      <td className="px-4 py-4">
-                        <div className="font-black text-xs text-slate-800 uppercase print:text-black truncate">{inst.institution_name}</div>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase print:text-slate-700">{inst.ano_cto_name || '-'}</div>
-                      </td>
-                      <td className="px-4 py-4 text-center font-black text-blue-600 border-l border-slate-200 print:text-black print:border-black bg-slate-50/50 print:bg-slate-100">{sysAgg.packets}</td>
-                      <td className="px-4 py-4 text-right font-black text-emerald-600 border-r border-slate-200 print:text-black print:border-black bg-slate-50/50 print:bg-slate-100">₹{formatAmount(sysAgg.amount)}</td>
-                      
-                      <td className="px-4 py-4 text-center">
-                        {user?.role === 'ADMIN' ? (
-                          <div className="flex flex-col gap-1 items-center">
-                            <input type="checkbox" checked={editData.billSubmitted} onChange={e => setEditData({...editData, billSubmitted: e.target.checked})} className="w-4 h-4 bg-white border-slate-300 rounded" />
-                            {editData.billSubmitted && <input type="date" value={editData.billSubmittedDate} onChange={e => setEditData({...editData, billSubmittedDate: e.target.value})} className="bg-slate-50 border border-slate-300 text-[10px] rounded px-1" />}
-                          </div>
-                        ) : (
-                          <span className={`px-2 py-1 rounded text-[10px] font-black ${billRecord.bill_submitted ? 'bg-emerald-900/50 text-emerald-600' : 'bg-rose-900/50 text-rose-600'} print:text-black print:bg-transparent`}>
-                            {billRecord.bill_submitted ? `YES (${formatDate(billRecord.bill_submitted_date)})` : 'NO'}
-                          </span>
-                        )}
-                      </td>
-                      
-                      <td className="px-4 py-4 text-center border-l border-slate-200 print:border-black">
-                        {user?.role === 'ADMIN' ? (
-                          <input type="number" value={editData.demandPackets} onChange={e => setEditData({...editData, demandPackets: Number(e.target.value)})} className="bg-slate-50 border border-slate-300 rounded px-2 py-1 w-16 text-center text-xs font-black text-slate-800" />
-                        ) : (
-                          <span className="font-black text-xs print:text-black">{billRecord.demand_packets || '-'}</span>
-                        )}
-                      </td>
-                      
-                      <td className="px-4 py-4 text-right">
-                        {user?.role === 'ADMIN' ? (
-                          <input type="number" value={editData.billAmount} onChange={e => setEditData({...editData, billAmount: Number(e.target.value)})} className="bg-slate-50 border border-slate-300 rounded px-2 py-1 w-24 text-right text-xs font-black text-slate-800" />
-                        ) : (
-                          <span className="font-black text-xs print:text-black">{billRecord.bill_amount ? `₹${formatAmount(billRecord.bill_amount)}` : '-'}</span>
-                        )}
-                      </td>
-                      
-                      <td className="px-4 py-4 text-center border-l border-slate-200 print:border-black">
-                        {user?.role === 'ADMIN' ? (
-                          <select value={editData.paymentStatus} onChange={e => setEditData({...editData, paymentStatus: e.target.value})} className={`bg-slate-50 border border-slate-300 rounded px-2 py-1 text-[10px] font-black outline-none ${editData.paymentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-400'}`}>
-                            <option value="PENDING">PENDING</option>
-                            <option value="PAID">PAID</option>
-                          </select>
-                        ) : (
-                          <span className={`px-2 py-1 rounded text-[10px] font-black ${billRecord.payment_status === 'PAID' ? 'bg-emerald-900/50 text-emerald-600' : 'bg-amber-900/50 text-amber-400'} print:text-black print:bg-transparent`}>
-                            {billRecord.payment_status || 'PENDING'}
-                          </span>
-                        )}
-                      </td>
-                      
-                      <td className="px-4 py-4">
-                        {user?.role === 'ADMIN' ? (
-                          <input type="text" value={editData.remarks} onChange={e => setEditData({...editData, remarks: e.target.value})} className="bg-slate-50 border border-slate-300 rounded px-2 py-1 w-full text-[10px] text-slate-700" placeholder="Remarks..." />
-                        ) : (
-                          <span className="text-[10px] text-slate-500 print:text-slate-700">{billRecord.remarks || '-'}</span>
-                        )}
-                      </td>
-                      
-                      {user?.role === 'ADMIN' && (
-                        <td className="px-4 py-4 text-center border-l border-slate-200 print:hidden">
-                          <button onClick={() => handleSaveBill(inst.id, inst.institution_name, editData)} className="p-1.5 bg-blue-600/20 hover:bg-blue-600/50 text-blue-600 rounded-lg transition-all" title="Save Bill Data">
-                            <Save size={14} />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
+                    <BillTableRow
+                      key={inst.id}
+                      inst={inst}
+                      sysAgg={sysAgg}
+                      billRecord={billRecord}
+                      onSave={handleSaveBill}
+                      isAdmin={user?.role === 'ADMIN'}
+                    />
                   );
                 })}
               </tbody>

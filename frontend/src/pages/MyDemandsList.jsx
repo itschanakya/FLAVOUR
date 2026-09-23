@@ -43,21 +43,23 @@ export default function MyDemandsList() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      setDemands(data);
+      setDemands(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setDemands([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const countAll = demands.length;
-  const countAccepted = demands.filter(d => d.status === 'ACCEPTED').length;
-  const countDelivered = demands.filter(d => d.delivery_status === 'DELIVERED').length;
-  const countPending = demands.filter(d => d.status === 'PENDING' || d.status === 'SUBMITTED').length;
-  const countRejected = demands.filter(d => d.status === 'REJECTED' || d.status === 'CANCELLED').length;
+  const safeDemands = Array.isArray(demands) ? demands : [];
+  const countAll = safeDemands.length;
+  const countAccepted = safeDemands.filter(d => d.status === 'ACCEPTED').length;
+  const countDelivered = safeDemands.filter(d => d.delivery_status === 'DELIVERED').length;
+  const countPending = safeDemands.filter(d => d.status === 'PENDING' || d.status === 'SUBMITTED').length;
+  const countRejected = safeDemands.filter(d => d.status === 'REJECTED' || d.status === 'CANCELLED').length;
 
-  const filteredDemands = demands.filter((dem) => {
+  const filteredDemands = safeDemands.filter((dem) => {
     if (statusSlicer === 'ACCEPTED' && dem.status !== 'ACCEPTED') return false;
     if (statusSlicer === 'DELIVERED' && dem.delivery_status !== 'DELIVERED') return false;
     if (statusSlicer === 'PENDING' && dem.status !== 'PENDING' && dem.status !== 'SUBMITTED') return false;

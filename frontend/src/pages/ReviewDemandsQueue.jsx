@@ -515,10 +515,11 @@ export default function ReviewDemandsQueue() {
   };
 
   const counts = {};
+  const safeDemands = Array.isArray(demands) ? demands : [];
   for (const st of Object.keys(STATUS_CONFIG)) {
-    counts[st] = st === 'ALL' ? demands.length : demands.filter(d => d.status === st).length;
+    counts[st] = st === 'ALL' ? safeDemands.length : safeDemands.filter(d => d.status === st).length;
   }
-  const pendingCount = demands.filter(d => d.status === 'PENDING').length;
+  const pendingCount = safeDemands.filter(d => d.status === 'PENDING').length;
 
   return (
     <div className="w-full space-y-5">

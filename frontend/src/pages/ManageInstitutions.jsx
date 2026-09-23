@@ -39,9 +39,10 @@ export default function ManageInstitutions() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      setInstitutions(data);
+      setInstitutions(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setInstitutions([]);
     } finally {
       setLoading(false);
     }
@@ -219,7 +220,7 @@ export default function ManageInstitutions() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {institutions.filter(inst =>
+              {(Array.isArray(institutions) ? institutions : []).filter(inst =>
                 !pinFilter || (inst.pin_code && inst.pin_code.startsWith(pinFilter))
               ).length === 0 ? (
                 <tr>
@@ -228,7 +229,7 @@ export default function ManageInstitutions() {
                   </td>
                 </tr>
               ) : (
-                institutions
+                (Array.isArray(institutions) ? institutions : [])
                   .filter(inst => !pinFilter || (inst.pin_code && inst.pin_code.startsWith(pinFilter)))
                   .map((inst) => {
                   const total = (inst.strength_1st_year || 0) + (inst.strength_2nd_year || 0) + (inst.strength_3rd_year || 0);

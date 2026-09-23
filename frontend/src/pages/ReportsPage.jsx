@@ -80,13 +80,16 @@ export default function ReportsPage() {
       // Master options for filters
       if (user.role === 'ADMIN') {
         const uRes = await fetch('/api/units', { headers: { Authorization: `Bearer ${token}` } });
-        setUnits(await uRes.json());
+        const uData = await uRes.json();
+        setUnits(Array.isArray(uData) ? uData : []);
       }
       const iRes = await fetch('/api/institutions', { headers: { Authorization: `Bearer ${token}` } });
-      setInstitutions(await iRes.json());
+      const iData = await iRes.json();
+      setInstitutions(Array.isArray(iData) ? iData : []);
 
       const cRes = await fetch('/api/catalog', { headers: { Authorization: `Bearer ${token}` } });
-      setCatalog(await cRes.json());
+      const cData = await cRes.json();
+      setCatalog(Array.isArray(cData) ? cData : []);
 
     } catch (err) {
       console.error(err);
@@ -195,7 +198,7 @@ export default function ReportsPage() {
 
   // Chart data preparation
   const pieColors = ['#f59e0b', '#3b82f6', '#ef4444', '#64748b', '#10b981'];
-  const statusPieData = summary ? [
+  const statusPieData = (summary && summary.summary) ? [
     { name: 'Pending', value: summary.summary.PENDING },
     { name: 'Approved', value: summary.summary.APPROVED },
     { name: 'Rejected', value: summary.summary.REJECTED },
