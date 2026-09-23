@@ -181,10 +181,11 @@ export default function InstitutionDashboard() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const catData = await catRes.json();
-      setCatalog(catData);
+      setCatalog(Array.isArray(catData) ? catData : []);
 
     } catch (err) {
       console.error(err);
+      setCatalog([]);
     } finally {
       setLoading(false);
     }
@@ -200,13 +201,15 @@ export default function InstitutionDashboard() {
   // Calculate consumed from history
   let consumedQuota = 0;
   let totalCost = 0;
-  recentDemands.forEach(d => {
+  const safeDemands = Array.isArray(recentDemands) ? recentDemands : [];
+  safeDemands.forEach(d => {
     consumedQuota += (d.total_quantity || 0);
     totalCost += (d.total_amount || 0);
   });
   const remainingQuota = annualQuota - consumedQuota;
 
-  const defaultItem = catalog.find(c => c.item_name === 'Standard Refreshment Packet') || catalog[0];
+  const safeCatalog = Array.isArray(catalog) ? catalog : [];
+  const defaultItem = safeCatalog.find(c => c.item_name === 'Standard Refreshment Packet') || safeCatalog[0];
   const perPacketPrice = defaultItem ? Number(defaultItem.unit_price || 75.00) : 75.00;
   const demandTotalAmount = (parseInt(totalDemanded) || 0) * perPacketPrice;
 
