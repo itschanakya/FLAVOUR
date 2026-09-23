@@ -490,7 +490,7 @@ export default function Layout({ children }) {
             {/* Center: Main Navigation (Visible in Laptop/PC View) */}
             {!isMobileView && (
               <nav className="hidden lg:flex items-center justify-center gap-1.5 xl:gap-2.5 mx-4 flex-1">
-                {currentNav.map((item) => {
+                {(Array.isArray(currentNav) ? currentNav : []).map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path ||
                     (item.path === '/dashboard' && location.pathname === '/') ||
@@ -632,7 +632,7 @@ export default function Layout({ children }) {
           style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))' }}
         >
           <nav className="flex items-center justify-around w-full max-w-md mx-auto gap-0.5">
-            {(mobileNavItems[role] || currentNav).map((item) => {
+            {(Array.isArray(mobileNavItems[role] || currentNav) ? (mobileNavItems[role] || currentNav) : []).map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path ||
                 (item.path === '/dashboard' && location.pathname === '/') ||
