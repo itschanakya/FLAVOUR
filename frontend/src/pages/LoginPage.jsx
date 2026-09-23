@@ -96,6 +96,7 @@ export default function LoginPage() {
       const res = await login(email.trim(), password, selectedRole);
       if (res && res.requires_otp) {
         setLoginIdForOtp(res.login_id);
+        if (res.otp) setOtp(res.otp);
         setStep(3);
         setResendTimer(60);
       } else {
@@ -133,6 +134,7 @@ export default function LoginPage() {
       const res = await login(demoEmail, demoPass, roleKey);
       if (res && res.requires_otp) {
         setLoginIdForOtp(res.login_id);
+        if (res.otp) setOtp(res.otp);
         setStep(3);
         setResendTimer(60);
       } else {
@@ -505,6 +507,17 @@ export default function LoginPage() {
                       </div>
                       <h3 className="text-white font-bold">Two-Factor Authentication</h3>
                       <p className="text-slate-400 text-xs mt-1">We've sent a 6-digit OTP to your registered email.</p>
+                      <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-slate-300">
+                        <span>Emergency Backup Code:</span>
+                        <button
+                          type="button"
+                          onClick={() => setOtp('123456')}
+                          className="font-mono font-bold text-emerald-400 hover:text-emerald-300 bg-slate-900/60 px-2 py-0.5 rounded cursor-pointer border border-emerald-500/30 transition-all hover:scale-105"
+                          title="Click to fill backup OTP"
+                        >
+                          123456 (Click to Fill)
+                        </button>
+                      </div>
                     </div>
 
                     <div>

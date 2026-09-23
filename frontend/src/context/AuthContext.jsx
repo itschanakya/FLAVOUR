@@ -43,14 +43,23 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password, expectedRole) => {
     let res;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     try {
       res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, expectedRole })
+        body: JSON.stringify({ email, password, expectedRole }),
+        signal: controller.signal
       });
     } catch (networkErr) {
+      if (networkErr.name === 'AbortError') {
+        throw new Error('Authentication request timed out. Please try again.');
+      }
       throw new Error('Unable to connect to the backend server. Please ensure the backend is running.');
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     let data;
@@ -79,14 +88,23 @@ export function AuthProvider({ children }) {
 
   const verifyOtp = async (login_id, otp) => {
     let res;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     try {
       res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login_id, otp })
+        body: JSON.stringify({ login_id, otp }),
+        signal: controller.signal
       });
     } catch (networkErr) {
+      if (networkErr.name === 'AbortError') {
+        throw new Error('Verification request timed out. Please try again.');
+      }
       throw new Error('Unable to connect to the backend server.');
+    } finally {
+      clearTimeout(timeoutId);
     }
     
     let data;

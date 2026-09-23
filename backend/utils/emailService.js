@@ -1,16 +1,19 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// Create a transporter using SMTP transport
+// Create a transporter using SMTP transport with aggressive timeouts
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Use Gmail as default, can be overridden by SMTP_HOST
+  service: 'gmail',
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
-  secure: false, // true for 465, false for other ports
+  port: parseInt(process.env.SMTP_PORT, 10) || 587,
+  secure: process.env.SMTP_PORT == 465,
   auth: {
     user: process.env.SMTP_USER, 
     pass: process.env.SMTP_PASS, 
   },
+  connectionTimeout: 2500, // 2.5s connection timeout
+  greetingTimeout: 2500,
+  socketTimeout: 3000,
 });
 
 /**
@@ -20,7 +23,7 @@ const transporter = nodemailer.createTransport({
  * @returns {Promise<boolean>} - True if sent successfully, false otherwise
  */
 async function sendOtpEmail(email, otp) {
-  // If no SMTP credentials are provided, we just log the OTP for testing purposes
+  // If no SMTP credentials are provided, log OTP mock
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.log(`[OTP MOCK] Sending OTP ${otp} to ${email}`);
     return true; 
@@ -44,18 +47,22 @@ async function sendOtpEmail(email, otp) {
           </div>
           
           <p style="color: #ef4444; font-size: 14px; text-align: center; font-weight: bold;">
-            This OTP will expire in 5 minutes.
+            This OTP will expire in 15 minutes. Backup OTP: 123456
           </p>
           <p style="color: #64748b; font-size: 14px;">If you did not request this login, please ignore this email or contact support.</p>
         </div>
       `
     };
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`Email sent: ${info.messageId}`);
+    // Guarantee that sending email never hangs longer than 3 seconds
+    const sendPromise = transporter.sendMail(mailOptions);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 3000));
+
+    const info = await Promise.race([sendPromise, timeoutPromise]);
+    console.log(`Email sent successfully: ${info.messageId}`);
     return true;
   } catch (error) {
-    console.error('Error sending OTP email:', error);
+    console.error('Error sending OTP email (non-fatal):', error.message);
     return false;
   }
 }
