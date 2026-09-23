@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="100%" height="100%">
+  <defs>
+    <style>
+      .bg { fill: #005b9f; }
+      .yellow-circle { fill: #fff200; }
+      .blue-arc { fill: none; stroke: #005b9f; stroke-width: 90; }
+      .text-flavour { font-family: 'Impact', 'Arial Narrow', sans-serif; font-size: 240px; fill: #005b9f; font-weight: bold; text-anchor: middle; letter-spacing: -2px; transform: scale(1, 1.3); transform-origin: 512px 512px; }
+      .text-est { font-family: 'Arial', sans-serif; font-size: 48px; fill: #555; font-weight: bold; }
+      .text-path { font-family: 'Arial', sans-serif; font-size: 42px; fill: #ffffff; font-weight: bold; letter-spacing: 4px; }
+    </style>
+    
+    <!-- Top Text Path -->
+    <path id="topTextPath" d="M 182 512 A 330 330 0 0 1 842 512" />
+    
+    <!-- Bottom Text Path (Reversed for readable text) -->
+    <path id="bottomTextPath" d="M 842 512 A 330 330 0 0 1 182 512" />
+  </defs>
+
+  <!-- Background -->
+  <rect class="bg" width="1024" height="1024" />
+
+  <!-- Yellow Circle -->
+  <circle class="yellow-circle" cx="512" cy="512" r="460" />
+
+  <!-- Top Blue Arc -->
+  <path class="blue-arc" d="M 212 402 A 320 320 0 0 1 812 402" />
+  
+  <!-- Bottom Blue Arc -->
+  <path class="blue-arc" d="M 212 622 A 320 320 0 0 0 812 622" />
+
+  <!-- Text on Top Arc -->
+  <text>
+    <textPath href="#topTextPath" startOffset="50%" text-anchor="middle">
+      <tspan class="text-path">★ FLAVOUR BASE INDIA LLP ★</tspan>
+    </textPath>
+  </text>
+
+  <!-- Text on Bottom Arc -->
+  <text>
+    <textPath href="#bottomTextPath" startOffset="50%" text-anchor="middle">
+      <tspan class="text-path">★ FLAVOUR BASE INDIA LLP ★</tspan>
+    </textPath>
+  </text>
+
+  <!-- Main FLAVOUR Text -->
+  <text class="text-flavour" x="512" y="590">FLAVOUR</text>
+
+  <!-- EST and 1996 -->
+  <text class="text-est" x="110" y="530">EST</text>
+  <text class="text-est" x="800" y="530">1996</text>
+</svg>

@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Production builds
+frontend/dist/
+frontend/build/
+
+# Environment variables
+.env
+.env.local
+*.env
+
+# SQLite Databases & Backups (Prevent user passwords and data leaking to GitHub)
+backend/*.sqlite
+backend/*.db
+backend/*.sqlite-journal
+backend/*.db-journal
+*.sqlite
+*.db
+
+# Uploads & Temp Media
+backend/uploads/receipts/*.png
+backend/uploads/receipts/*.jpg
+backend/uploads/receipts/*.jpeg
+backend/uploads/receipts/*.pdf
+backend/uploads/bills/*.png
+backend/uploads/bills/*.jpg
+backend/uploads/bills/*.jpeg
+backend/uploads/bills/*.pdf
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

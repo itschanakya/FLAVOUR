@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: refreshment-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node server.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        value: "REPLACE_WITH_TIDB_CLOUD_URL"
+      - key: NODE_ENV
+        value: production
