@@ -126,6 +126,31 @@ router.get('/partners', authenticateToken, authorizeRoles('ADMIN'), async (req, 
               assigned_pins, is_active, login_id, created_at 
        FROM delivery_partners ORDER BY id ASC`
     );
+
+    // Attach latest start_km from driver_daily_logs
+    try {
+      const logs = await db.all(
+        `SELECT driver_id, start_km, end_km, log_date 
+         FROM driver_daily_logs 
+         WHERE start_km IS NOT NULL 
+         ORDER BY log_date DESC, id DESC`
+      );
+      const logMap = {};
+      for (const l of logs) {
+        if (!logMap[l.driver_id]) {
+          logMap[l.driver_id] = l;
+        }
+      }
+      for (const p of partners) {
+        if (logMap[p.id]) {
+          p.start_km = logMap[p.id].start_km;
+          p.latest_end_km = logMap[p.id].end_km;
+        }
+      }
+    } catch (logErr) {
+      console.error('Error attaching partner driver logs:', logErr);
+    }
+
     res.json(partners);
   } catch (error) {
     console.error('Error fetching delivery partners:', error);
@@ -316,6 +341,21 @@ router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, r
           demandId
         ]
       );
+
+      // Auto-sync start km to driver_daily_logs if partnerId and sKm are provided
+      if (partnerId && sKm !== null) {
+        try {
+          const todayDate = new Date().toISOString().split('T')[0];
+          const existingLog = await db.get('SELECT id, start_km FROM driver_daily_logs WHERE driver_id = ? AND log_date = ?', [partnerId, todayDate]);
+          if (!existingLog) {
+            await db.run('INSERT INTO driver_daily_logs (driver_id, log_date, start_km) VALUES (?, ?, ?)', [partnerId, todayDate, sKm]);
+          } else if (existingLog.start_km === null) {
+            await db.run('UPDATE driver_daily_logs SET start_km = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [sKm, existingLog.id]);
+          }
+        } catch (syncErr) {
+          console.error('Auto-sync driver log error:', syncErr);
+        }
+      }
 
       // Audit log
       await db.run(
@@ -589,12 +629,13 @@ router.put('/driver/profile', authenticateToken, authorizeRoles('DELIVERY'), asy
   }
 });
 
-// GET /api/delivery/driver/demands - List all demands assigned to the logged-in driver
+// GET /api/delivery/driver/demands - List all demands assigned to the logged-in driver (supports datewise filtering)
 router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADMIN'), async (req, res) => {
   try {
     const db = await getDB();
     const partnerId = req.user.partner_id || req.user.id;
     const partnerPhone = req.user.phone || '';
+    const filterDate = req.query.date;
 
     let query = `
       SELECT 
@@ -617,8 +658,8 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
         d.delivery_notes,
         d.delivery_rejection_reason,
         d.bill_collection_status,
-        COALESCE(d.start_km_reading, 0) as start_odometer_reading,
-        COALESCE(d.closing_km_reading, 0) as delivery_odometer_reading,
+        d.start_km_reading as start_odometer_reading,
+        d.closing_km_reading as delivery_odometer_reading,
         d.start_km_reading,
         d.closing_km_reading,
         d.total_km,
@@ -654,6 +695,16 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
       params.push(req.query.partner_id);
     }
 
+    // Datewise filtering
+    if (filterDate && filterDate !== 'ALL' && filterDate.trim() !== '') {
+      query += ` AND (
+        d.demand_date = ? 
+        OR DATE(d.dispatched_at) = ? 
+        OR DATE(d.delivered_at) = ?
+      )`;
+      params.push(filterDate, filterDate, filterDate);
+    }
+
     query += ` ORDER BY 
         COALESCE(d.delivery_sequence, 0) ASC,
         CASE COALESCE(d.delivery_status, 'PENDING')
@@ -670,6 +721,48 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
     for (const dem of demands) {
       dem.total_quantity = Number(dem.total_quantity) || 0;
       dem.total_amount = Number(dem.total_amount) || 0;
+
+      // Auto-fallback for start_km_reading from driver_daily_logs if missing or 0
+      if ((!dem.start_km_reading || dem.start_km_reading === 0) && dem.delivery_partner_id) {
+        try {
+          const log = await db.get(
+            `SELECT start_km FROM driver_daily_logs 
+             WHERE driver_id = ? 
+               AND (DATE(log_date) = DATE(?) OR DATE(log_date) = DATE(?))
+               AND start_km IS NOT NULL 
+             ORDER BY id DESC LIMIT 1`,
+            [dem.delivery_partner_id, dem.dispatched_at || dem.demand_date, dem.demand_date]
+          );
+          if (log && log.start_km) {
+            dem.start_km_reading = log.start_km;
+            dem.start_odometer_reading = log.start_km;
+          } else {
+            const fallbackLog = await db.get(
+              `SELECT start_km FROM driver_daily_logs 
+               WHERE driver_id = ? AND start_km IS NOT NULL 
+               ORDER BY log_date DESC, id DESC LIMIT 1`,
+              [dem.delivery_partner_id]
+            );
+            if (fallbackLog && fallbackLog.start_km) {
+              dem.start_km_reading = fallbackLog.start_km;
+              dem.start_odometer_reading = fallbackLog.start_km;
+            }
+          }
+        } catch (logErr) {
+          console.error('Error fetching fallback driver start km:', logErr);
+        }
+      }
+
+      if (!dem.start_odometer_reading && dem.start_km_reading) {
+        dem.start_odometer_reading = dem.start_km_reading;
+      }
+      if (!dem.delivery_odometer_reading && dem.closing_km_reading) {
+        dem.delivery_odometer_reading = dem.closing_km_reading;
+      }
+      if (dem.start_km_reading && dem.closing_km_reading && !dem.total_km) {
+        dem.total_km = Math.max(0, dem.closing_km_reading - dem.start_km_reading);
+      }
+
       const items = await db.all(
         `SELECT di.*, 
                 COALESCE(di.unit_price_snapshot, 0) AS unit_price,
@@ -923,16 +1016,16 @@ router.get('/km-logs', authenticateToken, async (req, res) => {
   const date = req.query.date || new Date().toISOString().split('T')[0];
   try {
     const db = await getDB();
-    // Get ALL drivers (active and inactive) and their log for the specified date
+    // Get ALL drivers (active and inactive) and their log for the specified date or today
     const drivers = await db.all('SELECT id, name, vehicle_no, phone, rate_per_km, is_active FROM delivery_partners ORDER BY name ASC');
-    const logs = await db.all('SELECT * FROM driver_daily_logs WHERE log_date = ?', [date]);
+    const logs = await db.all('SELECT * FROM driver_daily_logs WHERE log_date = ? OR log_date = CURDATE() ORDER BY log_date DESC, id DESC', [date]);
 
-    // Also get the latest end_km for all drivers for suggestions safely
-    const allLatest = await db.all('SELECT driver_id, end_km, log_date FROM driver_daily_logs WHERE end_km IS NOT NULL ORDER BY log_date DESC');
+    // Also get the latest recorded km (end_km or start_km) for all drivers for suggestions safely
+    const allLatest = await db.all('SELECT driver_id, COALESCE(end_km, start_km) as latest_km, log_date FROM driver_daily_logs WHERE end_km IS NOT NULL OR start_km IS NOT NULL ORDER BY log_date DESC, id DESC');
     const latestLogsMap = {};
     for (const row of allLatest) {
-      if (latestLogsMap[row.driver_id] === undefined) {
-        latestLogsMap[row.driver_id] = row.end_km;
+      if (latestLogsMap[row.driver_id] === undefined && row.latest_km !== null) {
+        latestLogsMap[row.driver_id] = row.latest_km;
       }
     }
 

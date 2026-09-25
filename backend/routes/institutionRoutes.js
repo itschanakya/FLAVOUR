@@ -72,11 +72,8 @@ router.post('/bulk', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (
       const password = (row.password || row['PASSWORD'] || 'Inst@123').toString().trim();
 
       const cleanSlug = instName.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'inst';
-      if (!email) {
-        email = `${cleanSlug}_${unit_id}@ncc.gov.in`;
-      }
       if (!loginId) {
-        loginId = email;
+        loginId = cleanSlug;
       }
 
       try {
@@ -120,15 +117,10 @@ router.post('/bulk', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (
           );
           const newInstId = instRes.lastID;
 
-          // Ensure unique email and login_id
+          // Allow same email address across multiple institutions; ensure unique login_id only
           let finalEmail = email;
           let finalLogin = loginId;
           let counter = 1;
-          while (await db.get('SELECT id FROM users WHERE email = ?', [finalEmail])) {
-            finalEmail = `${cleanSlug}_${counter}@ncc.gov.in`;
-            counter++;
-          }
-          counter = 1;
           while (await db.get('SELECT id FROM users WHERE login_id = ?', [finalLogin])) {
             finalLogin = `${cleanSlug}_${counter}`;
             counter++;
@@ -195,12 +187,7 @@ router.post('/', authenticateToken, authorizeRoles('UNIT'), async (req, res) => 
 
     const db = await getDB();
 
-    // Check if email already exists
-    const existingUser = await db.get('SELECT id FROM users WHERE email = ?', [ano_cto_email]);
-    if (existingUser) {
-      return res.status(400).json({ error: 'ANO/CTO email already registered.' });
-    }
-
+    // Ensure login_id is unique across accounts (emails may be shared across multiple IDs)
     const existingLogin = await db.get('SELECT id FROM users WHERE login_id = ?', [login_id]);
     if (existingLogin) {
       return res.status(400).json({ error: 'Login ID already registered.' });
@@ -307,13 +294,7 @@ router.put('/:id', authenticateToken, authorizeRoles('UNIT', 'INSTITUTION', 'ADM
     // Update User credentials if provided
     const instId = parseInt(req.params.id);
     if (ano_cto_email || login_id || password) {
-      if (ano_cto_email) {
-        const existingEmail = await db.get('SELECT id, institution_id FROM users WHERE email = ?', [ano_cto_email]);
-        if (existingEmail && existingEmail.institution_id !== instId) {
-          return res.status(400).json({ error: 'Email already registered to another user.' });
-        }
-      }
-      
+
       if (login_id) {
         const existingLoginId = await db.get('SELECT id, institution_id FROM users WHERE login_id = ?', [login_id]);
         if (existingLoginId && existingLoginId.institution_id !== instId) {
@@ -382,4 +363,67 @@ router.put('/:id/schedule', authenticateToken, authorizeRoles('INSTITUTION'), as
   }
 });
 
+// DELETE /api/institutions/:id - Unit or Admin deletes an institution
+router.delete('/:id', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (req, res) => {
+  const db = await getDB();
+  const instId = parseInt(req.params.id);
+
+  try {
+    let inst;
+    if (req.user.role === 'UNIT') {
+      inst = await db.get('SELECT * FROM institutions WHERE id = ? AND unit_id = ?', [instId, req.user.unit_id]);
+      if (!inst) {
+        return res.status(404).json({ error: 'Institution not found under your unit.' });
+      }
+    } else {
+      inst = await db.get('SELECT * FROM institutions WHERE id = ?', [instId]);
+      if (!inst) {
+        return res.status(404).json({ error: 'Institution not found.' });
+      }
+    }
+
+    const demandCountRow = await db.get('SELECT COUNT(*) as count FROM demands WHERE institution_id = ?', [instId]);
+    const demandCount = demandCountRow ? demandCountRow.count : 0;
+
+    const { force } = req.query;
+    if (demandCount > 0 && force !== 'true') {
+      return res.status(400).json({
+        error: `Cannot delete '${inst.institution_name}' because it has ${demandCount} existing demand record(s).`,
+        hasDemands: true,
+        demandCount
+      });
+    }
+
+    // 1. Delete associated demands and sub-records if force
+    if (demandCount > 0) {
+      const demands = await db.all('SELECT id FROM demands WHERE institution_id = ?', [instId]);
+      const demandIds = demands.map(d => d.id);
+      if (demandIds.length > 0) {
+        const placeholders = demandIds.map(() => '?').join(',');
+        await db.run(`DELETE FROM demand_items WHERE demand_id IN (${placeholders})`, demandIds);
+        await db.run(`DELETE FROM demand_activity WHERE demand_id IN (${placeholders})`, demandIds);
+        await db.run(`DELETE FROM demands WHERE id IN (${placeholders})`, demandIds);
+      }
+    }
+
+    // 2. Delete linked users
+    await db.run('DELETE FROM users WHERE institution_id = ?', [instId]);
+
+    // 3. Delete institution
+    await db.run('DELETE FROM institutions WHERE id = ?', [instId]);
+
+    // 4. Audit log
+    await db.run(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
+      ['INSTITUTION', instId, 'DELETED', req.user.id, `Deleted institution ${inst.institution_name}`]
+    );
+
+    res.json({ message: `Institution '${inst.institution_name}' deleted successfully.` });
+  } catch (error) {
+    console.error('Delete institution error:', error);
+    res.status(500).json({ error: 'Failed to delete institution: ' + error.message });
+  }
+});
+
 module.exports = router;
+

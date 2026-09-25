@@ -74,11 +74,69 @@ async function getDB() {
 
     const instance = new DBWrapper(pool);
     await initializeSchema(instance);
+    await upgradeInventorySchema(instance);
     dbInstance = instance;
     return dbInstance;
   })();
 
   return initPromise;
+}
+
+async function upgradeInventorySchema(db) {
+  const alterStatements = [
+    // item_stock_logs enhancements (traceability, valuation, compatibility)
+    'ALTER TABLE item_stock_logs ADD COLUMN previous_stock INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE item_stock_logs ADD COLUMN unit_price REAL DEFAULT 0.0',
+    'ALTER TABLE item_stock_logs ADD COLUMN gst_rate REAL DEFAULT 0.0',
+    'ALTER TABLE item_stock_logs ADD COLUMN total_amount REAL DEFAULT 0.0',
+    'ALTER TABLE item_stock_logs ADD COLUMN indent_id INTEGER NULL',
+    'ALTER TABLE item_stock_logs ADD COLUMN reference_no VARCHAR(255) NULL',
+    'ALTER TABLE item_stock_logs ADD COLUMN change_type VARCHAR(50) NULL',
+    'ALTER TABLE item_stock_logs ADD COLUMN batch_no VARCHAR(100) NULL',
+
+    // stock_demand_indents enhancements (procurement lifecycle & invoicing)
+    'ALTER TABLE stock_demand_indents ADD COLUMN indent_date DATE DEFAULT (CURRENT_DATE)',
+    'ALTER TABLE stock_demand_indents ADD COLUMN supplier_name VARCHAR(255) DEFAULT \'State Central Refreshment Hub\'',
+    'ALTER TABLE stock_demand_indents ADD COLUMN invoice_no VARCHAR(255) NULL',
+    'ALTER TABLE stock_demand_indents ADD COLUMN invoice_date DATE NULL',
+    'ALTER TABLE stock_demand_indents ADD COLUMN received_units INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE stock_demand_indents ADD COLUMN payment_status VARCHAR(50) DEFAULT \'PENDING\'',
+    'ALTER TABLE stock_demand_indents ADD COLUMN fulfilled_by INTEGER NULL',
+    'ALTER TABLE stock_demand_indents ADD COLUMN taken_on_charge_by INTEGER NULL',
+    'ALTER TABLE stock_demand_indents ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+
+    // stock_demand_indent_items enhancements (batch & inspection tracking)
+    'ALTER TABLE stock_demand_indent_items ADD COLUMN received_quantity INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE stock_demand_indent_items ADD COLUMN batch_no VARCHAR(100) NULL',
+    'ALTER TABLE stock_demand_indent_items ADD COLUMN batch_expiry_date TEXT NULL',
+    'ALTER TABLE stock_demand_indent_items ADD COLUMN notes TEXT NULL',
+
+    // refreshment_items enhancements (statutory compliance & inventory planning)
+    'ALTER TABLE refreshment_items ADD COLUMN default_gst_rate REAL DEFAULT 5.0',
+    'ALTER TABLE refreshment_items ADD COLUMN category VARCHAR(100) DEFAULT \'Refreshment\'',
+    'ALTER TABLE refreshment_items ADD COLUMN hsn_code VARCHAR(50) DEFAULT \'2106\'',
+    'ALTER TABLE refreshment_items ADD COLUMN optimal_stock INTEGER DEFAULT 200',
+    'ALTER TABLE refreshment_items ADD COLUMN cost_price REAL DEFAULT 0.0',
+    'ALTER TABLE refreshment_items ADD COLUMN last_restocked_at DATETIME NULL'
+  ];
+
+  for (const sql of alterStatements) {
+    try {
+      await db.run(sql);
+    } catch (e) {
+      // Column already exists or constraint handled, safely continue
+    }
+  }
+
+  // Ensure change_type is synced with log_type for zero query friction
+  try {
+    await db.run('UPDATE item_stock_logs SET change_type = log_type WHERE change_type IS NULL');
+  } catch (e) { }
+
+  // Sync received_units with total_units for completed indents if 0
+  try {
+    await db.run("UPDATE stock_demand_indents SET received_units = total_units WHERE status = 'TAKEN_ON_CHARGE' AND (received_units IS NULL OR received_units = 0)");
+  } catch (e) { }
 }
 
 async function initializeSchema(db) {
@@ -122,7 +180,7 @@ async function initializeSchema(db) {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTO_INCREMENT,
       name TEXT NOT NULL,
-      email VARCHAR(255) UNIQUE NOT NULL,
+      email VARCHAR(255) NOT NULL,
       login_id VARCHAR(255) UNIQUE,
       password_hash TEXT NOT NULL,
       role VARCHAR(255) CHECK(role IN ('ADMIN', 'UNIT', 'INSTITUTION')) NOT NULL,
@@ -140,11 +198,17 @@ async function initializeSchema(db) {
       item_name TEXT NOT NULL,
       unit_price REAL NOT NULL,
       unit_of_measure TEXT NOT NULL,
+      category VARCHAR(100) DEFAULT 'Refreshment',
+      default_gst_rate REAL DEFAULT 5.0,
+      hsn_code VARCHAR(50) DEFAULT '2106',
       is_active INTEGER DEFAULT 1,
       current_stock INTEGER DEFAULT 100,
       min_threshold INTEGER DEFAULT 10,
+      optimal_stock INTEGER DEFAULT 200,
+      cost_price REAL DEFAULT 0.0,
       expiry_date TEXT,
       image_url TEXT,
+      last_restocked_at DATETIME,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -252,9 +316,17 @@ async function initializeSchema(db) {
     CREATE TABLE IF NOT EXISTS item_stock_logs (
       id INTEGER PRIMARY KEY AUTO_INCREMENT,
       item_id INTEGER NOT NULL,
-      log_type VARCHAR(255) CHECK(log_type IN ('STOCK_IN', 'CONSUMED', 'ADJUSTMENT')) NOT NULL,
+      log_type VARCHAR(50) NOT NULL,
+      change_type VARCHAR(50),
+      previous_stock INTEGER NOT NULL DEFAULT 0,
       quantity INTEGER NOT NULL,
       balance_after INTEGER NOT NULL,
+      unit_price REAL DEFAULT 0.0,
+      gst_rate REAL DEFAULT 0.0,
+      total_amount REAL DEFAULT 0.0,
+      indent_id INTEGER NULL,
+      reference_no VARCHAR(255) NULL,
+      batch_no VARCHAR(100) NULL,
       expiry_date TEXT,
       notes TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -324,6 +396,51 @@ async function initializeSchema(db) {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (grievance_id) REFERENCES grievances(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS stock_demand_indents (
+      id INTEGER PRIMARY KEY AUTO_INCREMENT,
+      indent_number VARCHAR(255) UNIQUE NOT NULL,
+      indent_date DATE DEFAULT (CURRENT_DATE),
+      status VARCHAR(255) NOT NULL DEFAULT 'DEMAND_GENERATED',
+      supplier_name VARCHAR(255) DEFAULT 'State Central Refreshment Hub',
+      invoice_no VARCHAR(255) NULL,
+      invoice_date DATE NULL,
+      total_items INTEGER NOT NULL DEFAULT 0,
+      total_units INTEGER NOT NULL DEFAULT 0,
+      received_units INTEGER NOT NULL DEFAULT 0,
+      subtotal REAL NOT NULL DEFAULT 0,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      grand_total REAL NOT NULL DEFAULT 0,
+      payment_status VARCHAR(50) DEFAULT 'PENDING',
+      created_by INTEGER,
+      fulfilled_by INTEGER NULL,
+      taken_on_charge_by INTEGER NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      fulfilled_at DATETIME,
+      taken_on_charge_at DATETIME,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS stock_demand_indent_items (
+      id INTEGER PRIMARY KEY AUTO_INCREMENT,
+      indent_id INTEGER NOT NULL,
+      item_id INTEGER NOT NULL,
+      item_name VARCHAR(255) NOT NULL,
+      unit_of_measure VARCHAR(255) NOT NULL,
+      unit_price REAL NOT NULL,
+      gst_rate REAL NOT NULL DEFAULT 0.0,
+      demand_quantity INTEGER NOT NULL,
+      received_quantity INTEGER NOT NULL DEFAULT 0,
+      subtotal REAL NOT NULL,
+      gst_amount REAL NOT NULL,
+      total_amount REAL NOT NULL,
+      batch_no VARCHAR(100) NULL,
+      batch_expiry_date TEXT NULL,
+      notes TEXT NULL,
+      FOREIGN KEY (indent_id) REFERENCES stock_demand_indents(id) ON DELETE CASCADE,
+      FOREIGN KEY (item_id) REFERENCES refreshment_items(id) ON DELETE CASCADE
     );
   `);
 

@@ -100,7 +100,7 @@ export default function AppSettings() {
   // Active Tab defaults based on role
   const [activeTab, setActiveTab] = useState(
     (requestedTab && !(role === 'INSTITUTION' && requestedTab === 'my-account'))
-      ? requestedTab
+      ? (requestedTab === 'inventory' ? 'stock' : requestedTab)
       : (role === 'ADMIN' ? 'units' : role === 'UNIT' ? 'inst-credentials' : role === 'DELIVERY' ? 'driver-account' : 'institution-details')
   );
 
@@ -108,6 +108,8 @@ export default function AppSettings() {
     if (requestedTab) {
       if (role === 'INSTITUTION' && requestedTab === 'my-account') {
         setActiveTab('institution-details');
+      } else if (requestedTab === 'inventory') {
+        setActiveTab('stock');
       } else {
         setActiveTab(requestedTab);
       }
@@ -561,6 +563,7 @@ export default function AppSettings() {
     setEditingUnit(unit);
     setUnitForm({
       unit_name: unit.unit_name || '',
+      unit_code: unit.unit_code || '',
       location: unit.location || '',
       ncc_group: unit.ncc_group || 'Group B',
       unit_email: unit.unit_email || '',
@@ -884,7 +887,20 @@ export default function AppSettings() {
             {/* 1. ADMIN TABS */}
             {role === 'ADMIN' && (
               <>
-
+                <button
+                  onClick={() => setActiveTab('units')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'units' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Building2 className="w-4 h-4 text-indigo-600" />
+                  Manage NCC Units
+                </button>
+                <button
+                  onClick={() => setActiveTab('inventory')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'inventory' || activeTab === 'catalog' ? 'bg-amber-50 text-amber-700 font-bold border border-amber-200' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Boxes className="w-4 h-4 text-amber-600" />
+                  Inventory
+                </button>
                 <button
                   onClick={() => setActiveTab('unit-credentials')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'unit-credentials' ? 'bg-amber-50 text-amber-700 font-bold border border-amber-200' : 'text-slate-600 hover:bg-slate-50'}`}
@@ -981,7 +997,8 @@ export default function AppSettings() {
               <h1 className={`font-bold text-slate-800 ${activeTab === 'catalog' || activeTab === 'stock' ? 'text-lg' : 'text-xl'}`}>
                 {activeTab === 'units' && 'Manage NCC Units (Battalions & Regiments)'}
                 {activeTab === 'catalog' && 'Refreshment Catalog & Standard Packet'}
-                {activeTab === 'stock' && 'Stock & Inventory Management'}
+                {activeTab === 'inventory' && 'Inventory Management'}
+                {activeTab === 'stock' && 'Stock Management'}
                 {activeTab === 'unit-credentials' && 'Units Login Credentials & Access Control'}
                 {activeTab === 'delivery-partners' && 'Delivery Partners & Delivery Reps (Logins & Vehicle Fleets)'}
                 {activeTab === 'inst-credentials' && 'Institutions Login Credentials & ANO Passwords'}
@@ -991,9 +1008,9 @@ export default function AppSettings() {
                 {activeTab === 'driver-account' && 'Driver Account & Fleet Load Capacity'}
                 {activeTab === 'km-history' && 'Daily Run & KM Summary'}
               </h1>
-              <p className={`text-slate-500 ${activeTab === 'catalog' || activeTab === 'stock' ? 'text-xs mt-0.5' : 'text-sm mt-1'}`}>
+              <p className={`text-slate-500 ${activeTab === 'catalog' || activeTab === 'stock' || activeTab === 'inventory' ? 'text-xs mt-0.5' : 'text-sm mt-1'}`}>
                 {activeTab === 'units' && 'Onboard NCC Units, issue Unit logins & manage jurisdiction scopes.'}
-                {activeTab === 'catalog' && 'Configure catalog items, approved pricing, photos, and Standard ₹75 Refreshment Packet builder.'}
+                {(activeTab === 'catalog' || activeTab === 'inventory') && 'Configure catalog items, approved pricing, photos, and Standard ₹75 Refreshment Packet builder.'}
                 {activeTab === 'stock' && 'Live stock balance ledger, batch expiry tracking, consumed today metrics, and incoming restock shipments.'}
                 {activeTab === 'unit-credentials' && 'View, manage, and reset User ID & Passwords for all NCC Units under headquarters.'}
                 {activeTab === 'delivery-partners' && 'Manage Delivery Representatives, Driver Login IDs, Passwords, Vehicle details, and Assigned PIN codes.'}
@@ -1069,14 +1086,9 @@ export default function AppSettings() {
                   <ManageUnits embedded={true} />
                 )}
 
-                {/* 0.1 ADMIN: MANAGE CATALOG */}
-                {activeTab === 'catalog' && (
+                {/* 0.1 ADMIN: INVENTORY (ITEMS, RATES, PACKETS) */}
+                {(activeTab === 'inventory' || activeTab === 'catalog') && (
                   <ManageCatalog embedded={true} initialView="catalog" />
-                )}
-
-                {/* 0.2 ADMIN: STOCK MANAGEMENT */}
-                {activeTab === 'stock' && (
-                  <ManageCatalog embedded={true} initialView="stock" />
                 )}
 
                 {/* 1. ADMIN: UNITS CREDENTIALS TABLE */}

@@ -45,6 +45,7 @@ export default function LoginPage() {
   const [step, setStep] = useState(1);
   const [otp, setOtp] = useState('');
   const [loginIdForOtp, setLoginIdForOtp] = useState('');
+  const [targetEmail, setTargetEmail] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
   const [emailSent, setEmailSent] = useState(true);
 
@@ -89,6 +90,18 @@ export default function LoginPage() {
     }
   };
 
+  const maskEmail = (emailStr) => {
+    if (!emailStr || !emailStr.includes('@')) return emailStr || '';
+    if (emailStr.includes('******')) return emailStr;
+    const [localPart, domain] = emailStr.split('@');
+    if (localPart.length <= 3) {
+      return `${localPart[0]}******@${domain}`;
+    }
+    const prefix = localPart.slice(0, 2);
+    const suffix = localPart.slice(-2);
+    return `${prefix}******${suffix}@${domain}`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -97,6 +110,7 @@ export default function LoginPage() {
       const res = await login(email.trim(), password, selectedRole);
       if (res && res.requires_otp) {
         setLoginIdForOtp(res.login_id);
+        setTargetEmail(res.email || email.trim());
         setEmailSent(res.email_sent !== false);
         setStep(3);
         setResendTimer(60);
@@ -125,7 +139,7 @@ export default function LoginPage() {
   };
 
   const handleQuickFill = async (demoEmail, demoPass, targetRole) => {
-    const roleKey = targetRole === 'INSTITUTION' ? 'ANO' : targetRole;
+    const roleKey = (targetRole === 'INSTITUTION' || targetRole === 'INSTITUTE') ? 'ANO' : targetRole;
     setSelectedRole(roleKey);
     setEmail(demoEmail);
     setPassword(demoPass);
@@ -135,6 +149,8 @@ export default function LoginPage() {
       const res = await login(demoEmail, demoPass, roleKey);
       if (res && res.requires_otp) {
         setLoginIdForOtp(res.login_id);
+        setTargetEmail(res.email || demoEmail);
+        setEmailSent(res.email_sent !== false);
         setStep(3);
         setResendTimer(60);
       } else {
@@ -154,6 +170,7 @@ export default function LoginPage() {
     try {
       const res = await login(email.trim(), password, selectedRole);
       if (res && res.requires_otp) {
+        setTargetEmail(res.email || email.trim());
         setResendTimer(60);
       }
     } catch (err) {
@@ -166,11 +183,11 @@ export default function LoginPage() {
   const demoRoles = [
     {
       id: 'ADMIN',
-      title: 'Vendor',
+      title: 'ADMIN',
       email: 'ADMIN',
       pass: 'Admin@123',
-      subtitle: 'Central Operations • ID: ADMIN • Dispatch & Bill Verification',
-      roleTag: 'Vendor',
+      subtitle: 'ID: ADMIN',
+      roleTag: 'ADMIN',
       color: 'from-amber-500/20 to-orange-500/20',
       border: 'border-amber-500/40 hover:border-amber-400',
       text: 'text-amber-400',
@@ -180,11 +197,11 @@ export default function LoginPage() {
     },
     {
       id: 'UNIT',
-      title: 'NCC',
+      title: 'NCC UNIT',
       email: '2DABNCC',
       pass: 'Unit@123',
-      subtitle: '2 Delhi Arty Bty • ID: 2DABNCC • Quotas & Demands',
-      roleTag: 'NCC',
+      subtitle: 'ID: 2DABNCC',
+      roleTag: 'NCC UNIT',
       color: 'from-blue-500/20 to-indigo-500/20',
       border: 'border-blue-500/40 hover:border-blue-400',
       text: 'text-blue-400',
@@ -195,11 +212,11 @@ export default function LoginPage() {
     {
       id: 'ANO',
       originalRole: 'INSTITUTION',
-      title: 'Institute',
+      title: 'INSTITUTE',
       email: 'APS_SV',
       pass: 'Inst@123',
-      subtitle: 'APS Shankar Vihar • ID: APS_SV • Roll Calls & Demands',
-      roleTag: 'Institute',
+      subtitle: 'ID: APS_SV',
+      roleTag: 'INSTITUTE',
       color: 'from-emerald-500/20 to-teal-500/20',
       border: 'border-emerald-500/40 hover:border-emerald-400',
       text: 'text-emerald-400',
@@ -209,11 +226,11 @@ export default function LoginPage() {
     },
     {
       id: 'DELIVERY',
-      title: 'Driver',
+      title: 'DELIVERY',
       email: '9876543210',
       pass: 'Driver@123',
-      subtitle: 'Rajesh Kumar • ID: 9876543210 • Live Delivery Route',
-      roleTag: 'Driver',
+      subtitle: 'ID: 9876543210',
+      roleTag: 'DELIVERY',
       color: 'from-cyan-500/20 to-sky-500/20',
       border: 'border-cyan-500/40 hover:border-cyan-400',
       text: 'text-cyan-400',
@@ -223,7 +240,9 @@ export default function LoginPage() {
     }
   ];
 
-  const filteredRoles = activeTab === 'ALL' ? demoRoles : demoRoles.filter(r => r.id === activeTab);
+  const filteredRoles = activeTab === 'ALL' 
+    ? demoRoles 
+    : demoRoles.filter(r => r.id === activeTab || (activeTab === 'INSTITUTE' && (r.id === 'ANO' || r.id === 'INSTITUTE')));
 
   return (
     <div className="min-h-screen bg-[#070e1a] text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans selection:bg-blue-600 selection:text-white">
@@ -501,17 +520,26 @@ export default function LoginPage() {
                 {/* Step 3: OTP Verification */}
                 {step === 3 && (
                   <form onSubmit={handleVerifyOtp} className="space-y-4">
-                    <div className="text-center mb-4">
-                      <div className="mx-auto w-12 h-12 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mb-2">
+                    <div className="text-center mb-4 space-y-2.5">
+                      <div className="mx-auto w-12 h-12 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mb-1 shadow-inner">
                         <Mail className="w-6 h-6" />
                       </div>
-                      <h3 className="text-white font-bold">Two-Factor Authentication</h3>
-                      {emailSent ? (
-                        <p className="text-slate-400 text-xs mt-1">We've sent a 6-digit OTP to your registered email. Please check your inbox.</p>
-                      ) : (
-                        <p className="text-amber-400 text-xs mt-1">⚠️ OTP could not be delivered to your email. Please verify your credentials are correct or contact the Admin to resolve this issue.</p>
-                      )}
-                      {/* Emergency Backup Code hidden for security */}
+                      <h3 className="text-white font-bold text-lg tracking-tight">Two-Factor Authentication</h3>
+                      
+                      {/* Prominently mention the recipient email on top */}
+                      <div className="p-3 rounded-2xl bg-blue-500/10 border border-blue-400/30 text-xs text-left space-y-1">
+                        <div className="text-slate-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span>OTP Sent To Registered Email:</span>
+                        </div>
+                        <div className="font-mono font-black text-sm text-blue-300 break-all">
+                          {maskEmail(targetEmail) || 'your registered email'}
+                        </div>
+                      </div>
+
+                      <p className="text-slate-400 text-xs leading-relaxed pt-1">
+                        Please enter the 6-digit code sent to your email. (Be sure to check your <strong>Inbox</strong> as well as <strong>Spam / Junk</strong> folder).
+                      </p>
                     </div>
 
                     <div>
@@ -609,7 +637,7 @@ export default function LoginPage() {
 
                       {/* Role Filter Tabs */}
                       <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-slate-950/70 border border-white/10 text-[10px] font-bold">
-                        {['ALL', 'ANO', 'UNIT', 'ADMIN', 'DELIVERY'].map((tab) => (
+                        {['ALL', 'ADMIN', 'UNIT', 'INSTITUTE', 'DELIVERY'].map((tab) => (
                           <button
                             key={tab}
                             type="button"
@@ -733,7 +761,7 @@ export default function LoginPage() {
               <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 space-y-1.5">
                 <div className="font-bold text-blue-300 flex items-center gap-2">
                   <Building2 className="w-4 h-4" />
-                  Unit Headquarters (2 Delhi Arty Bty)
+                  Unit Headquarters
                 </div>
                 <p className="text-slate-300">
                   For ANO credentials, institution registration, or quota amendments:
@@ -752,7 +780,7 @@ export default function LoginPage() {
                   For supply dispatch queries, delivery vehicle coordination, or billing vouchers:
                 </p>
                 <div className="font-mono text-white font-bold">
-                  Toll-Free: 1800-266-7890 • Email: admin@ncc.gov.in
+                  Toll-Free: 1800-266-7890
                 </div>
               </div>
 

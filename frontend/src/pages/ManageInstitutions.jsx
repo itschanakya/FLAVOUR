@@ -96,6 +96,45 @@ export default function ManageInstitutions() {
     setShowModal(true);
   };
 
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleDeleteInst = async (inst, force = false) => {
+    const confirmMsg = force
+      ? `Are you sure you want to permanently delete "${inst.institution_name}" and all its records? This cannot be undone.`
+      : `Delete institution "${inst.institution_name}"?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setDeletingId(inst.id);
+    try {
+      const url = `/api/institutions/${inst.id}${force ? '?force=true' : ''}`;
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.hasDemands) {
+          if (window.confirm(`${data.error}\n\nDo you want to FORCE DELETE this institution and all associated demands?`)) {
+            await handleDeleteInst(inst, true);
+            return;
+          }
+        } else {
+          alert(data.error || 'Failed to delete institution');
+        }
+        return;
+      }
+      alert(data.message || 'Institution deleted successfully.');
+      fetchInstitutions();
+    } catch (err) {
+      alert(err.message || 'Error deleting institution');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // -------------------------------------------------------------
   // EXCEL DOWNLOAD / EXPORT
   // -------------------------------------------------------------
@@ -153,7 +192,7 @@ export default function ManageInstitutions() {
         'PIN CODE': '110010',
         'ANO / CTO INCHARGE': 'Lt. Rajesh Kumar',
         'ANO CONTACT': '+91 9876543210',
-        'ANO EMAIL': 'ano.aps@ncc.gov.in',
+        'ANO EMAIL': 'ano.aps@gmail.com',
         'LOGIN ID': 'ano_aps',
         '1ST YR STRENGTH': 50,
         '2ND YR STRENGTH': 50,
@@ -167,7 +206,7 @@ export default function ManageInstitutions() {
         'PIN CODE': '110022',
         'ANO / CTO INCHARGE': 'Chief Officer A. K. Sharma',
         'ANO CONTACT': '+91 9811223344',
-        'ANO EMAIL': 'ano.dps@ncc.gov.in',
+        'ANO EMAIL': 'ano.dps@gmail.com',
         'LOGIN ID': 'ano_dps',
         '1ST YR STRENGTH': 50,
         '2ND YR STRENGTH': 40,
@@ -497,18 +536,40 @@ export default function ManageInstitutions() {
                         <div>{inst.ano_cto_name}</div>
                         <span className="text-xs text-slate-500">{inst.ano_cto_contact || 'No contact'}</span>
                       </td>
-                      <td className="p-4 font-mono text-xs text-blue-600">{inst.ano_email || 'N/A'}</td>
+                      <td className="p-4 text-xs">
+                        {inst.ano_email ? (
+                          <div className="font-mono text-blue-600 font-semibold">{inst.ano_email}</div>
+                        ) : (
+                          <div className="text-slate-400 italic">No email registered</div>
+                        )}
+                        {inst.login_id && (
+                          <div className="text-[10px] text-slate-500 font-mono mt-0.5">ID: {inst.login_id}</div>
+                        )}
+                      </td>
                       <td className="p-4 text-center font-bold text-blue-600">{inst.strength_1st_year}</td>
                       <td className="p-4 text-center font-bold text-indigo-400">{inst.strength_2nd_year}</td>
                       <td className="p-4 text-center font-bold text-purple-400">{inst.strength_3rd_year}</td>
                       <td className="p-4 text-center font-extrabold text-emerald-600">{total}</td>
                       <td className="p-4 text-right">
-                        <button
-                          onClick={() => handleOpenEdit(inst)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold inline-flex items-center gap-1 transition-all"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-blue-600" /> Edit Strength
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(inst)}
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 border border-slate-200 hover:border-blue-300 transition-all cursor-pointer shadow-xs"
+                            title="Edit Institution"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInst(inst)}
+                            disabled={deletingId === inst.id}
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-300 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                            title="Delete Institution"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

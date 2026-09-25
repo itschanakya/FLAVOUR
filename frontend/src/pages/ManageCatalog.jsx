@@ -587,9 +587,9 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
             </div>
             <div>
               <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                Stock & Inventory Management
+                Stock Management
                 <span className="px-2 py-0.5 rounded-full text-[11px] bg-emerald-100 text-emerald-800 font-bold">
-                  Live Balances
+                  Bal Stock
                 </span>
               </h2>
               <p className="text-xs text-slate-500">
@@ -599,7 +599,20 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
           </div>
         ) : (
           <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl w-fit">
-            
+            <button
+              onClick={() => setActiveTab('catalog')}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${
+                activeTab === 'catalog'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ShoppingBag className="w-4 h-4 text-amber-500" />
+              Catalog Items
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-700">
+                {items.length}
+              </span>
+            </button>
 
             <button
               onClick={() => setActiveTab('packet')}
@@ -1005,48 +1018,50 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
         </div>
       )}
 
-      {/* VIEW 2: DEDICATED STOCK & INVENTORY MANAGEMENT LEDGER */}
+      {/* VIEW 2: DEDICATED STOCK MANAGEMENT LEDGER */}
       {activeTab === 'stock' && (
         <div className="space-y-4">
           {/* Stock KPI Metric Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Items</span>
-              <div className="text-xl font-black text-slate-900 mt-0.5">{items.length}</div>
+              <div className="text-xl font-black text-slate-900 mt-0.5">
+                {String(items.length).padStart(2, '0')}
+              </div>
             </div>
 
             <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs">
               <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">In Stock</span>
               <div className="text-xl font-black text-emerald-700 mt-0.5">
-                {items.filter(i => i.is_active === 1 && !i.is_expired && !i.is_out_of_stock && !i.is_low_stock).length}
+                {String(items.filter(i => i.is_active === 1 && !i.is_expired && !i.is_out_of_stock && !i.is_low_stock).length).padStart(2, '0')}
               </div>
             </div>
 
             <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs">
               <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">Consumed Today</span>
               <div className="text-xl font-black text-blue-700 mt-0.5">
-                {items.reduce((acc, i) => acc + (i.consumed_today || 0), 0)}
+                {String(items.reduce((acc, i) => acc + (parseInt(i.consumed_today, 10) || 0), 0)).padStart(2, '0')}
               </div>
             </div>
 
             <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs">
               <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">Low Stock</span>
               <div className="text-xl font-black text-amber-700 mt-0.5">
-                {items.filter(i => i.is_low_stock).length}
+                {String(items.filter(i => i.is_low_stock).length).padStart(2, '0')}
               </div>
             </div>
 
             <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs">
               <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider block">Out of Stock</span>
               <div className="text-xl font-black text-red-700 mt-0.5">
-                {items.filter(i => i.is_out_of_stock).length}
+                {String(items.filter(i => i.is_out_of_stock).length).padStart(2, '0')}
               </div>
             </div>
 
             <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs">
               <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">Expired Batches</span>
               <div className="text-xl font-black text-rose-700 mt-0.5">
-                {expiredItems.length}
+                {String(expiredItems.length).padStart(2, '0')}
               </div>
             </div>
           </div>
@@ -1062,7 +1077,7 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
                     <th className="p-4">Stock Balance</th>
                     <th className="p-4">Consumed Today</th>
                     <th className="p-4">Batch Expiry Date</th>
-                    <th className="p-4">Inventory Health</th>
+                    <th className="p-4">Stock Health</th>
                     <th className="p-4 text-right">Stock Actions</th>
                   </tr>
                 </thead>
@@ -1070,7 +1085,7 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
                   {items.length === 0 ? (
                     <tr>
                       <td colSpan="7" className="p-8 text-center text-slate-400 text-xs">
-                        No items found in inventory.
+                        No items found in stock ledger.
                       </td>
                     </tr>
                   ) : (

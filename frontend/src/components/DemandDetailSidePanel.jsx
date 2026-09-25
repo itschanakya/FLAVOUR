@@ -239,7 +239,7 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
             </div>
             <div className={`flex items-center gap-1.5 text-xs font-bold ${statusCfg.subtext} truncate`}>
               <Building2 className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{currentDemand.institution_name}</span>
+              <span className="truncate">{currentDemand.institution_name || currentDemand.unit_name || user?.unit_name || 'Unit Demand'}</span>
               {currentDemand.demand_date && (
                 <span className="shrink-0 opacity-80">• {currentDemand.demand_date}</span>
               )}
@@ -263,10 +263,10 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
 
             {/* ── DEMAND STATUS PILL ROW ───────────────────────────────── */}
             <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg border ${demStatus === 'FULFILLED' ? 'bg-emerald-50 border-emerald-200' :
-                demStatus === 'APPROVED' ? 'bg-blue-50 border-blue-200' :
-                  demStatus === 'ACCEPTED' ? 'bg-indigo-50 border-indigo-200' :
-                    demStatus === 'REJECTED' ? 'bg-rose-50 border-rose-200' :
-                      'bg-amber-50 border-amber-200'
+              demStatus === 'APPROVED' ? 'bg-blue-50 border-blue-200' :
+                demStatus === 'ACCEPTED' ? 'bg-indigo-50 border-indigo-200' :
+                  demStatus === 'REJECTED' ? 'bg-rose-50 border-rose-200' :
+                    'bg-amber-50 border-amber-200'
               }`}>
               <span className="text-xs font-black uppercase tracking-wider text-slate-600">Demand Status</span>
               <span className={`px-4 py-1.5 rounded-full text-xs font-black border-2 ${statusCfg.badge}`}>
@@ -306,8 +306,8 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
                 <div className="absolute top-4 left-4 right-4 h-1 bg-slate-700/80 rounded-full z-0 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-700 ease-out ${isRejectedDelivery
-                        ? 'bg-gradient-to-r from-rose-500 to-rose-700'
-                        : 'bg-gradient-to-r from-amber-400 via-blue-500 via-purple-500 to-emerald-400'
+                      ? 'bg-gradient-to-r from-rose-500 to-rose-700'
+                      : 'bg-gradient-to-r from-amber-400 via-blue-500 via-purple-500 to-emerald-400'
                       }`}
                     style={{ width: `${isRejectedDelivery ? progressPercent : progressPercent}%` }}
                   />
@@ -401,8 +401,8 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
                         disabled={updatingStage}
                         onClick={() => handleUpdateDeliveryStage(stage)}
                         className={`py-1.5 px-1 rounded-xl text-[10px] font-black transition-all border text-center ${currentStage === stage
-                            ? `${active} text-white shadow-md ring-2`
-                            : 'bg-white/5 hover:bg-white/15 text-slate-300 border-white/10'
+                          ? `${active} text-white shadow-md ring-2`
+                          : 'bg-white/5 hover:bg-white/15 text-slate-300 border-white/10'
                           }`}
                       >
                         {emoji} {label}

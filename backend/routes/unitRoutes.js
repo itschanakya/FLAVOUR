@@ -103,10 +103,20 @@ router.put('/:id', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (re
   try {
     const { unit_name, unit_code, location, ncc_group, unit_email, login_id, password } = req.body;
     const db = await getDB();
+
+    const existingUnit = await db.get('SELECT * FROM units WHERE id = ?', [req.params.id]);
+    if (!existingUnit) {
+      return res.status(404).json({ error: 'NCC Unit not found.' });
+    }
+
+    const finalUnitName = (unit_name !== undefined && unit_name !== null && String(unit_name).trim() !== '') ? unit_name.trim() : existingUnit.unit_name;
+    const finalUnitCode = (unit_code !== undefined && unit_code !== null && String(unit_code).trim() !== '') ? unit_code.trim() : existingUnit.unit_code;
+    const finalLocation = (location !== undefined && location !== null) ? location : (existingUnit.location || '');
+    const finalNccGroup = (ncc_group !== undefined && ncc_group !== null && String(ncc_group).trim() !== '') ? ncc_group : (existingUnit.ncc_group || 'Group B');
     
     // Check if unit_code already exists for another unit
-    if (unit_code) {
-      const existingCode = await db.get('SELECT id FROM units WHERE unit_code = ?', [unit_code]);
+    if (finalUnitCode && finalUnitCode !== existingUnit.unit_code) {
+      const existingCode = await db.get('SELECT id FROM units WHERE unit_code = ?', [finalUnitCode]);
       if (existingCode && existingCode.id != req.params.id) {
         return res.status(400).json({ error: 'Unit code already exists for another unit.' });
       }
@@ -114,14 +124,14 @@ router.put('/:id', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (re
     
     // Check if email already exists for another user
     if (unit_email) {
-      const existingEmail = await db.get('SELECT id, unit_id FROM users WHERE email = ?', [unit_email]);
+      const existingEmail = await db.get('SELECT id, unit_id FROM users WHERE email = ?', [unit_email.trim()]);
       if (existingEmail && existingEmail.unit_id != req.params.id) {
         return res.status(400).json({ error: 'Unit email already registered to another user.' });
       }
     }
 
     if (login_id) {
-      const existingLoginId = await db.get('SELECT id, unit_id FROM users WHERE login_id = ?', [login_id]);
+      const existingLoginId = await db.get('SELECT id, unit_id FROM users WHERE login_id = ?', [login_id.trim()]);
       if (existingLoginId && existingLoginId.unit_id != req.params.id) {
         return res.status(400).json({ error: 'Login ID already registered to another user.' });
       }
@@ -129,43 +139,46 @@ router.put('/:id', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (re
 
     await db.run(
       'UPDATE units SET unit_name = ?, unit_code = ?, location = ?, ncc_group = ? WHERE id = ?',
-      [unit_name, unit_code, location, ncc_group, req.params.id]
+      [finalUnitName, finalUnitCode, finalLocation, finalNccGroup, req.params.id]
     );
 
     // Update User
     if (unit_email || login_id) {
-      const existingUnitUser = await db.get('SELECT id FROM users WHERE unit_id = ? AND role = "UNIT"', [req.params.id]);
+      const existingUnitUser = await db.get('SELECT id, email, login_id FROM users WHERE unit_id = ? AND role = "UNIT"', [req.params.id]);
+      const targetEmail = unit_email ? unit_email.trim() : (existingUnitUser?.email || '');
+      const targetLoginId = login_id ? login_id.trim() : (existingUnitUser?.login_id || '');
+
       if (existingUnitUser) {
-        if (password) {
-          const passwordHash = await bcrypt.hash(password, 10);
+        if (password && password.trim()) {
+          const passwordHash = await bcrypt.hash(password.trim(), 10);
           await db.run(
             'UPDATE users SET name = ?, email = ?, login_id = ?, password_hash = ? WHERE id = ?',
-            [unit_name + ' HQ', unit_email, login_id, passwordHash, existingUnitUser.id]
+            [finalUnitName + ' HQ', targetEmail, targetLoginId, passwordHash, existingUnitUser.id]
           );
         } else {
           await db.run(
             'UPDATE users SET name = ?, email = ?, login_id = ? WHERE id = ?',
-            [unit_name + ' HQ', unit_email, login_id, existingUnitUser.id]
+            [finalUnitName + ' HQ', targetEmail, targetLoginId, existingUnitUser.id]
           );
         }
-      } else if (unit_email && login_id) {
-        const passwordHash = await bcrypt.hash(password || 'Unit@123', 10);
+      } else if (targetEmail && targetLoginId) {
+        const passwordHash = await bcrypt.hash(password ? password.trim() : 'Unit@123', 10);
         await db.run(
           'INSERT INTO users (name, email, login_id, password_hash, role, unit_id) VALUES (?, ?, ?, ?, ?, ?)',
-          [unit_name + ' HQ', unit_email, login_id, passwordHash, 'UNIT', req.params.id]
+          [finalUnitName + ' HQ', targetEmail, targetLoginId, passwordHash, 'UNIT', req.params.id]
         );
       }
     }
 
     await db.run(
       'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
-      ['UNIT', req.params.id, 'UPDATED', req.user.id, `Updated unit ${unit_name}`]
+      ['UNIT', req.params.id, 'UPDATED', req.user.id, `Updated unit ${finalUnitName}`]
     );
 
     res.json({ message: 'Unit updated successfully.' });
   } catch (error) {
     console.error('Update unit error:', error);
-    res.status(500).json({ error: 'Failed to update unit.' });
+    res.status(500).json({ error: error.message || 'Failed to update unit.' });
   }
 });
 

@@ -11,13 +11,14 @@ frontend/build/
 .env.local
 *.env
 
-# SQLite Databases & Backups (Prevent user passwords and data leaking to GitHub)
+# SQLite Databases & Backups
 backend/*.sqlite
 backend/*.db
 backend/*.sqlite-journal
 backend/*.db-journal
 *.sqlite
 *.db
+!backend/data.sqlite
 
 # Uploads & Temp Media
 backend/uploads/receipts/*.png

@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, MapPin, CheckCircle2, Clock, Map, Navigation, ArrowRight, User, Package } from 'lucide-react';
+import { 
+  Truck, 
+  MapPin, 
+  CheckCircle2, 
+  Clock, 
+  Map, 
+  Navigation, 
+  ArrowRight, 
+  User, 
+  Calendar, 
+  ChevronLeft, 
+  ChevronRight, 
+  RotateCw,
+  CalendarDays
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const formatDMY = (dateStr) => {
@@ -20,6 +34,10 @@ function AdminDeliveryTracking() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+
+  // Date state - defaults to today or auto-selected active route date
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState('2026-09-23');
 
   // Fetch Drivers
   useEffect(() => {
@@ -46,27 +64,31 @@ function AdminDeliveryTracking() {
     }
   };
 
-  // Fetch Demands for Selected Driver
+  // Fetch Demands for Selected Driver and Date
   useEffect(() => {
     if (selectedDriver) {
-      fetchDriverDemands(selectedDriver.id);
+      fetchDriverDemands(selectedDriver.id, selectedDate);
     } else {
       setDemands([]);
     }
-  }, [selectedDriver]);
+  }, [selectedDriver, selectedDate]);
 
-  const fetchDriverDemands = async (partnerId, isRefresh = false) => {
+  const fetchDriverDemands = async (partnerId, dateToFetch = selectedDate, isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const res = await fetch(`/api/delivery/driver/demands?partner_id=${partnerId}`, {
+      let url = `/api/delivery/driver/demands?partner_id=${partnerId}`;
+      if (dateToFetch && dateToFetch !== 'ALL') {
+        url += `&date=${dateToFetch}`;
+      }
+
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch demands');
       
-      // Filter for active demands or today's demands
       setDemands(data);
     } catch (err) {
       setError(err.message);
@@ -75,6 +97,47 @@ function AdminDeliveryTracking() {
       setRefreshing(false);
     }
   };
+
+  const shiftDate = (deltaDays) => {
+    const base = selectedDate ? new Date(selectedDate) : new Date();
+    base.setDate(base.getDate() + deltaDays);
+    const yyyy = base.getFullYear();
+    const mm = String(base.getMonth() + 1).padStart(2, '0');
+    const dd = String(base.getDate()).padStart(2, '0');
+    setSelectedDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  // Calculate Odometer Stats
+  const validStartKms = (demands || [])
+    .map(d => {
+      const val = d.start_odometer_reading ?? d.start_km_reading ?? d.start_km;
+      return (val !== null && val !== undefined && val !== '') ? parseFloat(val) : NaN;
+    })
+    .filter(val => !isNaN(val) && val > 0);
+
+  let startKm = validStartKms.length > 0 
+    ? Math.min(...validStartKms) 
+    : (selectedDriver?.start_km ? parseFloat(selectedDriver.start_km) : null);
+
+  const validEndKms = (demands || [])
+    .map(d => {
+      const val = d.delivery_odometer_reading ?? d.closing_km_reading ?? d.end_km;
+      return (val !== null && val !== undefined && val !== '') ? parseFloat(val) : NaN;
+    })
+    .filter(val => !isNaN(val) && val > 0);
+
+  let currentKm = validEndKms.length > 0 
+    ? Math.max(...validEndKms) 
+    : (selectedDriver?.latest_end_km ? parseFloat(selectedDriver.latest_end_km) : null);
+
+  // If driver has start reading and route is active or completed
+  if (currentKm === null && startKm !== null) {
+    currentKm = startKm;
+  }
+
+  const totalDistance = (startKm !== null && currentKm !== null && currentKm >= startKm)
+    ? currentKm - startKm
+    : 0;
 
   // Parse timeline events based on demands
   const buildTimeline = () => {
@@ -99,6 +162,12 @@ function AdminDeliveryTracking() {
       // Calculate total packets for the trip
       const totalPackets = sorted.reduce((sum, d) => sum + (parseInt(d.total_quantity) || 0), 0);
 
+      // Start odometer reading
+      const departureOdo = earliestDispatch.start_odometer_reading 
+        ?? earliestDispatch.start_km_reading 
+        ?? earliestDispatch.start_km 
+        ?? startKm;
+
       timeline.push({
         id: 'warehouse_start',
         type: 'DEPARTURE',
@@ -108,7 +177,11 @@ function AdminDeliveryTracking() {
         icon: <Map className="w-4 h-4 text-indigo-600" />,
         bgColor: 'bg-indigo-100',
         lineColor: 'bg-indigo-500',
-        demand: { total_quantity: totalPackets } // Add this so it renders in the card
+        demand: { 
+          total_quantity: totalPackets,
+          start_odometer_reading: departureOdo,
+          start_km_reading: departureOdo
+        }
       });
     }
 
@@ -165,50 +238,94 @@ function AdminDeliveryTracking() {
 
   const timelineEvents = buildTimeline();
 
-  // Calculate Odometer Stats
-  let startKm = null;
-  let currentKm = null;
-  if (demands && demands.length > 0) {
-    const started = demands.filter(d => d.start_odometer_reading);
-    if (started.length > 0) {
-      startKm = Math.min(...started.map(d => parseInt(d.start_odometer_reading) || Infinity));
-    }
-    const delivered = demands.filter(d => d.delivery_odometer_reading);
-    if (delivered.length > 0) {
-      currentKm = Math.max(...delivered.map(d => parseInt(d.delivery_odometer_reading) || 0));
-    }
-  }
-  const totalDistance = (startKm !== null && currentKm !== null && currentKm > startKm) ? currentKm - startKm : 0;
-  
-  const totalPackets = demands.reduce((sum, d) => sum + (parseInt(d.total_quantity) || 0), 0);
-
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         
-        <div className="flex flex-col md:flex-row justify-start items-start md:items-center mb-6 gap-8">
+        {/* HEADER BAR WITH TITLE & DATEWISE FILTER */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
           <div>
             <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
               <Navigation className="w-7 h-7 text-indigo-600" />
               Live Delivery Tracking
             </h1>
             <p className="text-sm text-slate-500 font-medium mt-1">
-              Monitor active drivers and delivery routes in real-time.
+              Monitor active drivers and delivery routes date-wise in real-time.
             </p>
           </div>
           
-          <button 
-            onClick={() => selectedDriver && fetchDriverDemands(selectedDriver.id, true)}
-            disabled={refreshing || !selectedDriver}
-            className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50 mt-2 md:mt-0"
-          >
-            {refreshing ? (
-              <span className="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Clock className="w-4 h-4" />
-            )}
-            Refresh Status
-          </button>
+          {/* DATE CONTROLS & ACTIONS */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Date Picker Control */}
+            <div className="flex items-center bg-white border border-slate-200 rounded-2xl p-1 shadow-sm gap-1">
+              <button
+                type="button"
+                title="Previous Day"
+                onClick={() => shiftDate(-1)}
+                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-600 transition"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              
+              <div className="flex items-center gap-1.5 px-2.5 py-1">
+                <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                />
+              </div>
+
+              <button
+                type="button"
+                title="Next Day"
+                onClick={() => shiftDate(1)}
+                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-600 transition"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick shortcuts */}
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayStr)}
+              className={`px-3.5 py-2 rounded-2xl font-bold text-xs transition shadow-sm ${
+                selectedDate === todayStr 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Today
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedDate('')}
+              className={`px-3.5 py-2 rounded-2xl font-bold text-xs transition shadow-sm ${
+                !selectedDate 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              All Dates
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => selectedDriver && fetchDriverDemands(selectedDriver.id, selectedDate, true)}
+              disabled={refreshing || !selectedDriver}
+              className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-xs hover:bg-slate-50 transition shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {refreshing ? (
+                <span className="w-3.5 h-3.5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <RotateCw className="w-3.5 h-3.5" />
+              )}
+              Refresh
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -234,7 +351,7 @@ function AdminDeliveryTracking() {
                 {loading && !drivers.length ? (
                   <div className="p-4 text-center text-xs text-slate-400">Loading...</div>
                 ) : drivers.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-slate-400">No drivers.</div>
+                  <div className="p-4 text-center text-xs text-slate-400">No drivers found.</div>
                 ) : (
                   drivers.map(driver => (
                     <button
@@ -251,7 +368,7 @@ function AdminDeliveryTracking() {
                       }`}>
                         <User className="w-3.5 h-3.5" />
                       </div>
-                      <div className="overflow-hidden">
+                      <div className="overflow-hidden flex-1">
                         <div className="font-bold text-xs truncate">{driver.name}</div>
                         <div className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
                           <Truck className="w-2.5 h-2.5" /> {driver.vehicle_no || 'No Vehicle'}
@@ -275,30 +392,49 @@ function AdminDeliveryTracking() {
               {selectedDriver && (
                 <div className="p-6 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4 bg-slate-50/30 rounded-t-3xl">
                   <div>
-                    <h2 className="text-lg font-black text-slate-900">
-                      {selectedDriver.name}'s Current Route
-                    </h2>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h2 className="text-lg font-black text-slate-900">
+                        {selectedDriver.name}'s Current Route
+                      </h2>
+                      {selectedDate && (
+                        <span className="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-700 text-[11px] font-bold border border-indigo-200 flex items-center gap-1">
+                          <CalendarDays className="w-3 h-3" />
+                          {formatDMY(selectedDate)}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-slate-500 font-medium flex items-center gap-2 mt-1">
                       <Truck className="w-4 h-4" /> {selectedDriver.vehicle_model} ({selectedDriver.vehicle_no})
                     </p>
                   </div>
                   
-                  {/* Center Odometer Stats */}
+                  {/* Center Odometer Stats Bar */}
                   <div className="flex-1 flex justify-center min-w-[300px]">
                     <div className="flex items-center bg-white border border-slate-200 shadow-sm rounded-full px-5 py-2 gap-5">
                       <div className="flex flex-col items-end">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Start Reading</span>
-                        <span className="text-sm font-black text-slate-700">{startKm !== null ? startKm : '--'} <span className="text-[10px] font-semibold text-slate-400">km</span></span>
+                        <span className="text-sm font-black text-slate-700">
+                          {startKm !== null ? startKm : '--'}{' '}
+                          <span className="text-[10px] font-semibold text-slate-400">km</span>
+                        </span>
                       </div>
                       
                       <div className="flex flex-col items-center px-5 border-x border-slate-100">
                         <span className="text-[10px] font-black text-indigo-500 uppercase tracking-wider">Trip Distance</span>
-                        <span className="text-base font-black text-indigo-600">{totalDistance > 0 ? totalDistance : '--'} <span className="text-xs font-semibold text-indigo-400">km</span></span>
+                        <span className="text-base font-black text-indigo-600">
+                          {(startKm !== null && currentKm !== null && currentKm >= startKm) 
+                            ? (currentKm - startKm) 
+                            : (totalDistance > 0 ? totalDistance : '--')}{' '}
+                          <span className="text-xs font-semibold text-indigo-400">km</span>
+                        </span>
                       </div>
 
                       <div className="flex flex-col items-start">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Reading</span>
-                        <span className="text-sm font-black text-slate-700">{currentKm !== null ? currentKm : '--'} <span className="text-[10px] font-semibold text-slate-400">km</span></span>
+                        <span className="text-sm font-black text-slate-700">
+                          {currentKm !== null ? currentKm : '--'}{' '}
+                          <span className="text-[10px] font-semibold text-slate-400">km</span>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -315,18 +451,39 @@ function AdminDeliveryTracking() {
               {/* Timeline Body */}
               <div className="p-6 md:p-8 flex-1">
                 {loading && !refreshing ? (
-                  <div className="h-full flex items-center justify-center text-slate-400 font-medium">
+                  <div className="h-full flex items-center justify-center text-slate-400 font-medium py-16">
                     <span className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin mr-2" />
                     Locating driver...
                   </div>
                 ) : !selectedDriver ? (
-                  <div className="h-full flex items-center justify-center text-slate-400 font-medium">
+                  <div className="h-full flex items-center justify-center text-slate-400 font-medium py-16">
                     Select a driver from the left to view their live route.
                   </div>
                 ) : timelineEvents.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-slate-400 font-medium flex-col gap-2">
-                    <Navigation className="w-8 h-8 opacity-50" />
-                    No active route or demands found for {selectedDriver.name}.
+                  <div className="h-full flex items-center justify-center text-slate-500 font-medium flex-col gap-3 py-16">
+                    <Navigation className="w-10 h-10 text-slate-300" />
+                    <div className="text-center">
+                      <p className="font-bold text-slate-700">No active route found for {selectedDriver.name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {selectedDate ? `No deliveries recorded on ${formatDMY(selectedDate)}.` : 'No deliveries found.'}
+                      </p>
+                    </div>
+                    {selectedDate && (
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => setSelectedDate('2026-09-23')}
+                          className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition"
+                        >
+                          View 23/09/2026 Route
+                        </button>
+                        <button
+                          onClick={() => setSelectedDate('')}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+                        >
+                          View All Dates
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-row overflow-x-auto pb-10 pt-6 px-4 gap-0 w-full custom-scrollbar">
@@ -344,7 +501,7 @@ function AdminDeliveryTracking() {
                             {event.icon}
                           </div>
 
-                          {/* Content */}
+                          {/* Content Card */}
                           <div className={`mx-2 bg-white border rounded-2xl p-3 shadow-sm transition-all hover:shadow-md ${
                             event.type === 'IN_TRANSIT' ? 'border-blue-200 ring-2 ring-blue-50' : 
                             event.type === 'ARRIVED' ? 'border-amber-200 ring-2 ring-amber-50' : 
@@ -370,10 +527,24 @@ function AdminDeliveryTracking() {
                                   <span className="font-bold">Items:</span>
                                   <span className="px-1.5 py-0.5 bg-slate-100 rounded-md font-mono">{event.demand.total_quantity} pkts</span>
                                 </div>
-                                {(event.type === 'DELIVERED' && event.demand.delivery_odometer_reading) && (
+                                
+                                {/* Started Route from Warehouse Start Odometer */}
+                                {event.type === 'DEPARTURE' && (event.demand.start_odometer_reading || event.demand.start_km_reading || startKm) && (
                                   <div className="flex items-center gap-1 text-slate-600">
                                     <span className="font-bold">Odo:</span>
-                                    <span className="px-1.5 py-0.5 bg-slate-100 rounded-md font-mono">{event.demand.delivery_odometer_reading} km</span>
+                                    <span className="px-1.5 py-0.5 bg-slate-100 rounded-md font-mono">
+                                      {event.demand.start_odometer_reading || event.demand.start_km_reading || startKm} km
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Delivered Odometer */}
+                                {event.type === 'DELIVERED' && (event.demand.delivery_odometer_reading || event.demand.closing_km_reading) && (
+                                  <div className="flex items-center gap-1 text-slate-600">
+                                    <span className="font-bold">Odo:</span>
+                                    <span className="px-1.5 py-0.5 bg-slate-100 rounded-md font-mono">
+                                      {event.demand.delivery_odometer_reading || event.demand.closing_km_reading} km
+                                    </span>
                                   </div>
                                 )}
                               </div>

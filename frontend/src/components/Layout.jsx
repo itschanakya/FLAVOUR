@@ -22,7 +22,8 @@ import {
   ClipboardList,
   Monitor,
   Smartphone,
-  Navigation
+  Navigation,
+  Boxes
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useSSE } from '../context/SSEContext';
@@ -162,7 +163,7 @@ export default function Layout({ children }) {
       { path: '/admin/delivery-tracking', label: 'Live Tracking', icon: Navigation },
       { path: '/documentation', label: 'Documentation', icon: FileCheck },
       { path: '/reports', label: 'Reports & Analytics', icon: Layers },
-      { path: '/inventory', label: 'Inventory', icon: ClipboardList },
+      { path: '/stock', label: 'Stock Mgmt', icon: Boxes },
       { path: '/bill-collection', label: 'Bill Collection', icon: Receipt }
     ],
     UNIT: [
@@ -191,7 +192,7 @@ export default function Layout({ children }) {
       { path: '/approved-demands', label: 'Supply', icon: Truck },
       { path: '/delivery', label: 'Fleet', icon: Truck },
       { path: '/admin/delivery-tracking', label: 'Live', icon: Navigation },
-      { path: '/inventory', label: 'Inventory', icon: ClipboardList },
+      { path: '/stock', label: 'Stock Mgmt', icon: Boxes },
       { path: '/bill-collection', label: 'Bills', icon: Receipt },
       { path: '/reports', label: 'Reports', icon: Layers }
     ],
@@ -276,6 +277,12 @@ export default function Layout({ children }) {
       inactive: 'text-indigo-950 hover:text-indigo-700 hover:bg-indigo-50/90 border-indigo-200/80 hover:border-indigo-400 bg-white/90',
       iconActive: 'text-white',
       iconInactive: 'text-indigo-600 group-hover:scale-110'
+    },
+    '/stock': {
+      active: 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-500/30 border-teal-600',
+      inactive: 'text-teal-950 hover:text-teal-700 hover:bg-teal-50/90 border-teal-200/80 hover:border-teal-400 bg-white/90',
+      iconActive: 'text-white',
+      iconInactive: 'text-teal-600 group-hover:scale-110'
     },
     '/inventory': {
       active: 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-500/30 border-teal-600',

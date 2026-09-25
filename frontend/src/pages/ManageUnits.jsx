@@ -345,7 +345,7 @@ export default function ManageUnits({ embedded = false }) {
                         required
                         value={unitEmail}
                         onChange={(e) => setUnitEmail(e.target.value)}
-                        placeholder="unit1@ncc.gov.in"
+                        placeholder="unit@gmail.com"
                         className="w-full p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 text-xs"
                       />
                     </div>

@@ -663,87 +663,22 @@ _National Cadet Corps - Supply & Logistics Portal_`;
     window.open(url, '_blank');
   };
 
-  const handleMissingKmSubmit = async () => {
-    if (!missingKmModal.startKmInput) {
-      alert("Please enter today's starting odometer reading.");
-      return;
-    }
-    
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const res = await fetch('/api/delivery/km-logs/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ 
-          driver_id: missingKmModal.driverId, 
-          log_date: today, 
-          start_km: parseFloat(missingKmModal.startKmInput) 
-        })
-      });
-      
-      if (res.ok) {
-        // Optimistically update kmLogs to allow dispatch to pass
-        setKmLogs(prev => {
-          const exists = prev.find(l => l.driver_id === missingKmModal.driverId && l.log_date === today);
-          if (exists) {
-            return prev.map(l => (l.driver_id === missingKmModal.driverId && l.log_date === today) ? { ...l, start_km: parseFloat(missingKmModal.startKmInput) } : l);
-          } else {
-            return [...prev, { driver_id: missingKmModal.driverId, log_date: today, start_km: parseFloat(missingKmModal.startKmInput) }];
-          }
-        });
-        
-        const andSendWhatsApp = missingKmModal.andSendWhatsApp;
-        setMissingKmModal({ open: false, driverId: null, partnerName: '', suggestedKm: 0, startKmInput: '' });
-        
-        // Wait a tick for state to update, then trigger assignment again
-        setTimeout(() => {
-          handleSaveAssignment(null, andSendWhatsApp);
-        }, 100);
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to save Start KM');
-      }
-    } catch (err) {
-      alert('Error saving Start KM');
-    }
+  // Helper for today's local date YYYY-MM-DD
+  const getTodayLocalDateStr = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
-  // Submit Assignment
-  const handleSaveAssignment = async (e, andSendWhatsApp = false) => {
-    if (e) e.preventDefault();
-    if (!customPartnerName.trim()) {
-      alert('Please select or enter Delivery Partner Name');
-      return;
-    }
-
-    if (assignPartnerId) {
-      const today = new Date().toISOString().split('T')[0];
-      const todayLog = kmLogs.find(l => String(l.driver_id) === String(assignPartnerId) && l.log_date === today);
-      if (!todayLog || todayLog.start_km === null) {
-        setMissingKmModal({
-          open: true,
-          driverId: assignPartnerId,
-          partnerName: customPartnerName,
-          suggestedKm: todayLog ? todayLog.suggested_start_km : 0,
-          startKmInput: '',
-          andSendWhatsApp
-        });
-        return;
-      }
-    }
-
-    if (startKm !== '' && closingKm !== '') {
-      const s = parseFloat(startKm);
-      const c = parseFloat(closingKm);
-      if (!isNaN(s) && !isNaN(c) && c < s) {
-        alert('Closing Meter Reading cannot be less than Starting Meter Reading.');
-        return;
-      }
-    }
-
+  // Direct dispatch executor without stale React state issues
+  const executeDispatch = async (resolvedStartKm, andSendWhatsApp = false) => {
     setAssigning(true);
     try {
-      const s = startKm !== '' ? parseFloat(startKm) : null;
+      const s = (resolvedStartKm !== null && resolvedStartKm !== undefined && resolvedStartKm !== '')
+        ? parseFloat(resolvedStartKm)
+        : (startKm !== '' ? parseFloat(startKm) : null);
       const c = closingKm !== '' ? parseFloat(closingKm) : null;
       const t = (s !== null && c !== null) ? Math.max(0, c - s) : null;
 
@@ -778,20 +713,137 @@ _National Cadet Corps - Supply & Logistics Portal_`;
         delivery_notes: deliveryNotes.trim(),
         start_km_reading: s,
         closing_km_reading: c,
-        total_km: t
+        total_km: t,
+        delivery_status: 'OUT_FOR_DELIVERY'
       };
 
       setAssignModalOpen(false);
-      fetchDeliveryData();
+      setMissingKmModal({ open: false, driverId: null, partnerName: '', suggestedKm: 0, startKmInput: '', andSendWhatsApp: false });
+      await fetchDeliveryData();
 
       if (andSendWhatsApp) {
         handleSendWhatsAppAlert(updatedDem);
       }
     } catch (err) {
-      alert(err.message);
+      alert(err.message || 'Failed to assign delivery');
     } finally {
       setAssigning(false);
     }
+  };
+
+  const handleMissingKmSubmit = async () => {
+    const rawVal = String(missingKmModal.startKmInput || '').trim();
+    if (!rawVal) {
+      alert("Please enter today's starting odometer reading.");
+      return;
+    }
+    const enteredKm = parseFloat(rawVal);
+    if (isNaN(enteredKm) || enteredKm < 0) {
+      alert("Please enter a valid positive starting odometer reading.");
+      return;
+    }
+    
+    try {
+      const today = getTodayLocalDateStr();
+      const driverIdNum = parseInt(missingKmModal.driverId);
+
+      const res = await fetch('/api/delivery/km-logs/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ 
+          driver_id: driverIdNum, 
+          log_date: today, 
+          start_km: enteredKm 
+        })
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Failed to save Start KM');
+        return;
+      }
+
+      // Optimistically update kmLogs in state
+      setKmLogs(prev => {
+        const dIdStr = String(missingKmModal.driverId);
+        const exists = prev.find(l => String(l.driver_id) === dIdStr);
+        if (exists) {
+          return prev.map(l => String(l.driver_id) === dIdStr ? { ...l, start_km: enteredKm, log_date: today } : l);
+        } else {
+          return [...prev, { driver_id: driverIdNum, log_date: today, start_km: enteredKm }];
+        }
+      });
+      setStartKm(String(enteredKm));
+      
+      const andSendWhatsApp = missingKmModal.andSendWhatsApp;
+      setMissingKmModal({ open: false, driverId: null, partnerName: '', suggestedKm: 0, startKmInput: '', andSendWhatsApp: false });
+      
+      // Directly proceed to dispatch with the saved start KM without re-checking stale state!
+      await executeDispatch(enteredKm, andSendWhatsApp);
+    } catch (err) {
+      alert('Error saving Start KM: ' + (err.message || 'Network error'));
+    }
+  };
+
+  // Submit Assignment
+  const handleSaveAssignment = async (e, andSendWhatsApp = false) => {
+    if (e) e.preventDefault();
+    if (!customPartnerName.trim()) {
+      alert('Please select or enter Delivery Partner Name');
+      return;
+    }
+
+    if (assignPartnerId) {
+      const today = getTodayLocalDateStr();
+      const driverLog = kmLogs.find(l => String(l.driver_id) === String(assignPartnerId));
+
+      const hasStartKmInDemand = startKm !== '' || (selectedDemandForAssign?.start_km_reading !== null && selectedDemandForAssign?.start_km_reading !== undefined);
+      const hasStartKmInLog = driverLog && driverLog.start_km !== null && driverLog.start_km !== undefined;
+      const isAlreadyDispatched = selectedDemandForAssign?.delivery_status === 'OUT_FOR_DELIVERY' || selectedDemandForAssign?.delivery_status === 'DELIVERED';
+
+      if (!hasStartKmInDemand && !hasStartKmInLog && !isAlreadyDispatched) {
+        setMissingKmModal({
+          open: true,
+          driverId: assignPartnerId,
+          partnerName: customPartnerName,
+          suggestedKm: driverLog ? (driverLog.suggested_start_km || 0) : 0,
+          startKmInput: driverLog?.suggested_start_km ? String(driverLog.suggested_start_km) : '',
+          andSendWhatsApp
+        });
+        return;
+      }
+
+      const resolvedStart = hasStartKmInDemand
+        ? (startKm !== '' ? parseFloat(startKm) : selectedDemandForAssign.start_km_reading)
+        : (hasStartKmInLog ? driverLog.start_km : null);
+
+      if (resolvedStart !== null && startKm === '') {
+        setStartKm(String(resolvedStart));
+      }
+
+      if (startKm !== '' && closingKm !== '') {
+        const s = parseFloat(startKm);
+        const c = parseFloat(closingKm);
+        if (!isNaN(s) && !isNaN(c) && c < s) {
+          alert('Closing Meter Reading cannot be less than Starting Meter Reading.');
+          return;
+        }
+      }
+
+      await executeDispatch(resolvedStart, andSendWhatsApp);
+      return;
+    }
+
+    if (startKm !== '' && closingKm !== '') {
+      const s = parseFloat(startKm);
+      const c = parseFloat(closingKm);
+      if (!isNaN(s) && !isNaN(c) && c < s) {
+        alert('Closing Meter Reading cannot be less than Starting Meter Reading.');
+        return;
+      }
+    }
+
+    await executeDispatch(null, andSendWhatsApp);
   };
 
 
