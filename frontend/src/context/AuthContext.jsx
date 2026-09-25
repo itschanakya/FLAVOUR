@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
   const login = async (email, password, expectedRole) => {
     let res;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
       res = await fetch('/api/auth/login', {
@@ -89,7 +89,7 @@ export function AuthProvider({ children }) {
   const verifyOtp = async (login_id, otp) => {
     let res;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
       res = await fetch('/api/auth/verify-otp', {

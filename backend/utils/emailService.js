@@ -15,7 +15,10 @@ if (smtpUser && smtpPass) {
     auth: {
       user: smtpUser,
       pass: smtpPass
-    }
+    },
+    connectionTimeout: 6000,
+    greetingTimeout: 6000,
+    socketTimeout: 8000
   });
 }
 
