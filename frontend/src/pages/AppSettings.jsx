@@ -4,12 +4,14 @@ import {
   Settings, CalendarClock, Save, CheckCircle2, Key, Building2, School,
   Search, Edit3, ShieldAlert, X, ShoppingBag, Users, MapPin, ExternalLink,
   Truck, Plus, Trash2, Phone, ShieldCheck, Wifi, Eye, EyeOff, Boxes,
-  Gauge, AlertCircle, Info, Navigation, Scale, Compass, Map, CalendarDays, History
+  Gauge, AlertCircle, Info, Navigation, Scale, Compass, Map, CalendarDays, History,
+  Download, Upload, RotateCcw, DatabaseBackup, Lock, ShieldOff, FileJson
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManageCatalog from './ManageCatalog';
 import ManageUnits from './ManageUnits';
 import CustomDateInput from '../components/CustomDateInput';
+import DataBackupPanel from '../components/DataBackupPanel';
 
 export const VEHICLE_PRESETS = {
   ECO: {
@@ -929,6 +931,13 @@ export default function AppSettings() {
                   <ShieldAlert className="w-4 h-4 text-blue-500" />
                   Admin My Account
                 </button>
+                <button
+                  onClick={() => setActiveTab('data-backup')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'data-backup' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <DatabaseBackup className="w-4 h-4 text-rose-600" />
+                  Data Backup
+                </button>
               </>
             )}
 
@@ -1007,6 +1016,7 @@ export default function AppSettings() {
                 {activeTab === 'my-account' && 'Account Settings & Login Credentials'}
                 {activeTab === 'driver-account' && 'Driver Account & Fleet Load Capacity'}
                 {activeTab === 'km-history' && 'Daily Run & KM Summary'}
+                {activeTab === 'data-backup' && 'Data Backup & System Reset'}
               </h1>
               <p className={`text-slate-500 ${activeTab === 'catalog' || activeTab === 'stock' || activeTab === 'inventory' ? 'text-xs mt-0.5' : 'text-sm mt-1'}`}>
                 {activeTab === 'units' && 'Onboard NCC Units, issue Unit logins & manage jurisdiction scopes.'}
@@ -1020,6 +1030,7 @@ export default function AppSettings() {
                 {activeTab === 'my-account' && 'Update your official login email address, username ID, or set a new password.'}
                 {activeTab === 'driver-account' && 'Configure your vehicle fleet specifications, maximum daily load capacity (packets), travel distance range, and view real-time payload metrics.'}
                 {activeTab === 'km-history' && 'Record and review daily starting and closing odometer readings for all fleet drivers.'}
+                {activeTab === 'data-backup' && 'Export a full database backup, restore from a backup file, or reset all demand records.'}
               </p>
             </div>
 
@@ -1635,6 +1646,11 @@ export default function AppSettings() {
                       </div>
                     )}
                   </div>
+                )}
+
+                {/* ═══ DATA BACKUP TAB ═══ */}
+                {activeTab === 'data-backup' && role === 'ADMIN' && (
+                  <DataBackupPanel token={token} />
                 )}
 
                 {/* 2. UNIT: INSTITUTIONS CREDENTIALS TABLE */}

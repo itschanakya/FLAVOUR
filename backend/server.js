@@ -47,6 +47,7 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/bill-collection', require('./routes/billCollectionRoutes'));
 app.use('/api/delivery', require('./routes/deliveryRoutes'));
 app.use('/api/packets', require('./routes/packetRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
 
 app.use('/api/stream', require('./routes/streamRoutes'));
 
