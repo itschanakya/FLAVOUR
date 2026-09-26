@@ -42,6 +42,7 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         d.delivery_partner_name,
         d.delivery_partner_phone,
         d.delivery_partner_vehicle,
+        COALESCE(d.delivery_mode, 'DRIVER') as delivery_mode,
         COALESCE(d.delivery_status, 'PENDING') as delivery_status,
         d.dispatched_at,
         d.delivered_at,
@@ -64,7 +65,7 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
       LEFT JOIN institutions i ON d.institution_id = i.id
       JOIN units u ON d.unit_id = u.id
       WHERE d.is_deleted = 0
-        AND d.status IN ('READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED')
+        AND d.status IN ('READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED', 'REJECTED')
     `;
 
     const params = [];
@@ -283,11 +284,12 @@ router.delete('/partners/:id', authenticateToken, authorizeRoles('ADMIN'), async
   }
 });
 
-// POST /api/delivery/assign - Assign delivery partner & vehicle to demands
+// POST /api/delivery/assign - Assign delivery partner, porter, or self delivery to demands
 router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const {
       demandIds,
+      deliveryMode, // 'DRIVER' | 'PORTER' | 'SELF_DELIVERY'
       partnerId,
       partnerName,
       partnerPhone,
@@ -303,8 +305,24 @@ router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, r
     if (!demandIds || !Array.isArray(demandIds) || demandIds.length === 0) {
       return res.status(400).json({ error: 'At least one demand ID is required' });
     }
-    if (!partnerName) {
-      return res.status(400).json({ error: 'Delivery partner name is required' });
+
+    const mode = deliveryMode || 'DRIVER';
+    let assignedPartnerName = partnerName || 'Driver';
+    let assignedPhone = partnerPhone || '';
+    let assignedVehicle = partnerVehicle || '';
+
+    if (mode === 'PORTER') {
+      assignedPartnerName = 'Handled by Porter';
+      assignedPhone = 'Porter Staff';
+      assignedVehicle = 'Porter Transport';
+    } else if (mode === 'SELF_DELIVERY') {
+      assignedPartnerName = 'Admin Self Delivery';
+      assignedPhone = '';
+      assignedVehicle = 'Admin Direct Handover';
+    } else {
+      if (!partnerName) {
+        return res.status(400).json({ error: 'Delivery partner name is required for Driver Mode' });
+      }
     }
 
     const sKm = (startKm !== undefined && startKm !== null && startKm !== '') ? parseFloat(startKm) : ((start_km_reading !== undefined && start_km_reading !== null && start_km_reading !== '') ? parseFloat(start_km_reading) : null);
@@ -321,6 +339,7 @@ router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, r
              delivery_partner_name = ?, 
              delivery_partner_phone = ?, 
              delivery_partner_vehicle = ?, 
+             delivery_mode = ?,
              delivery_status = 'OUT_FOR_DELIVERY',
              dispatched_at = ?,
              delivery_notes = ?,
@@ -330,9 +349,10 @@ router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, r
          WHERE id = ?`,
         [
           partnerId || null,
-          partnerName,
-          partnerPhone || '',
-          partnerVehicle || '',
+          assignedPartnerName,
+          assignedPhone,
+          assignedVehicle,
+          mode,
           now,
           deliveryNotes || '',
           sKm,
@@ -343,7 +363,7 @@ router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, r
       );
 
       // Auto-sync start km to driver_daily_logs if partnerId and sKm are provided
-      if (partnerId && sKm !== null) {
+      if (mode === 'DRIVER' && partnerId && sKm !== null) {
         try {
           const todayDate = new Date().toISOString().split('T')[0];
           const existingLog = await db.get('SELECT id, start_km FROM driver_daily_logs WHERE driver_id = ? AND log_date = ?', [partnerId, todayDate]);
@@ -357,19 +377,21 @@ router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         }
       }
 
+      const modeLogText = mode === 'PORTER' ? 'Porter Assigned' : (mode === 'SELF_DELIVERY' ? 'Self Delivery (Admin Direct)' : `Assigned to delivery partner ${assignedPartnerName} (${assignedVehicle || 'No Vehicle'})`);
+
       // Audit log
       await db.run(
         'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
-        ['DEMAND', demandId, 'DELIVERY_DISPATCHED', req.user.id, `Assigned to delivery partner ${partnerName} (${partnerVehicle || 'No Vehicle'}).`]
+        ['DEMAND', demandId, 'DELIVERY_DISPATCHED', req.user.id, modeLogText]
       );
 
       // Activity log
       await db.run(
         'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
-        [demandId, req.user.id, 'STATUS_CHANGE', 'ACCEPTED', 'OUT_FOR_DELIVERY', `Out for delivery via ${partnerName}.`]
+        [demandId, req.user.id, 'STATUS_CHANGE', 'ACCEPTED', 'OUT_FOR_DELIVERY', `Dispatched via ${modeLogText}.`]
       );
 
-      broadcastToAll('DEMAND_UPDATED', { id: demandId, delivery_status: 'OUT_FOR_DELIVERY', timestamp: Date.now() });
+      broadcastToAll('DEMAND_UPDATED', { id: demandId, delivery_status: 'OUT_FOR_DELIVERY', delivery_mode: mode, timestamp: Date.now() });
     }
 
     res.json({ message: `Successfully assigned ${demandIds.length} demand(s) for physical delivery.` });
@@ -425,7 +447,7 @@ router.post('/status', authenticateToken, authorizeRoles('ADMIN'), async (req, r
       return res.status(400).json({ error: 'Demand ID and delivery status are required' });
     }
 
-    const validStatuses = ['PENDING', 'OUT_FOR_DELIVERY', 'ARRIVED', 'DELIVERED'];
+    const validStatuses = ['PENDING', 'OUT_FOR_DELIVERY', 'ARRIVED', 'DELIVERED', 'REJECTED'];
     if (!validStatuses.includes(deliveryStatus)) {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
@@ -437,9 +459,10 @@ router.post('/status', authenticateToken, authorizeRoles('ADMIN'), async (req, r
     const params = [deliveryStatus];
 
     if (deliveryStatus === 'DELIVERED') {
-      // User requested that marking as delivered automatically pushes to Documentation (status='DELIVERED')
       query += `, delivered_at = ?, status = 'DELIVERED'`;
       params.push(now);
+    } else if (deliveryStatus === 'REJECTED') {
+      query += `, status = 'REJECTED'`;
     } else if (deliveryStatus === 'OUT_FOR_DELIVERY') {
       query += `, dispatched_at = COALESCE(dispatched_at, ?)`;
       params.push(now);

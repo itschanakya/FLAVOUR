@@ -10,17 +10,55 @@ import {
 } from 'lucide-react';
 import { useSSE } from '../context/SSEContext';
 
-function StatusBadge({ status }) {
-  const map = {
-    APPROVED: 'bg-amber-100 text-amber-700 border-amber-200',
-    ACCEPTED: 'bg-blue-100 text-blue-700 border-blue-200',
-    FULFILLED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  };
+function StatusBadge({ status, deliveryStatus, demand }) {
+  const dStatus = deliveryStatus || demand?.delivery_status;
+  const mainStatus = status || demand?.status;
+
+  if (dStatus === 'DELIVERED' || mainStatus === 'DELIVERED' || mainStatus === 'FULFILLED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Delivered & Verified
+      </span>
+    );
+  }
+  if (dStatus === 'REJECTED' || mainStatus === 'REJECTED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+        <AlertCircle className="w-3 h-3 text-rose-600" /> Rejected
+      </span>
+    );
+  }
+  if (dStatus === 'ARRIVED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200 animate-bounce">
+        <MapPin className="w-3 h-3 text-purple-600" /> At Gate
+      </span>
+    );
+  }
+  if (dStatus === 'OUT_FOR_DELIVERY' || mainStatus === 'OUT_FOR_DELIVERY') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 animate-pulse">
+        <Truck className="w-3 h-3 text-blue-600" /> In Transit
+      </span>
+    );
+  }
+  if (mainStatus === 'READY_FOR_DISPATCH') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+        <Package className="w-3 h-3 text-amber-600" /> Ready for Dispatch
+      </span>
+    );
+  }
+  if (mainStatus === 'ACCEPTED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+        <CheckCircle2 className="w-3 h-3 text-indigo-600" /> Accepted
+      </span>
+    );
+  }
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${map[status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-      {status === 'APPROVED' ? <><AlertCircle className="w-3 h-3" /> Awaiting Action</> : 
-       status === 'ACCEPTED' ? <><Truck className="w-3 h-3" /> Preparing</> : 
-       <><CheckCircle2 className="w-3 h-3" /> Delivered</>}
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+      <AlertCircle className="w-3 h-3 text-amber-600" /> {mainStatus}
     </span>
   );
 }
@@ -54,7 +92,7 @@ function DemandCard({ dem, onPrepare, onSendToFleet, loadingId }) {
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap justify-end">
-            <StatusBadge status={dem.status} />
+            <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} />
           </div>
         </div>
 

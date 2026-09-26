@@ -439,11 +439,11 @@ function DemandCard({ dem, onAction, onDelete, onClick }) {
               <div>
                 <span className="font-black text-blue-950 block">Out for Delivery (In Transit)</span>
                 <span className="text-[11px] text-blue-700 font-semibold">
-                  Driver: {dem.delivery_partner_name} • {dem.delivery_partner_vehicle || 'Vehicle'}
+                  Mode: {dem.delivery_mode === 'PORTER' ? 'Handled by Porter' : (dem.delivery_mode === 'SELF_DELIVERY' ? 'Admin Self Delivery' : `${dem.delivery_partner_name || 'Driver'} (${dem.delivery_partner_vehicle || 'Vehicle'})`)}
                 </span>
               </div>
             </div>
-            {dem.delivery_partner_phone && (
+            {dem.delivery_mode === 'DRIVER' && dem.delivery_partner_phone && (
               <a
                 href={`tel:${dem.delivery_partner_phone}`}
                 onClick={(e) => e.stopPropagation()}
@@ -452,6 +452,22 @@ function DemandCard({ dem, onAction, onDelete, onClick }) {
                 <Phone className="w-3 h-3" /> {dem.delivery_partner_phone}
               </a>
             )}
+          </div>
+        )}
+
+        {dem.delivery_status === 'ARRIVED' && (
+          <div className="mb-4 p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-indigo-600 rounded-lg text-white animate-bounce">
+                <MapPin className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <span className="font-black text-indigo-950 block">Arrived at Institution Gate</span>
+                <span className="text-[11px] text-indigo-700 font-semibold">
+                  {dem.delivery_mode === 'PORTER' ? 'Porter Present at Gate' : (dem.delivery_mode === 'SELF_DELIVERY' ? 'Admin Present at Gate' : `Driver: ${dem.delivery_partner_name}`)}
+                </span>
+              </div>
+            </div>
           </div>
         )}
 

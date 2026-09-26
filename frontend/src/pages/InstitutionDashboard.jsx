@@ -21,6 +21,7 @@ import {
 import { IndianRupee } from 'lucide-react';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
 import CustomDateInput from '../components/CustomDateInput';
+import StatusBadge from '../components/StatusBadge';
 import { useSSE } from '../context/SSEContext';
 
 const formatDMY = (dateStr) => {
@@ -840,29 +841,12 @@ export default function InstitutionDashboard() {
                       </td>
                       <td className="px-3 py-4">
                         <div className="flex flex-col gap-1 items-start">
-                          <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border ${
-                            dem.status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                            dem.status === 'APPROVED' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                            dem.status === 'ACCEPTED' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
-                            dem.status === 'FULFILLED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                            'bg-rose-100 text-rose-700 border-rose-200'
-                          }`}>
-                            {dem.status}
-                          </span>
-                          {/* Live Physical Delivery Badge */}
-                          {dem.delivery_status === 'DELIVERED' ? (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                              <CheckCircle2 className="w-2.5 h-2.5" /> Delivered
+                          <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} />
+                          {dem.delivery_partner_name && dem.delivery_status !== 'DELIVERED' && (
+                            <span className="text-[10px] font-bold text-slate-500">
+                              Handler: {dem.delivery_partner_name}
                             </span>
-                          ) : dem.delivery_status === 'OUT_FOR_DELIVERY' ? (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 animate-pulse" title={`Driver: ${dem.delivery_partner_name}`}>
-                              <Truck className="w-2.5 h-2.5" /> Out for Delivery
-                            </span>
-                          ) : dem.delivery_partner_name ? (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                              Driver Assigned
-                            </span>
-                          ) : null}
+                          )}
                         </div>
                       </td>
                       <td className="px-3 py-4">

@@ -34,6 +34,7 @@ export default function DeliveryManagement() {
   const [missingKmModal, setMissingKmModal] = useState({ open: false, driverId: null, partnerName: '', suggestedKm: 0, startKmInput: '' });
 
   // Assignment Form State
+  const [deliveryMode, setDeliveryMode] = useState('DRIVER'); // 'DRIVER' | 'PORTER' | 'SELF_DELIVERY'
   const [assignPartnerId, setAssignPartnerId] = useState('');
   const [customPartnerName, setCustomPartnerName] = useState('');
   const [customPartnerPhone, setCustomPartnerPhone] = useState('');
@@ -566,13 +567,14 @@ export default function DeliveryManagement() {
   // Open Assign Modal for single demand
   const handleOpenAssign = (dem) => {
     setSelectedDemandForAssign(dem);
-    if (dem.delivery_partner_id) {
+    const mode = dem.delivery_mode || 'DRIVER';
+    setDeliveryMode(mode);
+    if (mode === 'DRIVER' && dem.delivery_partner_id) {
       setAssignPartnerId(String(dem.delivery_partner_id));
       setCustomPartnerName(dem.delivery_partner_name || '');
       setCustomPartnerPhone(dem.delivery_partner_phone || '');
       setCustomVehicleNo(dem.delivery_partner_vehicle || '');
-    } else {
-      // If there's exactly 1 driver matched for this PIN, auto-prefill!
+    } else if (mode === 'DRIVER') {
       const matched = partners.filter(p => driverMatchesPin(p, dem.pin_code));
       if (matched.length === 1) {
         setAssignPartnerId(String(matched[0].id));
@@ -585,6 +587,16 @@ export default function DeliveryManagement() {
         setCustomPartnerPhone('');
         setCustomVehicleNo('');
       }
+    } else if (mode === 'PORTER') {
+      setAssignPartnerId('');
+      setCustomPartnerName('Handled by Porter');
+      setCustomPartnerPhone('Porter Staff');
+      setCustomVehicleNo('Porter Transport');
+    } else if (mode === 'SELF_DELIVERY') {
+      setAssignPartnerId('');
+      setCustomPartnerName('Admin Self Delivery');
+      setCustomPartnerPhone('');
+      setCustomVehicleNo('Admin Direct Handover');
     }
     setStartKm(dem.start_km_reading !== null && dem.start_km_reading !== undefined ? String(dem.start_km_reading) : '');
     setClosingKm(dem.closing_km_reading !== null && dem.closing_km_reading !== undefined ? String(dem.closing_km_reading) : '');
@@ -624,13 +636,13 @@ export default function DeliveryManagement() {
     const demandNo = dem.demand_number || 'N/A';
     const institution = dem.institution_name || 'Institution';
     const packets = dem.total_quantity || 0;
-    const partnerName = dem.delivery_partner_name || 'Assigned Driver';
+    const partnerName = dem.delivery_partner_name || 'Assigned Delivery';
     const partnerPhone = dem.delivery_partner_phone || 'N/A';
-    const partnerVehicle = dem.delivery_partner_vehicle || 'Standard Vehicle';
+    const partnerVehicle = dem.delivery_partner_vehicle || 'Standard Transport';
     const pin = dem.pin_code && dem.pin_code !== 'N/A' ? `PIN: ${dem.pin_code}` : '';
     const address = dem.complete_address ? dem.complete_address : '';
     const notes = dem.delivery_notes ? `\n📝 *Notes:* ${dem.delivery_notes}` : '';
-    const meterNotes = dem.start_km_reading ? `\n🚗 *Starting Odometer:* ${dem.start_km_reading} KM` : '';
+    const meterNotes = (dem.delivery_mode === 'DRIVER' && dem.start_km_reading) ? `\n🚗 *Starting Odometer:* ${dem.start_km_reading} KM` : '';
 
     const text = 
 `🇮🇳 *NCC REFRESHMENT DISPATCH ALERT* 🇮🇳
@@ -644,9 +656,10 @@ Refreshment supply for *${institution}* is now *OUT FOR DELIVERY*.
 🥪 *Refreshment Packets:* *${packets} Packets*
 
 🚚 *DELIVERY DISPATCH DETAILS:*
-• *Delivery Partner:* ${partnerName}
-• *Driver Mobile:* ${partnerPhone}
-• *Vehicle:* ${partnerVehicle}${meterNotes}${notes}
+• *Mode:* ${dem.delivery_mode === 'PORTER' ? 'Handled by Porter' : (dem.delivery_mode === 'SELF_DELIVERY' ? 'Admin Self Delivery' : 'Fleet Driver')}
+• *Delivery Handler:* ${partnerName}
+• *Contact Mobile:* ${partnerPhone}
+• *Transport:* ${partnerVehicle}${meterNotes}${notes}
 ${pin ? `• *Location:* ${pin}` : ''}
 ${address ? `• *Destination Address:* ${address}` : ''}
 
@@ -676,10 +689,25 @@ _National Cadet Corps - Supply & Logistics Portal_`;
   const executeDispatch = async (resolvedStartKm, andSendWhatsApp = false) => {
     setAssigning(true);
     try {
-      const s = (resolvedStartKm !== null && resolvedStartKm !== undefined && resolvedStartKm !== '')
+      const mode = deliveryMode || 'DRIVER';
+      let pName = customPartnerName.trim();
+      let pPhone = customPartnerPhone.trim();
+      let pVehicle = customVehicleNo.trim();
+
+      if (mode === 'PORTER') {
+        pName = 'Handled by Porter';
+        pPhone = 'Porter Staff';
+        pVehicle = 'Porter Transport';
+      } else if (mode === 'SELF_DELIVERY') {
+        pName = 'Admin Self Delivery';
+        pPhone = '';
+        pVehicle = 'Admin Direct Handover';
+      }
+
+      const s = (mode === 'DRIVER' && resolvedStartKm !== null && resolvedStartKm !== undefined && resolvedStartKm !== '')
         ? parseFloat(resolvedStartKm)
-        : (startKm !== '' ? parseFloat(startKm) : null);
-      const c = closingKm !== '' ? parseFloat(closingKm) : null;
+        : (mode === 'DRIVER' && startKm !== '' ? parseFloat(startKm) : null);
+      const c = (mode === 'DRIVER' && closingKm !== '') ? parseFloat(closingKm) : null;
       const t = (s !== null && c !== null) ? Math.max(0, c - s) : null;
 
       const res = await fetch('/api/delivery/assign', {
@@ -690,10 +718,11 @@ _National Cadet Corps - Supply & Logistics Portal_`;
         },
         body: JSON.stringify({
           demandIds: [selectedDemandForAssign.id],
-          partnerId: assignPartnerId ? parseInt(assignPartnerId) : null,
-          partnerName: customPartnerName.trim(),
-          partnerPhone: customPartnerPhone.trim(),
-          partnerVehicle: customVehicleNo.trim(),
+          deliveryMode: mode,
+          partnerId: mode === 'DRIVER' && assignPartnerId ? parseInt(assignPartnerId) : null,
+          partnerName: pName,
+          partnerPhone: pPhone,
+          partnerVehicle: pVehicle,
           deliveryNotes: deliveryNotes.trim(),
           startKm: s,
           closingKm: c,
@@ -706,10 +735,11 @@ _National Cadet Corps - Supply & Logistics Portal_`;
 
       const updatedDem = {
         ...selectedDemandForAssign,
-        delivery_partner_id: assignPartnerId ? parseInt(assignPartnerId) : null,
-        delivery_partner_name: customPartnerName.trim(),
-        delivery_partner_phone: customPartnerPhone.trim(),
-        delivery_partner_vehicle: customVehicleNo.trim(),
+        delivery_mode: mode,
+        delivery_partner_id: mode === 'DRIVER' && assignPartnerId ? parseInt(assignPartnerId) : null,
+        delivery_partner_name: pName,
+        delivery_partner_phone: pPhone,
+        delivery_partner_vehicle: pVehicle,
         delivery_notes: deliveryNotes.trim(),
         start_km_reading: s,
         closing_km_reading: c,
@@ -788,6 +818,12 @@ _National Cadet Corps - Supply & Logistics Portal_`;
   // Submit Assignment
   const handleSaveAssignment = async (e, andSendWhatsApp = false) => {
     if (e) e.preventDefault();
+
+    if (deliveryMode === 'PORTER' || deliveryMode === 'SELF_DELIVERY') {
+      await executeDispatch(null, andSendWhatsApp);
+      return;
+    }
+
     if (!customPartnerName.trim()) {
       alert('Please select or enter Delivery Partner Name');
       return;
@@ -1785,9 +1821,29 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                               )}
                             </div>
 
-                            {/* Col 3: Driver Assignment (col-span-2) */}
+                            {/* Col 3: Mode & Handler Assignment (col-span-2) */}
                             <div className="lg:col-span-2 flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
-                              {dem.delivery_partner_name ? (
+                              {dem.delivery_mode === 'PORTER' || dem.delivery_partner_name === 'Handled by Porter' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAssign(dem)}
+                                  className="w-full max-w-[170px] px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 text-xs font-black border border-purple-200 flex items-center justify-center gap-1.5 truncate transition-all shadow-2xs"
+                                  title="Click to change delivery mode"
+                                >
+                                  <Package className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                  <span className="truncate">Porter Assigned</span>
+                                </button>
+                              ) : dem.delivery_mode === 'SELF_DELIVERY' || dem.delivery_partner_name === 'Admin Self Delivery' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAssign(dem)}
+                                  className="w-full max-w-[170px] px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-black border border-emerald-200 flex items-center justify-center gap-1.5 truncate transition-all shadow-2xs"
+                                  title="Click to change delivery mode"
+                                >
+                                  <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate">Self Delivery</span>
+                                </button>
+                              ) : dem.delivery_partner_name ? (
                                 <>
                                   <button
                                     type="button"
@@ -1815,38 +1871,68 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                   type="button"
                                   onClick={() => handleOpenAssign(dem)}
                                   className="w-full max-w-[170px] px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-black border border-dashed border-amber-300 flex items-center justify-center gap-1 transition-all shadow-2xs active:scale-95"
-                                  title="Click to assign delivery partner"
+                                  title="Click to assign driver, porter, or self delivery"
                                 >
                                   <Plus className="w-3.5 h-3.5 text-amber-600" />
-                                  <span>Assign Driver</span>
+                                  <span>Assign Mode</span>
                                 </button>
                               )}
                             </div>
 
-                            {/* Col 4: Live Status & Quick Action (col-span-2) */}
-                            <div className="lg:col-span-2 flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            {/* Col 4: Live Status & Quick Action Movement Points (col-span-2) */}
+                            <div className="lg:col-span-2 flex flex-col items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
                               {isDelivered ? (
-                                <span className="w-full max-w-[150px] py-1 px-2 rounded-xl text-[11px] font-black border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center justify-center gap-1 shadow-2xs">
+                                <span className="w-full max-w-[160px] py-1 px-2 rounded-xl text-[11px] font-black border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center justify-center gap-1 shadow-2xs">
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Delivered
                                 </span>
+                              ) : dem.delivery_status === 'REJECTED' ? (
+                                <span className="w-full max-w-[160px] py-1 px-2 rounded-xl text-[11px] font-black border bg-rose-50 text-rose-800 border-rose-200 flex items-center justify-center gap-1 shadow-2xs">
+                                  <X className="w-3.5 h-3.5 text-rose-600 shrink-0" /> Rejected
+                                </span>
+                              ) : dem.delivery_status === 'ARRIVED' ? (
+                                <div className="flex items-center gap-1 w-full max-w-[170px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateStatus(dem.id, 'DELIVERED')}
+                                    className="flex-1 py-1 px-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black shadow-2xs transition-all active:scale-95 flex items-center justify-center gap-1"
+                                    title="Click to mark physically delivered"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" /> Delivered
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateStatus(dem.id, 'REJECTED')}
+                                    className="py-1 px-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold border border-rose-200 transition-all"
+                                    title="Click to reject delivery"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : isOut ? (
+                                <div className="flex items-center gap-1 w-full max-w-[170px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateStatus(dem.id, 'ARRIVED')}
+                                    className="flex-1 py-1 px-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black shadow-2xs transition-all active:scale-95 flex items-center justify-center gap-1"
+                                    title="Mark arrived at institution gate"
+                                  >
+                                    <MapPin className="w-3 h-3" /> In at Gate
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateStatus(dem.id, 'DELIVERED')}
+                                    className="py-1 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black shadow-2xs transition-all active:scale-95"
+                                    title="Mark delivered"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                  </button>
+                                </div>
                               ) : (
                                 <span
-                                  className={`w-full max-w-[150px] py-1 px-2 rounded-xl text-[10px] font-black border flex items-center justify-center gap-1 text-center shadow-2xs truncate ${
-                                    isOut
-                                      ? 'bg-blue-50 text-blue-800 border-blue-200'
-                                      : 'bg-amber-50 text-amber-800 border-amber-200'
-                                  }`}
-                                  title={isOut ? 'Out for Delivery (In Transit)' : 'Ready for Dispatch (Waiting for Driver)'}
+                                  className="w-full max-w-[160px] py-1 px-2 rounded-xl text-[10px] font-black border bg-amber-50 text-amber-800 border-amber-200 flex items-center justify-center gap-1 text-center shadow-2xs truncate"
+                                  title="Ready for Dispatch"
                                 >
-                                  {isOut ? (
-                                    <>
-                                      <Truck className="w-3 h-3 text-blue-600 shrink-0" /> Transit
-                                    </>
-                                  ) : (
-                                    <>
-                                      <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" /> Ready
-                                    </>
-                                  )}
+                                  <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" /> Ready for Dispatch
                                 </span>
                               )}
                             </div>
@@ -2113,32 +2199,75 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               )}
             </div>
 
-            {/* Modal Footer Actions */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center gap-2.5">
+            {/* Modal Footer Actions & Movement Points */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => handleOpenAssign(selectedDemandForSummary)}
-                className="flex-1 py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 font-extrabold text-xs rounded-xl transition-all shadow-2xs"
+                className="py-2 px-3 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 font-extrabold text-xs rounded-xl transition-all shadow-2xs"
               >
-                {selectedDemandForSummary.delivery_partner_name ? 'Re-Assign' : 'Assign Partner'}
+                {selectedDemandForSummary.delivery_partner_name ? 'Re-Assign Mode' : 'Assign Mode'}
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSendWhatsAppAlert(selectedDemandForSummary)}
-                className="py-2.5 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1.5"
-                title="Send WhatsApp Out-for-Delivery Alert to ANO"
+                className="py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
+                title="Send WhatsApp Alert to ANO"
               >
-                <MessageCircle className="w-3.5 h-3.5" />
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
                 <span>WhatsApp</span>
               </button>
 
-              {selectedDemandForSummary.delivery_status !== 'DELIVERED' ? (
-                <span className="py-2.5 px-3.5 bg-slate-100 text-slate-500 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1 cursor-not-allowed">
-                  <Clock className="w-3.5 h-3.5" /> Waiting for Driver
+              {/* Admin Live Movement Control Buttons */}
+              {selectedDemandForSummary.delivery_status === 'OUT_FOR_DELIVERY' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateStatus(selectedDemandForSummary.id, 'ARRIVED')}
+                    className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1"
+                    title="Mark arrived at institution gate"
+                  >
+                    <MapPin className="w-3.5 h-3.5" /> In at Gate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateStatus(selectedDemandForSummary.id, 'DELIVERED')}
+                    className="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1"
+                    title="Mark delivered"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Mark Delivered
+                  </button>
+                </>
+              ) : selectedDemandForSummary.delivery_status === 'ARRIVED' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateStatus(selectedDemandForSummary.id, 'DELIVERED')}
+                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1"
+                    title="Mark delivered"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Mark Delivered
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateStatus(selectedDemandForSummary.id, 'REJECTED')}
+                    className="py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-all flex items-center justify-center gap-1"
+                    title="Reject delivery"
+                  >
+                    <X className="w-3.5 h-3.5" /> Reject
+                  </button>
+                </>
+              ) : selectedDemandForSummary.delivery_status === 'DELIVERED' ? (
+                <span className="py-2 px-3 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-default border border-emerald-200 ml-auto">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Delivered & Completed
+                </span>
+              ) : selectedDemandForSummary.delivery_status === 'REJECTED' ? (
+                <span className="py-2 px-3 bg-rose-50 text-rose-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-default border border-rose-200 ml-auto">
+                  <X className="w-3.5 h-3.5" /> Delivery Rejected
                 </span>
               ) : (
-                <span className="py-2.5 px-3 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-default border border-emerald-200">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Delivered
+                <span className="py-2 px-3.5 bg-slate-100 text-slate-500 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1 cursor-not-allowed ml-auto">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Ready for Dispatch
                 </span>
               )}
             </div>
@@ -2186,32 +2315,118 @@ _National Cadet Corps - Supply & Logistics Portal_`;
             </div>
 
             <form onSubmit={handleSaveAssignment} className="space-y-4">
-              {/* Select Driver from List */}
-              {partners.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-black text-slate-700">
-                      Select Driver *
-                    </label>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {partners.length} Available
-                    </span>
-                  </div>
-                  <select
-                    value={assignPartnerId}
-                    onChange={(e) => handlePartnerSelect(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 shadow-2xs"
+              {/* Delivery Mode Selection Tabs */}
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-1.5">
+                  Select Delivery Fulfillment Mode *
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeliveryMode('DRIVER');
+                    }}
+                    className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
+                      deliveryMode === 'DRIVER'
+                        ? 'bg-white text-blue-700 shadow-xs border border-blue-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
                   >
-                    <option value="">-- Choose Driver or Type Below --</option>
-                    {displayedDrivers.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.phone}) — {p.vehicle_no || 'Vehicle'} [{p.vehicle_model || 'Van'}] {p.assigned_pins ? `• PINs: ${p.assigned_pins}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Driver</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeliveryMode('PORTER');
+                      setAssignPartnerId('');
+                      setCustomPartnerName('Handled by Porter');
+                      setCustomPartnerPhone('Porter Staff');
+                      setCustomVehicleNo('Porter Transport');
+                    }}
+                    className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
+                      deliveryMode === 'PORTER'
+                        ? 'bg-white text-purple-700 shadow-xs border border-purple-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Package className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                    <span>Porter</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeliveryMode('SELF_DELIVERY');
+                      setAssignPartnerId('');
+                      setCustomPartnerName('Admin Self Delivery');
+                      setCustomPartnerPhone('');
+                      setCustomVehicleNo('Admin Direct Handover');
+                    }}
+                    className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
+                      deliveryMode === 'SELF_DELIVERY'
+                        ? 'bg-white text-emerald-700 shadow-xs border border-emerald-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Self Delivery</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Mode Specific Body */}
+              {deliveryMode === 'DRIVER' ? (
+                partners.length > 0 ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-black text-slate-700">
+                        Select Driver *
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {partners.length} Available
+                      </span>
+                    </div>
+                    <select
+                      value={assignPartnerId}
+                      onChange={(e) => handlePartnerSelect(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                    >
+                      <option value="">-- Choose Driver or Type Below --</option>
+                      {displayedDrivers.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.phone}) — {p.vehicle_no || 'Vehicle'} [{p.vehicle_model || 'Van'}] {p.assigned_pins ? `• PINs: ${p.assigned_pins}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="text-xs text-amber-800 bg-amber-50 p-3 rounded-xl border border-amber-200">
+                    No registered driver partners found. Please add a driver in Partners Registry or choose Porter / Self Delivery mode.
+                  </div>
+                )
+              ) : deliveryMode === 'PORTER' ? (
+                <div className="bg-purple-50/80 p-3.5 rounded-2xl border border-purple-200 space-y-1.5 text-xs text-purple-900">
+                  <div className="font-black flex items-center gap-1.5 text-purple-800">
+                    <Package className="w-4 h-4 text-purple-600" />
+                    <span>Porter Mode Active</span>
+                  </div>
+                  <p className="text-[11px] text-purple-700 font-medium leading-relaxed">
+                    Details of porter not required. Order will be marked as <strong>"Porter Assigned"</strong>. Live tracking movement points (In Transit → In at Gate → Delivered / Rejected) are managed directly from the Admin console.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 space-y-1.5 text-xs text-emerald-900">
+                  <div className="font-black flex items-center gap-1.5 text-emerald-800">
+                    <Building2 className="w-4 h-4 text-emerald-600" />
+                    <span>Self Delivery Mode Active</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
+                    Admin direct handover to institution/unit. Order will be marked as <strong>"Self Delivery"</strong>. Live tracking movement points (In Transit → In at Gate → Delivered / Rejected) are managed directly from the Admin console.
+                  </p>
                 </div>
               )}
-
 
               {/* Delivery Notes */}
               <div>

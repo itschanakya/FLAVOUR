@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSSE } from '../context/SSEContext';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
-import { FileText, FileCheck, Eye, Search, Calendar, MessageSquare, AlertCircle, CheckCircle, Truck, ClipboardList, Clock } from 'lucide-react';
+import { FileText, FileCheck, Eye, Search, Calendar, MessageSquare, AlertCircle, CheckCircle, Truck, ClipboardList, Clock, MapPin } from 'lucide-react';
 
 const formatDMY = (dateStr) => {
   if (!dateStr) return '-';
@@ -26,6 +27,7 @@ const formatDMY = (dateStr) => {
 
 export default function MyDemandsList() {
   const { token } = useAuth();
+  const { events } = useSSE();
   const navigate = useNavigate();
   const [demands, setDemands] = useState([]);
   const [selectedDemand, setSelectedDemand] = useState(null);
@@ -33,11 +35,7 @@ export default function MyDemandsList() {
   const [statusSlicer, setStatusSlicer] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    fetchDemands();
-  }, []);
-
-  const fetchDemands = async () => {
+  const fetchDemands = useCallback(async () => {
     try {
       const res = await fetch('/api/demands', {
         headers: { Authorization: `Bearer ${token}` }
@@ -50,7 +48,23 @@ export default function MyDemandsList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchDemands();
+  }, [fetchDemands]);
+
+  useEffect(() => {
+    if (events?.DEMAND_UPDATED || events?.NEW_NOTIFICATION || events?.timestamp) {
+      fetchDemands();
+    }
+  }, [events?.DEMAND_UPDATED, events?.NEW_NOTIFICATION, events?.timestamp, fetchDemands]);
+
+  useEffect(() => {
+    const handleSync = () => fetchDemands();
+    window.addEventListener('demand-status-changed', handleSync);
+    return () => window.removeEventListener('demand-status-changed', handleSync);
+  }, [fetchDemands]);
 
   const safeDemands = Array.isArray(demands) ? demands : [];
   const countAll = safeDemands.length;
@@ -230,20 +244,12 @@ export default function MyDemandsList() {
                     <td className="p-4 font-bold text-emerald-600">₹{(dem.total_amount || 0).toLocaleString('en-IN')}</td>
                     <td className="p-4">
                       <div className="flex flex-col gap-1 items-start">
-                        <StatusBadge status={dem.status} />
-                        {dem.delivery_status === 'DELIVERED' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                            <CheckCircle className="w-3 h-3" /> Delivered
+                        <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} />
+                        {dem.delivery_partner_name && dem.delivery_status !== 'DELIVERED' && (
+                          <span className="text-[10px] font-bold text-slate-500">
+                            Handler: {dem.delivery_partner_name}
                           </span>
-                        ) : dem.delivery_status === 'OUT_FOR_DELIVERY' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 animate-pulse">
-                            <Truck className="w-3 h-3" /> In Transit ({dem.delivery_partner_name || 'Driver'})
-                          </span>
-                        ) : dem.delivery_partner_name ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                            Driver Assigned
-                          </span>
-                        ) : null}
+                        )}
                       </div>
                     </td>
                     <td className="p-4 text-center">

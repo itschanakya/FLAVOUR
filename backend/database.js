@@ -124,7 +124,10 @@ async function upgradeInventorySchema(db) {
     "ALTER TABLE institutions ADD COLUMN first_demand_day VARCHAR(50) DEFAULT 'Wednesday'",
     "ALTER TABLE institutions ADD COLUMN first_demand_time VARCHAR(20) DEFAULT '08:00'",
     "ALTER TABLE institutions ADD COLUMN second_demand_day VARCHAR(50) DEFAULT 'Saturday'",
-    "ALTER TABLE institutions ADD COLUMN second_demand_time VARCHAR(20) DEFAULT '08:00'"
+    "ALTER TABLE institutions ADD COLUMN second_demand_time VARCHAR(20) DEFAULT '08:00'",
+
+    // demands fulfillment mode expansion
+    "ALTER TABLE demands ADD COLUMN delivery_mode VARCHAR(50) DEFAULT 'DRIVER'"
   ];
 
   for (const sql of alterStatements) {
