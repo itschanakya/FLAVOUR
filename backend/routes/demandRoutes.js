@@ -59,8 +59,8 @@ router.get('/', authenticateToken, async (req, res) => {
 
     let baseQuery = `
       SELECT d.*, 
-        COALESCE(i.institution_name, u.unit_name || ' (Direct Unit Demand)') as institution_name,
-        COALESCE(i.ano_cto_name, usr.name || ' (Unit HQ)') as ano_cto_name,
+        COALESCE(i.institution_name, CONCAT(u.unit_name, ' (Direct Unit Demand)')) as institution_name,
+        COALESCE(i.ano_cto_name, CONCAT(usr.name, ' (Unit HQ)')) as ano_cto_name,
         COALESCE(i.complete_address, d.delivery_venue, u.location, 'Unit Battalion HQ') as complete_address,
         COALESCE(i.google_location, '') as google_location,
         u.unit_name, u.unit_code, u.ncc_group,
@@ -147,8 +147,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const db = await getDB();
     const demand = await db.get(
       `SELECT d.*, 
-              COALESCE(i.institution_name, u.unit_name || ' (Direct Unit Demand)') as institution_name,
-              COALESCE(i.ano_cto_name, usr.name || ' (Unit HQ)') as ano_cto_name,
+              COALESCE(i.institution_name, CONCAT(u.unit_name, ' (Direct Unit Demand)')) as institution_name,
+              COALESCE(i.ano_cto_name, CONCAT(usr.name, ' (Unit HQ)')) as ano_cto_name,
               i.strength_1st_year, i.strength_2nd_year, i.strength_3rd_year,
               COALESCE(i.complete_address, d.delivery_venue, u.location, 'Unit Battalion HQ') as complete_address,
               COALESCE(i.google_location, '') as google_location,
