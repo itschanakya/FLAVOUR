@@ -460,9 +460,9 @@ export default function UnitDemandPage() {
   };
 
   return (
-    <div className="space-y-4 w-full mx-auto pb-8">
+    <div className="space-y-3 w-full mx-auto pb-4 flex flex-col min-h-[calc(100vh-6.5rem)]">
       {/* Top Banner with Integrated Mode Selector */}
-      <div className="glass-card p-3 sm:p-4 border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="glass-card p-3 sm:p-4 border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
             Refreshment Demand Console
@@ -514,30 +514,30 @@ export default function UnitDemandPage() {
 
       {/* Success / Error Alerts */}
       {successMsg && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-semibold flex items-center gap-3 animate-fadeIn shadow-xs">
+        <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-semibold flex items-center gap-3 animate-fadeIn shadow-xs shrink-0">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-sm font-semibold flex items-center gap-3 animate-shake shadow-xs">
+        <div className="p-3 sm:p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-sm font-semibold flex items-center gap-3 animate-shake shadow-xs shrink-0">
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Main Content: Compact Form (Left 28%) & Expanded Table Data (Right 72%) */}
-      <div className="flex flex-col lg:flex-row gap-5 items-start w-full">
-        {/* Main Form Container - Compact 28% */}
-        <div className="w-full lg:w-[28%] shrink-0 glass-card p-4 border-slate-200 shadow-sm space-y-3.5">
-          <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Main Content: Form (Left 28%) & Expanded Table Data (Right 72%) - Full Vertical Justification */}
+      <div className="flex flex-col lg:flex-row gap-4 items-stretch w-full flex-1">
+        {/* Main Form Container - Compact 28% Full Height */}
+        <div className="w-full lg:w-[28%] shrink-0 glass-card p-4 border-slate-200 shadow-sm flex flex-col justify-between h-full">
+          <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between gap-3">
 
             {/* =============================================================== */}
             {/* OPTION 1 CONTENT: DEMAND FOR INSTITUTION ON THEIR BEHALF */}
             {/* =============================================================== */}
             {demandMode === 'INSTITUTION' && (
-              <div className="space-y-3 animate-fadeIn">
+              <div className="flex-1 flex flex-col justify-between gap-2.5 animate-fadeIn">
                 {/* Searchable Institution Combobox */}
                 <div className="relative" ref={instDropdownRef}>
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
@@ -800,7 +800,7 @@ export default function UnitDemandPage() {
             {/* OPTION 2 CONTENT: DEMAND FOR UNIT (DIRECT WITH CUSTOM RATE) */}
             {/* =============================================================== */}
             {demandMode === 'UNIT_DIRECT' && (
-              <div className="space-y-3 animate-fadeIn">
+              <div className="flex-1 flex flex-col justify-between gap-2.5 animate-fadeIn">
                 {/* COMMON FIELDS: DATE, TIME & VENUE */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
@@ -956,7 +956,7 @@ export default function UnitDemandPage() {
             {/* =============================================================== */}
             {/* LIVE SUMMARY TOTAL BAR */}
             {/* =============================================================== */}
-            <div className="p-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-wrap items-center justify-between gap-2 shadow-sm">
+            <div className="p-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-wrap items-center justify-between gap-2 shadow-sm shrink-0">
               <div>
                 <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">
                   Total Requisition
@@ -984,7 +984,7 @@ export default function UnitDemandPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-1 shrink-0">
               <button
                 type="submit"
                 disabled={submitting}
@@ -1028,8 +1028,8 @@ export default function UnitDemandPage() {
         </div>
 
         {/* Recent Demands Placed in this Jurisdiction (Right 72% Expanded Table) */}
-        <div className="w-full lg:w-[72%] flex-1 min-w-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="w-full lg:w-[72%] flex-1 min-w-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm flex flex-col justify-between h-full">
+          <div className="flex items-center justify-between shrink-0 pb-3 border-b border-slate-100">
             <div>
               <h3 className="text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
                 <FileCheck className="w-4 h-4 text-blue-600" />
@@ -1037,27 +1037,30 @@ export default function UnitDemandPage() {
               </h3>
               <p className="text-xs text-slate-500">Live feed of demands created directly by Unit or on behalf of institutions. Click any row to track on right margin.</p>
             </div>
-            <span className="text-xs font-bold text-slate-500">{recentUnitDemands.length} Records</span>
+            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">{recentUnitDemands.length} Records</span>
           </div>
 
           {loadingDemands ? (
-            <div className="py-6 text-center text-xs text-slate-400 font-semibold">Loading recent records...</div>
+            <div className="flex-1 flex items-center justify-center py-16 text-center text-xs text-slate-400 font-semibold">Loading recent records...</div>
           ) : recentUnitDemands.length === 0 ? (
-            <div className="py-6 text-center text-xs text-slate-400 font-medium">No recent demands found.</div>
+            <div className="flex-1 flex flex-col items-center justify-center py-20 text-center text-slate-400 font-medium gap-2">
+              <FileCheck className="w-8 h-8 text-slate-300 stroke-[1.5]" />
+              <span>No recent demands found.</span>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto flex-1 flex flex-col mt-2">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase border-b border-slate-200">
+                <thead className="bg-slate-50/80 text-slate-500 font-extrabold uppercase border-b border-slate-200 shrink-0">
                   <tr>
-                    <th className="py-2.5 px-3">Demand No</th>
-                    <th className="py-2.5 px-3">Type</th>
-                    <th className="py-2.5 px-3">Beneficiary</th>
-                    <th className="py-2.5 px-3">Date & Time</th>
-                    <th className="py-2.5 px-3 text-right">Packets</th>
-                    <th className="py-2.5 px-3 text-right">Rate</th>
-                    <th className="py-2.5 px-3 text-right">Total Amount</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
-                    <th className="py-2.5 px-3 text-center">Action</th>
+                    <th className="py-3 px-3">Demand No</th>
+                    <th className="py-3 px-3">Type</th>
+                    <th className="py-3 px-3">Beneficiary</th>
+                    <th className="py-3 px-3">Date & Time</th>
+                    <th className="py-3 px-3 text-right">Packets</th>
+                    <th className="py-3 px-3 text-right">Rate</th>
+                    <th className="py-3 px-3 text-right">Total Amount</th>
+                    <th className="py-3 px-3 text-center">Status</th>
+                    <th className="py-3 px-3 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -1067,34 +1070,34 @@ export default function UnitDemandPage() {
                       onClick={() => setSelectedDemand(d)}
                       className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                     >
-                      <td className="py-2.5 px-3 font-bold text-blue-600 group-hover:text-indigo-600 font-mono">
+                      <td className="py-3.5 px-3 font-bold text-blue-600 group-hover:text-indigo-600 font-mono">
                         {d.demand_number}
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-3.5 px-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
                           d.demand_type === 'UNIT_DIRECT' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
                         }`}>
                           {d.demand_type === 'UNIT_DIRECT' ? 'UNIT DIRECT' : 'INSTITUTE'}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-800 truncate max-w-[240px]">
+                      <td className="py-3.5 px-3 font-semibold text-slate-800 truncate max-w-[240px]">
                         {d.demand_type === 'UNIT_DIRECT'
                           ? (d.unit_code || d.unit_name || 'Unit HQ')
                           : (d.institution_name || 'Institution')}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-500">
+                      <td className="py-3.5 px-3 text-slate-500">
                         {d.demand_date} • {d.demand_time || '08:00 AM'}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                      <td className="py-3.5 px-3 text-right font-bold text-slate-900">
                         {d.total_quantity || d.quantity || 0}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                      <td className="py-3.5 px-3 text-right font-mono text-slate-600">
                         ₹{d.custom_unit_rate ? Number(d.custom_unit_rate).toFixed(2) : (d.avg_unit_price ? Number(d.avg_unit_price).toFixed(2) : '75.00')}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-emerald-600 font-mono">
+                      <td className="py-3.5 px-3 text-right font-bold text-emerald-600 font-mono">
                         ₹{Number(d.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-2.5 px-3 text-center">
+                      <td className="py-3.5 px-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
                           d.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
                           d.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
@@ -1103,11 +1106,11 @@ export default function UnitDemandPage() {
                           {d.status}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-center" onClick={e => e.stopPropagation()}>
+                      <td className="py-3.5 px-3 text-center" onClick={e => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={() => setSelectedDemand(d)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-all cursor-pointer shadow-2xs"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-all cursor-pointer shadow-2xs"
                           title="View Details & Live Tracking"
                         >
                           <Eye className="w-3 h-3 text-indigo-600" />
@@ -1120,6 +1123,12 @@ export default function UnitDemandPage() {
               </table>
             </div>
           )}
+
+          {/* Table Footer Strip to anchor bottom nicely */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 shrink-0">
+            <span className="font-medium">Showing latest jurisdictional records</span>
+            <span className="font-semibold text-slate-600">Auto-synced via Realtime SSE</span>
+          </div>
         </div>
       </div>
 
