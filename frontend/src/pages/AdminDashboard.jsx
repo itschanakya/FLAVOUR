@@ -456,6 +456,7 @@ export default function AdminDashboard() {
                   <tr>
                     <th className="p-4">Demand Ref</th>
                     <th className="p-4">NCC Unit</th>
+                    <th className="p-4">Type</th>
                     <th className="p-4">Institution Name</th>
                     <th className="p-4">Demand Date</th>
                     <th className="p-4">Total Amount</th>
@@ -466,7 +467,7 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-slate-800/60">
                   {displayedDemands.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="p-8 text-center text-slate-500 font-medium">
+                      <td colSpan="8" className="p-8 text-center text-slate-500 font-medium">
                         {selectedUnit 
                           ? `No demands pending vendor action for ${selectedUnit.unit_name}.` 
                           : 'No demands currently pending vendor action.'}
@@ -477,19 +478,17 @@ export default function AdminDashboard() {
                       <tr key={dem.id} className="hover:bg-white/50 transition-colors">
                         <td className="p-4 font-mono font-bold text-blue-600">{dem.demand_number}</td>
                         <td className="p-4 text-slate-700 font-medium">{dem.unit_name}</td>
+                        <td className="p-4">
+                          <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide border ${
+                            dem.demand_type === 'UNIT_DIRECT' 
+                              ? 'bg-purple-100 text-purple-800 border-purple-200' 
+                              : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          }`}>
+                            {dem.demand_type === 'UNIT_DIRECT' ? 'UNIT DEMAND' : 'INSTITUTE'}
+                          </span>
+                        </td>
                         <td className="p-4 font-semibold text-slate-900">
-                          {dem.demand_type === 'UNIT_DIRECT' ? (
-                            <div className="flex flex-col gap-1">
-                              <span className="inline-flex w-fit items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-100 text-purple-800 uppercase tracking-wide">
-                                Unit Demand
-                              </span>
-                              <span className="text-slate-800 font-bold text-sm">
-                                {dem.unit_code || dem.unit_name || '—'}
-                              </span>
-                            </div>
-                          ) : (
-                            dem.institution_name || '—'
-                          )}
+                          {dem.demand_type === 'UNIT_DIRECT' ? (dem.unit_code || dem.unit_name || '—') : (dem.institution_name || '—')}
                         </td>
                         <td className="p-4 font-bold text-slate-700 text-xs">{formatDMY(dem.demand_date)}</td>
                         <td className="p-4 font-bold text-emerald-600">₹{(dem.total_amount || 0).toLocaleString('en-IN')}</td>

@@ -786,8 +786,9 @@ export default function InstitutionDashboard() {
                   </th>
                   <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">NO</th>
                   <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">DATE & TIME</th>
+                  <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">TYPE</th>
                   <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">INSTITUTION</th>
-                  <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">ANO</th>
+                  <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">ANO/UNIT</th>
                   <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">STATUS</th>
                   <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">PKTS</th>
                   <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">RATE</th>
@@ -798,7 +799,7 @@ export default function InstitutionDashboard() {
               <tbody>
                 {recentDemands.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="py-28 text-center text-slate-400 font-bold bg-slate-50/50 rounded-2xl">
+                    <td colSpan="11" className="py-28 text-center text-slate-400 font-bold bg-slate-50/50 rounded-2xl">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <History className="w-8 h-8 text-slate-300 stroke-[1.5]" />
                         <span className="text-sm font-semibold text-slate-400">No demands found.</span>
@@ -821,10 +822,21 @@ export default function InstitutionDashboard() {
                         <div className="text-[10px] font-bold text-slate-400 mt-0.5 tracking-wider">{formatTimeDisplay(dem.demand_time, dem.created_at)}</div>
                       </td>
                       <td className="px-3 py-4">
-                        <div className="font-bold text-slate-800 uppercase text-xs">{instDetails?.institution_name || 'INSTITUTION'}</div>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold inline-block ${
+                          dem.demand_type === 'UNIT_DIRECT' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          {dem.demand_type === 'UNIT_DIRECT' ? 'UNIT DIRECT' : 'INSTITUTE'}
+                        </span>
                       </td>
                       <td className="px-3 py-4">
-                        <div className="font-bold text-slate-600 uppercase text-[10px] bg-slate-100 px-2 py-1 rounded-md inline-block">{instDetails?.ano_cto_name || user?.name}</div>
+                        <div className="font-bold text-slate-800 uppercase text-xs">{instDetails?.institution_name || dem.institution_name || 'INSTITUTION'}</div>
+                      </td>
+                      <td className="px-3 py-4">
+                        <div className="font-bold text-slate-600 uppercase text-[10px] bg-slate-100 px-2 py-1 rounded-md inline-block">
+                          {dem.demand_type === 'UNIT_DIRECT' || !dem.ano_cto_name || /^\d+$/.test(String(dem.ano_cto_name).trim())
+                            ? 'UNIT ADM'
+                            : (dem.ano_cto_name || instDetails?.ano_cto_name || user?.name)}
+                        </div>
                       </td>
                       <td className="px-3 py-4">
                         <div className="flex flex-col gap-1 items-start">

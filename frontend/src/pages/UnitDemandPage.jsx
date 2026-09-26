@@ -1107,7 +1107,7 @@ export default function UnitDemandPage() {
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">DATE &amp; TIME</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">TYPE</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">BENEFICIARY</th>
-                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">ANO</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">ANO/UNIT</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">VENUE</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">STATUS</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-center">PKTS</th>
@@ -1147,7 +1147,9 @@ export default function UnitDemandPage() {
                       </td>
                       <td className="px-3 py-4">
                         <div className="font-bold text-slate-600 uppercase text-[10px] bg-slate-100 px-2 py-1 rounded-md inline-block">
-                          {d.ano_cto_name || (d.demand_type === 'UNIT_DIRECT' ? 'UNIT HQ' : 'N/A')}
+                          {d.demand_type === 'UNIT_DIRECT' || !d.ano_cto_name || /^\d+$/.test(String(d.ano_cto_name).trim())
+                            ? 'UNIT ADM'
+                            : d.ano_cto_name}
                         </div>
                       </td>
                       <td className="px-3 py-4">

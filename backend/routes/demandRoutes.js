@@ -60,7 +60,7 @@ router.get('/', authenticateToken, async (req, res) => {
     let baseQuery = `
       SELECT d.*, 
         COALESCE(i.institution_name, CONCAT(u.unit_name, ' (Direct Unit Demand)')) as institution_name,
-        COALESCE(i.ano_cto_name, CONCAT(usr.name, ' (Unit HQ)')) as ano_cto_name,
+        CASE WHEN d.demand_type = 'UNIT_DIRECT' THEN 'UNIT ADM' WHEN i.ano_cto_name GLOB '[0-9]*' THEN 'UNIT ADM' ELSE COALESCE(i.ano_cto_name, 'UNIT ADM') END as ano_cto_name,
         COALESCE(i.complete_address, CASE WHEN d.delivery_venue IS NOT NULL AND d.delivery_venue NOT GLOB '[0-9]*' AND LENGTH(d.delivery_venue) > 3 THEN d.delivery_venue ELSE NULL END, u.location, u.unit_name, 'Unit Battalion HQ') as complete_address,
         COALESCE(i.google_location, '') as google_location,
         u.unit_name, u.unit_code, u.ncc_group,
