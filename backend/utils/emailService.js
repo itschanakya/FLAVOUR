@@ -250,7 +250,7 @@ async function sendPasswordResetSuccessEmail(email, loginId, newPassword) {
           You can now log in using these credentials at the official portal:
         </p>
         <div style="text-align: center; margin: 20px 0;">
-          <a href="https://flavour-9mqh.onrender.com" style="display: inline-block; padding: 10px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; border-radius: 6px;">
+          <a href="https://flavourbaseindia.org" style="display: inline-block; padding: 10px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; border-radius: 6px;">
             Go to Portal Sign In
           </a>
         </div>
@@ -265,7 +265,7 @@ async function sendPasswordResetSuccessEmail(email, loginId, newPassword) {
   // 1. Try sending via Gmail SMTP
   if (transporter) {
     try {
-      const textContent = `Hello,\n\nYour password for NCC Refreshment Portal has been updated successfully.\n\nLogin ID: ${loginId}\nNew Password: ${newPassword}\n\nSign In: https://flavour-9mqh.onrender.com\n\nNCC Refreshment Portal`;
+      const textContent = `Hello,\n\nYour password for NCC Refreshment Portal has been updated successfully.\n\nLogin ID: ${loginId}\nNew Password: ${newPassword}\n\nSign In: https://flavourbaseindia.org\n\nNCC Refreshment Portal`;
       const info = await transporter.sendMail({
         from: `"NCC Refreshment Security" <${smtpUser}>`,
         to: email,
