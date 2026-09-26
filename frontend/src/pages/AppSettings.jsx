@@ -353,8 +353,8 @@ export default function AppSettings() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (res.ok && data.length > 0) {
-        const inst = data[0];
+      if (res.ok && Array.isArray(data) && data.length > 0) {
+        const inst = data.find(i => i.id == user?.institution_id) || data[0];
         setSchedule({
           first_demand_day: inst.first_demand_day || 'Wednesday',
           first_demand_time: inst.first_demand_time || '08:00',
@@ -510,7 +510,12 @@ export default function AppSettings() {
       setError('');
       setSaveSuccess(false);
 
-      const res = await fetch(`/api/institutions/${user.institution_id}/schedule`, {
+      const targetInstId = user?.institution_id || institutionData.id;
+      if (!targetInstId) {
+        throw new Error('Institution ID could not be identified for this session.');
+      }
+
+      const res = await fetch(`/api/institutions/${targetInstId}/schedule`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -523,6 +528,7 @@ export default function AppSettings() {
       if (!res.ok) throw new Error(data?.error || 'Failed to save schedule');
 
       setSaveSuccess(true);
+      await fetchSchedule();
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       setError(err.message);

@@ -337,17 +337,25 @@ router.put('/:id', authenticateToken, authorizeRoles('UNIT', 'INSTITUTION', 'ADM
   }
 });
 
-// PUT /api/institutions/:id/schedule - Institution updates their schedule
-router.put('/:id/schedule', authenticateToken, authorizeRoles('INSTITUTION'), async (req, res) => {
+// PUT /api/institutions/:id/schedule - Institution or Unit/Admin updates their schedule
+router.put('/:id/schedule', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN'), async (req, res) => {
   try {
     const { first_demand_day, first_demand_time, second_demand_day, second_demand_time } = req.body;
     
-    // Check ownership
-    if (req.user.institution_id != req.params.id) {
+    const db = await getDB();
+
+    // Check ownership for INSTITUTION
+    if (req.user.role === 'INSTITUTION' && req.user.institution_id != req.params.id) {
       return res.status(403).json({ error: 'Unauthorized to update this institution.' });
     }
 
-    const db = await getDB();
+    // Check ownership for UNIT
+    if (req.user.role === 'UNIT') {
+      const inst = await db.get('SELECT id FROM institutions WHERE id = ? AND unit_id = ?', [req.params.id, req.user.unit_id]);
+      if (!inst) {
+        return res.status(403).json({ error: 'Institution not under your unit jurisdiction.' });
+      }
+    }
     
     await db.run(
       `UPDATE institutions 
@@ -359,7 +367,7 @@ router.put('/:id/schedule', authenticateToken, authorizeRoles('INSTITUTION'), as
     res.json({ message: 'Schedule updated successfully.' });
   } catch (error) {
     console.error('Update schedule error:', error);
-    res.status(500).json({ error: 'Failed to update schedule.' });
+    res.status(500).json({ error: error.message || 'Failed to update schedule.' });
   }
 });
 

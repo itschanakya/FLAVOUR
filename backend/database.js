@@ -118,7 +118,13 @@ async function upgradeInventorySchema(db) {
     'ALTER TABLE refreshment_items ADD COLUMN hsn_code VARCHAR(50) DEFAULT \'2106\'',
     'ALTER TABLE refreshment_items ADD COLUMN optimal_stock INTEGER DEFAULT 200',
     'ALTER TABLE refreshment_items ADD COLUMN cost_price REAL DEFAULT 0.0',
-    'ALTER TABLE refreshment_items ADD COLUMN last_restocked_at DATETIME NULL'
+    'ALTER TABLE refreshment_items ADD COLUMN last_restocked_at DATETIME NULL',
+
+    // institutions schedule enhancements
+    "ALTER TABLE institutions ADD COLUMN first_demand_day VARCHAR(50) DEFAULT 'Wednesday'",
+    "ALTER TABLE institutions ADD COLUMN first_demand_time VARCHAR(20) DEFAULT '08:00'",
+    "ALTER TABLE institutions ADD COLUMN second_demand_day VARCHAR(50) DEFAULT 'Saturday'",
+    "ALTER TABLE institutions ADD COLUMN second_demand_time VARCHAR(20) DEFAULT '08:00'"
   ];
 
   for (const sql of alterStatements) {
@@ -174,6 +180,10 @@ async function initializeSchema(db) {
       strength_3rd_year INTEGER DEFAULT 0,
       google_location TEXT,
       complete_address TEXT,
+      first_demand_day VARCHAR(50) DEFAULT 'Wednesday',
+      first_demand_time VARCHAR(20) DEFAULT '08:00',
+      second_demand_day VARCHAR(50) DEFAULT 'Saturday',
+      second_demand_time VARCHAR(20) DEFAULT '08:00',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE
     );
