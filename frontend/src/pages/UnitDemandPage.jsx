@@ -544,31 +544,31 @@ export default function UnitDemandPage() {
             </div>
 
             {/* Demand Mode Toggle */}
-            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            <div className="flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
               <button
                 type="button"
                 onClick={() => { setDemandMode('UNIT_DIRECT'); setErrorMsg(''); setSuccessMsg(''); }}
-                className={`py-1 px-2 text-[10px] font-black rounded-md transition-all cursor-pointer ${demandMode === 'UNIT_DIRECT' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`py-1.5 px-3 text-xs font-black rounded-lg transition-all cursor-pointer ${demandMode === 'UNIT_DIRECT' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
               >
                 UNIT DIRECT
               </button>
               <button
                 type="button"
                 onClick={() => { setDemandMode('INSTITUTION'); setErrorMsg(''); setSuccessMsg(''); }}
-                className={`py-1 px-2 text-[10px] font-black rounded-md transition-all cursor-pointer ${demandMode === 'INSTITUTION' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`py-1.5 px-3 text-xs font-black rounded-lg transition-all cursor-pointer ${demandMode === 'INSTITUTION' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
               >
                 FOR INSTITUTE
               </button>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between gap-2.5">
+          <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between gap-3.5 sm:gap-4 py-1">
 
             {/* =============================================================== */}
             {/* OPTION 1 CONTENT: DEMAND FOR INSTITUTION ON THEIR BEHALF */}
             {/* =============================================================== */}
             {demandMode === 'INSTITUTION' && (
-              <div className="flex-1 flex flex-col justify-between gap-2.5 animate-fadeIn">
+              <div className="flex-1 flex flex-col justify-between gap-3.5 animate-fadeIn">
                 {/* Searchable Institution Combobox */}
                 <div className="relative" ref={instDropdownRef}>
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
@@ -595,7 +595,7 @@ export default function UnitDemandPage() {
                         if (!instDropdownOpen) setInstDropdownOpen(true);
                       }}
                       onFocus={() => setInstDropdownOpen(true)}
-                      className="w-full pl-8 pr-16 py-1.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 shadow-xs transition-all"
+                      className="w-full pl-8 pr-16 py-2 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 shadow-2xs transition-all"
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                       {instSearch && (
@@ -678,36 +678,36 @@ export default function UnitDemandPage() {
                 {/* =============================================================== */}
                 {/* COMMON FIELDS: DATE, TIME & VENUE */}
                 {/* =============================================================== */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-blue-600" />
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
                       Delivery Date (DD/MM/YYYY)
                     </label>
                     <CustomDateInput
                       value={demandDate}
                       onChange={setDemandDate}
-                      className="w-full py-1.5 pl-3 pr-8 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs sm:text-sm shadow-2xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-blue-600" />
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-blue-600" />
                       Delivery Time (12-Hour)
                     </label>
                     <input
                       type="time"
                       value={demandTime}
                       onChange={e => setDemandTime(e.target.value)}
-                      className="w-full py-1.5 px-3 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs sm:text-sm shadow-2xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-blue-600" />
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
                     Delivery Location / Venue
                   </label>
                   <input
@@ -716,21 +716,21 @@ export default function UnitDemandPage() {
                     value={venue}
                     onChange={e => setVenue(e.target.value)}
                     placeholder="Enter delivery location"
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-2xs"
                   />
                 </div>
 
                 {/* Demand Type Toggle */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Demand Type
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => setDemandPrefix('FIRST')}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${demandPrefix === 'FIRST'
-                        ? 'bg-emerald-600 text-white shadow-xs'
+                      className={`py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${demandPrefix === 'FIRST'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                     >
@@ -739,8 +739,8 @@ export default function UnitDemandPage() {
                     <button
                       type="button"
                       onClick={() => setDemandPrefix('SECOND')}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${demandPrefix === 'SECOND'
-                        ? 'bg-emerald-600 text-white shadow-xs'
+                      className={`py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${demandPrefix === 'SECOND'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                     >
@@ -772,7 +772,7 @@ export default function UnitDemandPage() {
                     </div>
                   </div>
                   <div className={`grid grid-cols-1 ${Number(selectedInst?.strength_3rd_year || 0) > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2.5`}>
-                    <div className="p-2.5 rounded-lg border border-slate-200 bg-white">
+                    <div className="p-2.5 rounded-xl border border-slate-200 bg-white">
                       <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-0.5">
                         <span>1ST YEAR</span>
                         <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_1st_year || 50}</span>
@@ -788,7 +788,7 @@ export default function UnitDemandPage() {
                       />
                     </div>
 
-                    <div className="p-2.5 rounded-lg border border-slate-200 bg-white">
+                    <div className="p-2.5 rounded-xl border border-slate-200 bg-white">
                       <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-0.5">
                         <span>2ND YEAR</span>
                         <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_2nd_year || 50}</span>
@@ -805,7 +805,7 @@ export default function UnitDemandPage() {
                     </div>
 
                     {Number(selectedInst?.strength_3rd_year || 0) > 0 && (
-                      <div className="p-2.5 rounded-lg border border-slate-200 bg-white">
+                      <div className="p-2.5 rounded-xl border border-slate-200 bg-white">
                         <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-0.5">
                           <span>3RD YEAR</span>
                           <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_3rd_year || 0}</span>
@@ -830,38 +830,38 @@ export default function UnitDemandPage() {
             {/* OPTION 2 CONTENT: DEMAND FOR UNIT (DIRECT WITH CUSTOM RATE) */}
             {/* =============================================================== */}
             {demandMode === 'UNIT_DIRECT' && (
-              <div className="space-y-3 animate-fadeIn">
+              <div className="flex-1 flex flex-col justify-between gap-3.5 sm:gap-4 animate-fadeIn">
                 {/* COMMON FIELDS: DATE, TIME & VENUE */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-blue-600" />
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
                       Delivery Date (DD/MM/YYYY)
                     </label>
                     <CustomDateInput
                       value={demandDate}
                       onChange={setDemandDate}
-                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
+                      className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs sm:text-sm shadow-2xs"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-blue-600" />
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-blue-600" />
                       Delivery Time (12-Hour)
                     </label>
                     <input
                       type="time"
                       value={demandTime}
                       onChange={e => setDemandTime(e.target.value)}
-                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
+                      className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs sm:text-sm shadow-2xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-blue-600" />
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
                     Delivery Location / Venue
                   </label>
                   <input
@@ -870,37 +870,37 @@ export default function UnitDemandPage() {
                     value={venue}
                     onChange={e => setVenue(e.target.value)}
                     placeholder="Enter delivery location"
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-2xs"
                   />
                 </div>
 
                 {/* Packet Type Selection: Simple Clean Buttons */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Select Packet Type
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => setPacketType('CUSTOMIZED')}
-                      className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${packetType === 'CUSTOMIZED'
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                      className={`py-3 px-3.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all cursor-pointer shadow-2xs ${packetType === 'CUSTOMIZED'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md scale-[1.01]'
                         : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                         }`}
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
+                      <Sparkles className="w-4 h-4" />
                       <span>Customized</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setPacketType('REGULAR')}
-                      className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${packetType === 'REGULAR'
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                      className={`py-3 px-3.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all cursor-pointer shadow-2xs ${packetType === 'REGULAR'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md scale-[1.01]'
                         : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                         }`}
                     >
-                      <ShoppingBag className="w-3.5 h-3.5" />
+                      <ShoppingBag className="w-4 h-4" />
                       <span>Regular (₹75)</span>
                     </button>
                   </div>
@@ -909,10 +909,10 @@ export default function UnitDemandPage() {
                 {/* Rate & Total Packets Inputs */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Rate per packet */}
-                  <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs space-y-1.5">
+                  <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                        <IndianRupee className="w-3 h-3 text-blue-600" />
+                        <IndianRupee className="w-3.5 h-3.5 text-blue-600" />
                         Rate Per Packet (₹)
                       </label>
                       {packetType === 'REGULAR' && (
@@ -922,7 +922,7 @@ export default function UnitDemandPage() {
 
                     {packetType === 'CUSTOMIZED' ? (
                       <div className="relative">
-                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold text-xs">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
                           ₹
                         </span>
                         <input
@@ -934,21 +934,21 @@ export default function UnitDemandPage() {
                           value={customRate}
                           onChange={e => setCustomRate(e.target.value)}
                           placeholder="e.g. 50 or 60"
-                          className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-slate-300 font-bold text-slate-900 text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                          className="w-full pl-7 pr-3 py-2 rounded-lg border border-slate-300 font-bold text-slate-900 text-base focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                         />
                       </div>
                     ) : (
-                      <div className="py-1.5 px-3 rounded-lg bg-slate-50 text-slate-800 font-bold text-sm border border-slate-200">
+                      <div className="py-2 px-3 rounded-lg bg-slate-50 text-slate-800 font-bold text-base border border-slate-200">
                         ₹75.00
                       </div>
                     )}
                   </div>
 
                   {/* Total Number of Packets */}
-                  <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs space-y-1.5">
+                  <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                        <Layers className="w-3 h-3 text-blue-600" />
+                        <Layers className="w-3.5 h-3.5 text-blue-600" />
                         Total No. of Packets
                       </label>
                       <span className="text-[10px] font-bold text-blue-600">Direct</span>
@@ -961,14 +961,14 @@ export default function UnitDemandPage() {
                       value={totalPackets}
                       onChange={e => setTotalPackets(e.target.value)}
                       placeholder="e.g. 100 or 250"
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-bold text-slate-900 text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold text-slate-900 text-base focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                     />
                   </div>
                 </div>
 
                 {/* Purpose / Occasion */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Training Event / Occasion Purpose
                   </label>
                   <input
@@ -977,7 +977,7 @@ export default function UnitDemandPage() {
                     value={purpose}
                     onChange={e => setPurpose(e.target.value)}
                     placeholder="e.g. ATC, Cadre, Special Parade..."
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-2xs"
                   />
                 </div>
               </div>
@@ -986,46 +986,46 @@ export default function UnitDemandPage() {
             {/* =============================================================== */}
             {/* LIVE SUMMARY TOTAL BAR */}
             {/* =============================================================== */}
-            <div className="p-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-wrap items-center justify-between gap-2 shadow-sm">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-wrap items-center justify-between gap-2 shadow-md">
               <div>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Total Requisition
                 </span>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-xl font-bold text-white">
+                  <span className="text-2xl font-black text-white">
                     {demandMode === 'UNIT_DIRECT' ? unitPacketCount : instTotalQty}
                   </span>
                   <span className="text-xs font-semibold text-slate-300">Packets</span>
                   <span className="text-slate-500">•</span>
-                  <span className="text-[11px] text-slate-300">
+                  <span className="text-xs text-slate-300">
                     @ ₹{(demandMode === 'UNIT_DIRECT' ? effectiveRate : 75).toFixed(2)}/pkt
                   </span>
                 </div>
               </div>
 
               <div className="text-right">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 block">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
                   Total Amount
                 </span>
-                <div className="text-xl font-bold text-emerald-400 font-mono">
+                <div className="text-2xl font-black text-emerald-400 font-mono">
                   ₹{(demandMode === 'UNIT_DIRECT' ? unitTotalAmount : instTotalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2.5 pt-1">
               <button
                 type="submit"
                 disabled={submitting}
-                className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-white text-xs shadow-sm transition-all duration-200 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${demandMode === 'UNIT_DIRECT'
+                className={`flex-1 py-3.5 px-5 rounded-xl font-black text-white text-xs sm:text-sm uppercase tracking-wider shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 ${demandMode === 'UNIT_DIRECT'
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500'
                   : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
                   }`}
               >
                 {submitting ? (
                   <>
-                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                     <span>Processing...</span>
                   </>
                 ) : (
@@ -1033,7 +1033,7 @@ export default function UnitDemandPage() {
                     <span>
                       {demandMode === 'UNIT_DIRECT' ? 'PLACE UNIT DIRECT DEMAND' : 'PLACE INSTITUTION DEMAND'}
                     </span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
@@ -1048,10 +1048,11 @@ export default function UnitDemandPage() {
                   setErrorMsg('');
                   setSuccessMsg('');
                 }}
-                className="py-2.5 px-3.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-all cursor-pointer flex items-center gap-1"
+                className="py-3.5 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-black text-xs uppercase tracking-wider transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                title="Clear entries"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>CLEAR</span>
+                <RotateCcw className="w-4 h-4" />
+                <span>Clear</span>
               </button>
             </div>
           </form>
