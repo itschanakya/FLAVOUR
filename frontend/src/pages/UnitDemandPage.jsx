@@ -27,7 +27,9 @@ import {
   X,
   Coffee,
   History,
-  Printer
+  Printer,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import CustomDateInput from '../components/CustomDateInput';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
@@ -1111,7 +1113,7 @@ export default function UnitDemandPage() {
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-center">PKTS</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">RATE</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">COST</th>
-                    <th className="pr-4 pl-2 py-4 text-center font-black text-slate-400 text-[10px] uppercase tracking-widest">DOCUMENTS</th>
+                    <th className="pr-4 pl-2 py-4 text-center font-black text-slate-400 text-[10px] uppercase tracking-widest">ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1178,46 +1180,23 @@ export default function UnitDemandPage() {
                         ₹{Number(d.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="pr-4 pl-2 py-4 text-center rounded-r-xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                          {d.delivery_receipt_url ? (
-                            <a
-                              href={d.delivery_receipt_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-all shadow-xs"
-                              title="View Signed Delivery Receipt"
-                            >
-                              <FileText className="w-3 h-3 text-emerald-600" /> Receipt
-                            </a>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200">
-                              Receipt (Pending)
-                            </span>
-                          )}
-
-                          {d.invoice_url ? (
-                            <a
-                              href={d.invoice_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition-all shadow-xs"
-                              title="View Bill / Invoice"
-                            >
-                              <FileCheck className="w-3 h-3 text-indigo-600" /> Bill
-                            </a>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200">
-                              Bill (Pending)
-                            </span>
-                          )}
-
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => setSelectedDemand(d)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all shadow-xs cursor-pointer"
-                            title="View Demand Details & Verification"
+                            className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer"
+                            title="Edit / View Details"
                           >
-                            <Eye className="w-3 h-3 text-blue-600" /> View Details
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDemand(d.id, d.demand_number)}
+                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 border border-rose-200 shadow-2xs transition-all cursor-pointer"
+                            title="Delete Demand"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
