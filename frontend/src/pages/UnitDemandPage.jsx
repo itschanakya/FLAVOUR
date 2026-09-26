@@ -23,7 +23,10 @@ import {
   Eye,
   ChevronDown,
   ChevronRight,
-  X
+  X,
+  Coffee,
+  History,
+  Printer
 } from 'lucide-react';
 import CustomDateInput from '../components/CustomDateInput';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
@@ -459,555 +462,494 @@ export default function UnitDemandPage() {
     }
   };
 
+  const totalJurisdictionPackets = recentUnitDemands.reduce((acc, d) => acc + (Number(d.total_quantity || d.quantity) || 0), 0);
+  const totalJurisdictionCost = recentUnitDemands.reduce((acc, d) => acc + (Number(d.total_amount) || 0), 0);
+
   return (
-    <div className="space-y-3 w-full mx-auto pb-4 flex flex-col min-h-[calc(100vh-6.5rem)]">
-      {/* Top Banner with Integrated Mode Selector */}
-      <div className="glass-card p-3 sm:p-4 border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-            Refreshment Demand Console
-          </h1>
+    <div className="space-y-3 pb-4 flex flex-col min-h-[calc(100vh-6.5rem)]">
+
+      {/* 4 Summary Cards - Ultra Compact Single Row Identical to ANO Dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 shrink-0">
+        {/* Total Packets */}
+        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-2.5 sm:p-3 text-white shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[9px] font-black tracking-wider text-indigo-100 uppercase">TOTAL PACKETS</div>
+            <div className="text-lg sm:text-xl font-black mt-0.5">{totalJurisdictionPackets.toLocaleString('en-IN')}</div>
+          </div>
+          <div className="p-2 bg-white/20 rounded-lg">
+            <Coffee className="w-4 h-4 text-white" />
+          </div>
         </div>
 
-        {/* Integrated Mode Selector */}
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <button
-            type="button"
-            onClick={() => {
-              setDemandMode('UNIT_DIRECT');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-            className={`py-1.5 px-4 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${demandMode === 'UNIT_DIRECT'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Demand for Unit</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setDemandMode('INSTITUTION');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-            className={`py-1.5 px-4 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${demandMode === 'INSTITUTION'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-          >
-            <School className="w-4 h-4" />
-            <span>Demand for Institution</span>
-          </button>
+        {/* Total Cost */}
+        <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[9px] font-black tracking-wider text-slate-400 uppercase">TOTAL COST</div>
+            <div className="text-lg sm:text-xl font-black text-slate-800 mt-0.5 font-mono">
+              ₹{totalJurisdictionCost.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </div>
+          </div>
+          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+            <IndianRupee className="w-4 h-4" />
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-500 hidden sm:inline">Jurisdiction:</span>
-          <span className="px-3 py-1.5 rounded-xl bg-white text-slate-800 font-extrabold text-xs border border-slate-200 shadow-xs truncate max-w-[200px]">
-            {user?.unit_name || '2 DELHI ARTY BTY NCC'}
-          </span>
+        {/* Total Entries */}
+        <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <div className="text-[9px] font-black tracking-wider text-slate-400 uppercase">TOTAL ENTRIES</div>
+            <div className="text-lg sm:text-xl font-black text-slate-800 mt-0.5">{recentUnitDemands.length}</div>
+          </div>
+          <div className="p-2 bg-amber-50 text-amber-500 rounded-lg">
+            <History className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Unit Profile */}
+        <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="text-[9px] font-black tracking-wider text-fuchsia-500 uppercase">PROFILE</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500">
+              <span>Jurisdiction: <strong className="text-slate-700">{institutions.length} Inst</strong></span>
+            </div>
+          </div>
+          <div className="font-bold text-slate-800 text-xs truncate mt-0.5">{user?.unit_name || '2 DELHI ARTY BTY NCC'}</div>
         </div>
       </div>
 
-      {/* Success / Error Alerts */}
-      {successMsg && (
-        <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-semibold flex items-center gap-3 animate-fadeIn shadow-xs shrink-0">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span>{successMsg}</span>
-        </div>
-      )}
+      {/* Main Grid: Form (Left) & Table (Right) - Full Viewport Vertical Justification Identical to ANO Dashboard */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-stretch flex-1">
+        
+        {/* LEFT COLUMN: COMPACT NEW DEMAND ENTRY FORM */}
+        <div className="xl:col-span-4 bg-white rounded-xl border border-slate-200/80 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between h-full">
+          <div className="flex items-center justify-between mb-2 shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
+              <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">NEW DEMAND ENTRY</h2>
+            </div>
 
-      {errorMsg && (
-        <div className="p-3 sm:p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-sm font-semibold flex items-center gap-3 animate-shake shadow-xs shrink-0">
-          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
+            {/* Demand Mode Toggle */}
+            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+              <button 
+                type="button"
+                onClick={() => { setDemandMode('UNIT_DIRECT'); setErrorMsg(''); setSuccessMsg(''); }}
+                className={`py-1 px-2 text-[10px] font-black rounded-md transition-all cursor-pointer ${demandMode === 'UNIT_DIRECT' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                UNIT DIRECT
+              </button>
+              <button 
+                type="button"
+                onClick={() => { setDemandMode('INSTITUTION'); setErrorMsg(''); setSuccessMsg(''); }}
+                className={`py-1 px-2 text-[10px] font-black rounded-md transition-all cursor-pointer ${demandMode === 'INSTITUTION' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                FOR INSTITUTE
+              </button>
+            </div>
+          </div>
 
-      {/* Main Content: Form (Left 28%) & Expanded Table Data (Right 72%) - Full Vertical Justification */}
-      <div className="flex flex-col lg:flex-row gap-4 items-stretch w-full flex-1">
-        {/* Main Form Container - Compact 28% Full Height */}
-        <div className="w-full lg:w-[28%] shrink-0 glass-card p-4 border-slate-200 shadow-sm flex flex-col justify-between h-full">
-          <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between gap-3">
-
-            {/* =============================================================== */}
-            {/* OPTION 1 CONTENT: DEMAND FOR INSTITUTION ON THEIR BEHALF */}
-            {/* =============================================================== */}
-            {demandMode === 'INSTITUTION' && (
-              <div className="flex-1 flex flex-col justify-between gap-2.5 animate-fadeIn">
-                {/* Searchable Institution Combobox */}
-                <div className="relative" ref={instDropdownRef}>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
-                    <span className="flex items-center gap-1">
-                      <School className="w-3.5 h-3.5 text-emerald-600" />
-                      Select Affiliated Institution
-                    </span>
-                    {selectedInst && (
-                      <span className="text-[10px] font-bold text-slate-400">
-                        PIN: {selectedInst.pin_code || '110003'}
-                      </span>
-                    )}
-                  </label>
-
-                  {/* Search Input & Dropdown Trigger */}
-                  <div className="relative group">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-emerald-600 transition-colors pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder={selectedInst ? `${selectedInst.institution_name} (Click to search...)` : "Search institution..."}
-                      value={instSearch}
-                      onChange={(e) => {
-                        setInstSearch(e.target.value);
-                        if (!instDropdownOpen) setInstDropdownOpen(true);
-                      }}
-                      onFocus={() => setInstDropdownOpen(true)}
-                      className="w-full pl-8 pr-16 py-1.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 shadow-xs transition-all"
+          <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between gap-2.5">
+            <div className="flex-1 flex flex-col justify-between gap-2">
+              {demandMode === 'UNIT_DIRECT' ? (
+                <>
+                  {/* Event / Occasion Purpose */}
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
+                      TRAINING EVENT / OCCASION PURPOSE
+                    </label>
+                    <input 
+                      type="text" 
+                      required
+                      value={purpose}
+                      onChange={e => setPurpose(e.target.value)}
+                      placeholder="e.g. Combined Annual Training Camp (CATC) Direct Cadre"
+                      className="w-full px-3 py-1.5 bg-slate-50/70 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
                     />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                      {instSearch && (
-                        <button
-                          type="button"
-                          onClick={() => setInstSearch('')}
-                          className="p-1 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                          title="Clear search"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                      <button
+                  </div>
+
+                  {/* Packet Type */}
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">PACKET TYPE</label>
+                    <div className="flex gap-2">
+                      <button 
                         type="button"
-                        onClick={() => setInstDropdownOpen(prev => !prev)}
-                        className="p-1 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                        title={instDropdownOpen ? "Close list" : "Open list"}
+                        onClick={() => setPacketType('CUSTOMIZED')}
+                        className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all cursor-pointer ${packetType === 'CUSTOMIZED' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                       >
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${instDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+                        CUSTOMIZED
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setPacketType('REGULAR')}
+                        className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all cursor-pointer ${packetType === 'REGULAR' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        REGULAR (₹75)
                       </button>
                     </div>
                   </div>
 
-                  {/* Active Selected Institution Pill */}
-                  {selectedInst && !instSearch && (
-                    <div className="mt-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between text-[11px]">
-                      <span className="font-bold text-emerald-900 truncate">
-                        {selectedInst.institution_name}
-                      </span>
-                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded ml-1.5 shrink-0">
-                        ANO: {selectedInst.ano_cto_name || 'N/A'}
-                      </span>
+                  {/* Date & Time (Strict DD/MM/YYYY) */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">DATE</label>
+                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded">DD/MM/YYYY</span>
+                      </div>
+                      <CustomDateInput 
+                        value={demandDate}
+                        onChange={setDemandDate}
+                      />
                     </div>
-                  )}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">TIME</label>
+                        <span className="text-[9px] font-bold text-slate-400">12-Hour</span>
+                      </div>
+                      <div className="relative group">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+                        <input 
+                          type="time" 
+                          value={demandTime}
+                          onChange={e => setDemandTime(e.target.value)}
+                          className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                  {/* Dropdown Results Menu */}
-                  {instDropdownOpen && (
-                    <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100 animate-fadeIn">
-                      {filteredInstitutions.length === 0 ? (
-                        <div className="p-3 text-center text-xs font-semibold text-slate-400">
-                          No institutions found matching "{instSearch}"
+                  {/* Rate & Packets Row */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase">RATE PER PKT</label>
+                        {packetType === 'REGULAR' ? (
+                          <span className="text-[8px] font-bold text-slate-400">Locked</span>
+                        ) : (
+                          <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Budget</span>
+                        )}
+                      </div>
+                      {packetType === 'CUSTOMIZED' ? (
+                        <div className="relative">
+                          <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">₹</span>
+                          <input 
+                            type="number" 
+                            step="0.5" 
+                            min="1" 
+                            max="200"
+                            required
+                            value={customRate}
+                            onChange={e => setCustomRate(e.target.value)}
+                            className="w-full pl-5 pr-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-500"
+                          />
                         </div>
                       ) : (
-                        filteredInstitutions.map(inst => {
-                          const isSelected = String(inst.id) === String(selectedInstId);
-                          return (
+                        <div className="py-1 text-xs font-black text-slate-700 text-center font-mono">₹75.00</div>
+                      )}
+                    </div>
+
+                    <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase">TOTAL PACKETS</label>
+                        <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Direct</span>
+                      </div>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        required
+                        value={totalPackets}
+                        onChange={e => setTotalPackets(e.target.value)}
+                        className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Option 1: Institutional On-Behalf */}
+                  <div className="relative" ref={instDropdownRef}>
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <span>AFFILIATED INSTITUTION</span>
+                      {selectedInst && <span className="text-[9px] font-bold text-indigo-600">PIN: {selectedInst.pin_code || '110003'}</span>}
+                    </label>
+                    <div className="relative group">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+                      <input 
+                        type="text" 
+                        placeholder={selectedInst ? `${selectedInst.institution_name} (Click to change...)` : "Search institution..."}
+                        value={instSearch}
+                        onChange={(e) => {
+                          setInstSearch(e.target.value);
+                          if (!instDropdownOpen) setInstDropdownOpen(true);
+                        }}
+                        onFocus={() => setInstDropdownOpen(true)}
+                        className="w-full pl-8 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-2xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setInstDropdownOpen(prev => !prev)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${instDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+
+                    {instDropdownOpen && (
+                      <div className="absolute z-50 left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100">
+                        {filteredInstitutions.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-slate-400">No institutions found</div>
+                        ) : (
+                          filteredInstitutions.map(inst => (
                             <button
                               key={inst.id}
                               type="button"
                               onClick={() => selectInstitution(inst)}
-                              className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-emerald-50/70 transition-colors cursor-pointer ${
-                                isSelected ? 'bg-emerald-50/90 font-bold' : ''
-                              }`}
+                              className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-indigo-50/70 transition-colors cursor-pointer"
                             >
                               <div className="min-w-0 flex-1">
-                                <div className="text-xs font-bold text-slate-900 truncate flex items-center gap-1">
-                                  {inst.institution_name}
-                                  {isSelected && (
-                                    <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded">
-                                      Selected
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[10px] text-slate-500 truncate mt-0.5 flex items-center gap-1.5">
-                                  <span>ANO: {inst.ano_cto_name || 'N/A'}</span>
-                                  <span>•</span>
-                                  <span>PIN: {inst.pin_code || '110003'}</span>
-                                  <span>•</span>
-                                  <span>Vacancy: {(Number(inst.strength_1st_year) || 0) + (Number(inst.strength_2nd_year) || 0) + (Number(inst.strength_3rd_year) || 0)}</span>
-                                </div>
+                                <div className="text-xs font-bold text-slate-900 truncate">{inst.institution_name}</div>
+                                <div className="text-[10px] text-slate-500">ANO: {inst.ano_cto_name || 'N/A'} • Vacancy: {(Number(inst.strength_1st_year)||0)+(Number(inst.strength_2nd_year)||0)+(Number(inst.strength_3rd_year)||0)}</div>
                               </div>
-                              <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* =============================================================== */}
-                {/* COMMON FIELDS: DATE, TIME & VENUE */}
-                {/* =============================================================== */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-blue-600" />
-                      Delivery Date (DD/MM/YYYY)
-                    </label>
-                    <CustomDateInput
-                      value={demandDate}
-                      onChange={setDemandDate}
-                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-blue-600" />
-                      Delivery Time (12-Hour)
-                    </label>
-                    <input
-                      type="time"
-                      value={demandTime}
-                      onChange={e => setDemandTime(e.target.value)}
-                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-blue-600" />
-                    Delivery Location / Venue
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={venue}
-                    onChange={e => setVenue(e.target.value)}
-                    placeholder="Enter delivery location"
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
-                  />
-                </div>
-
-                {/* Demand Type Toggle */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Demand Type
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setDemandPrefix('FIRST')}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${demandPrefix === 'FIRST'
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                    >
-                      FIRST DEMAND
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDemandPrefix('SECOND')}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${demandPrefix === 'SECOND'
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                    >
-                      SECOND DEMAND
-                    </button>
-                  </div>
-                </div>
-
-                {/* Cadet Attendance Steppers */}
-                <div>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                      Cadet Attendance Strength
-                    </label>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold border border-slate-200">
-                        <span>Total Auth: {(selectedInst?.strength_1st_year || 0) + (selectedInst?.strength_2nd_year || 0) + (selectedInst?.strength_3rd_year || 0)}</span>
-                        <span className="text-slate-400">|</span>
-                        <span>1st: {selectedInst?.strength_1st_year || 0}</span>
-                        <span>2nd: {selectedInst?.strength_2nd_year || 0}</span>
-                        {Number(selectedInst?.strength_3rd_year || 0) > 0 && (
-                          <span>3rd: {selectedInst?.strength_3rd_year}</span>
+                          ))
                         )}
                       </div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${instTotalQty > 0 ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`}>
-                        Demanded: {instTotalQty}
+                    )}
+                  </div>
+
+                  {/* Demand Prefix */}
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">DEMAND TYPE</label>
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setDemandPrefix('FIRST')}
+                        className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all cursor-pointer ${demandPrefix === 'FIRST' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        FIRST DEMAND
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setDemandPrefix('SECOND')}
+                        className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all cursor-pointer ${demandPrefix === 'SECOND' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        SECOND DEMAND
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Date & Time (Strict DD/MM/YYYY) */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">DATE</label>
+                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded">DD/MM/YYYY</span>
+                      </div>
+                      <CustomDateInput 
+                        value={demandDate}
+                        onChange={setDemandDate}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">TIME</label>
+                        <span className="text-[9px] font-bold text-slate-400">12-Hour</span>
+                      </div>
+                      <div className="relative group">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+                        <input 
+                          type="time" 
+                          value={demandTime}
+                          onChange={e => setDemandTime(e.target.value)}
+                          className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quota Strip */}
+                  <div className="bg-slate-50 rounded-lg p-2 border border-slate-200/80 grid grid-cols-3 gap-1 text-center">
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase">Sanctioned</span>
+                      <span className="text-xs font-black text-slate-800">
+                        {(Number(selectedInst?.strength_1st_year) || 0) + (Number(selectedInst?.strength_2nd_year) || 0) + (Number(selectedInst?.strength_3rd_year) || 0)}
                       </span>
                     </div>
+                    <div className="border-x border-slate-200">
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase">Auth Quota</span>
+                      <span className="text-xs font-black text-slate-800">
+                        {(((Number(selectedInst?.strength_1st_year) || 0) + (Number(selectedInst?.strength_2nd_year) || 0) + (Number(selectedInst?.strength_3rd_year) || 0)) * 25).toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase">Demand Mode</span>
+                      <span className="text-xs font-black text-indigo-600 font-mono">ON-BEHALF</span>
+                    </div>
                   </div>
-                  <div className={`grid grid-cols-1 ${Number(selectedInst?.strength_3rd_year || 0) > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2.5`}>
-                    <div className="p-2.5 rounded-lg border border-slate-200 bg-white">
-                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-0.5">
-                        <span>1ST YEAR</span>
-                        <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_1st_year || 50}</span>
-                      </div>
-                      <input
-                        type="number"
-                        min="0"
-                        max={selectedInst?.strength_1st_year || 50}
-                        value={year1}
-                        onChange={e => setYear1(e.target.value)}
-                        placeholder="0"
-                        className="w-full text-base font-bold text-slate-900 focus:outline-none"
-                      />
-                    </div>
 
-                    <div className="p-2.5 rounded-lg border border-slate-200 bg-white">
-                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-0.5">
-                        <span>2ND YEAR</span>
-                        <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_2nd_year || 50}</span>
-                      </div>
-                      <input
-                        type="number"
-                        min="0"
-                        max={selectedInst?.strength_2nd_year || 50}
-                        value={year2}
-                        onChange={e => setYear2(e.target.value)}
-                        placeholder="0"
-                        className="w-full text-base font-bold text-slate-900 focus:outline-none"
-                      />
+                  {/* Cadet Attendance */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">CADET ATTENDANCE</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const s1 = Number(selectedInst?.strength_1st_year) || 0;
+                          const s2 = Number(selectedInst?.strength_2nd_year) || 0;
+                          const s3 = Number(selectedInst?.strength_3rd_year) || 0;
+                          setYear1(s1);
+                          setYear2(s2);
+                          setYear3(s3 > 0 ? s3 : 0);
+                          setTotalDemanded(s1 + s2 + (s3 > 0 ? s3 : 0));
+                        }}
+                        className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="Auto-fill quantities directly from sanctioned cadet vacancy"
+                      >
+                        Fill Vacancy
+                      </button>
                     </div>
-
-                    {Number(selectedInst?.strength_3rd_year || 0) > 0 && (
-                      <div className="p-2.5 rounded-lg border border-slate-200 bg-white">
-                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-0.5">
-                          <span>3RD YEAR</span>
-                          <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_3rd_year || 0}</span>
+                    <div className={`grid ${Number(selectedInst?.strength_3rd_year || 0) > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+                      <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                        <div className="flex justify-between items-center mb-0.5">
+                          <label className="text-[9px] font-black text-slate-500">1ST YR</label>
+                          <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {selectedInst?.strength_1st_year || 0}</span>
                         </div>
-                        <input
-                          type="number"
-                          min="0"
-                          max={selectedInst?.strength_3rd_year || 0}
-                          value={year3}
-                          onChange={e => setYear3(e.target.value)}
-                          placeholder="0"
-                          className="w-full text-base font-bold text-slate-900 focus:outline-none"
+                        <input 
+                          type="number" 
+                          min="0" 
+                          max={selectedInst?.strength_1st_year || 0}
+                          value={year1}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setYear1(val);
+                            setTotalDemanded((parseInt(val) || 0) + (parseInt(year2) || 0) + (parseInt(year3) || 0));
+                          }}
+                          className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
                         />
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* =============================================================== */}
-            {/* OPTION 2 CONTENT: DEMAND FOR UNIT (DIRECT WITH CUSTOM RATE) */}
-            {/* =============================================================== */}
-            {demandMode === 'UNIT_DIRECT' && (
-              <div className="flex-1 flex flex-col justify-between gap-2.5 animate-fadeIn">
-                {/* COMMON FIELDS: DATE, TIME & VENUE */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-blue-600" />
-                      Delivery Date (DD/MM/YYYY)
-                    </label>
-                    <CustomDateInput
-                      value={demandDate}
-                      onChange={setDemandDate}
-                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
-                    />
-                  </div>
+                      <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                        <div className="flex justify-between items-center mb-0.5">
+                          <label className="text-[9px] font-black text-slate-500">2ND YR</label>
+                          <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {selectedInst?.strength_2nd_year || 0}</span>
+                        </div>
+                        <input 
+                          type="number" 
+                          min="0" 
+                          max={selectedInst?.strength_2nd_year || 0}
+                          value={year2}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setYear2(val);
+                            setTotalDemanded((parseInt(year1) || 0) + (parseInt(val) || 0) + (parseInt(year3) || 0));
+                          }}
+                          className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-blue-600" />
-                      Delivery Time (12-Hour)
-                    </label>
-                    <input
-                      type="time"
-                      value={demandTime}
-                      onChange={e => setDemandTime(e.target.value)}
-                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-blue-600" />
-                    Delivery Location / Venue
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={venue}
-                    onChange={e => setVenue(e.target.value)}
-                    placeholder="Enter delivery location"
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
-                  />
-                </div>
-
-                {/* Packet Type Selection: Simple Clean Buttons */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Select Packet Type
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPacketType('CUSTOMIZED')}
-                      className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${packetType === 'CUSTOMIZED'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
-                        }`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Customized</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPacketType('REGULAR')}
-                      className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${packetType === 'REGULAR'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
-                        }`}
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>Regular (₹75)</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Rate & Total Packets Inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Rate per packet */}
-                  <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                        <IndianRupee className="w-3 h-3 text-blue-600" />
-                        Rate Per Packet (₹)
-                      </label>
-                      {packetType === 'REGULAR' && (
-                        <span className="text-[10px] font-bold text-slate-400">Locked @ ₹75</span>
+                      {Number(selectedInst?.strength_3rd_year || 0) > 0 && (
+                        <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                          <div className="flex justify-between items-center mb-0.5">
+                            <label className="text-[9px] font-black text-slate-500">3RD YR</label>
+                            <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {selectedInst?.strength_3rd_year || 0}</span>
+                          </div>
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max={selectedInst?.strength_3rd_year || 0}
+                            value={year3}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setYear3(val);
+                              setTotalDemanded((parseInt(year1) || 0) + (parseInt(year2) || 0) + (parseInt(val) || 0));
+                            }}
+                            className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
                       )}
                     </div>
+                  </div>
+                </>
+              )}
 
-                    {packetType === 'CUSTOMIZED' ? (
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold text-xs">
-                          ₹
-                        </span>
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="1"
-                          max="200"
-                          required
-                          value={customRate}
-                          onChange={e => setCustomRate(e.target.value)}
-                          placeholder="e.g. 50 or 60"
-                          className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-slate-300 font-bold text-slate-900 text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              {/* Live Demand Summary: Ultra Compact single-row matching ANO Console */}
+              <div className="bg-gradient-to-br from-indigo-50/70 to-purple-50/50 rounded-lg p-2 border border-indigo-100/90 shadow-2xs">
+                <div className="grid grid-cols-12 items-center gap-1.5">
+                  {/* 1. TOTAL QTY */}
+                  <div className="col-span-4">
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate">
+                      TOTAL QTY
+                    </label>
+                    <div className="flex items-center gap-1">
+                      {demandMode === 'UNIT_DIRECT' ? (
+                        <input 
+                          type="number" 
+                          min="1" 
+                          value={totalPackets}
+                          onChange={(e) => setTotalPackets(e.target.value)}
+                          className="w-14 px-1 py-0.5 bg-white border border-indigo-400 focus:border-indigo-600 rounded-md text-sm font-black text-indigo-700 text-center focus:outline-none"
                         />
-                      </div>
-                    ) : (
-                      <div className="py-1.5 px-3 rounded-lg bg-slate-50 text-slate-800 font-bold text-sm border border-slate-200">
-                        ₹75.00
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Total Number of Packets */}
-                  <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                        <Layers className="w-3 h-3 text-blue-600" />
-                        Total No. of Packets
-                      </label>
-                      <span className="text-[10px] font-bold text-blue-600">Direct</span>
+                      ) : (
+                        <span className="text-sm font-black text-indigo-700">{instTotalQty}</span>
+                      )}
+                      <span className="text-[10px] font-bold text-slate-500">Pkts</span>
                     </div>
+                  </div>
 
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={totalPackets}
-                      onChange={e => setTotalPackets(e.target.value)}
-                      placeholder="e.g. 100 or 250"
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-bold text-slate-900 text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                    />
+                  {/* 2. TOTAL AMOUNT */}
+                  <div className="col-span-4 border-l border-indigo-100 pl-1.5">
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate">
+                      TOTAL AMOUNT
+                    </label>
+                    <div className="text-xs sm:text-sm font-black text-emerald-600 truncate font-mono">
+                      ₹{(demandMode === 'UNIT_DIRECT' ? unitTotalAmount : instTotalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  {/* 3. PER PKT AMOUNT */}
+                  <div className="col-span-4 border-l border-indigo-100 pl-1.5 text-right">
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate" title="Per Packet Amount">
+                      PER PKT
+                    </label>
+                    <div className="text-xs font-black text-slate-800 font-mono">
+                      ₹{(demandMode === 'UNIT_DIRECT' ? effectiveRate : 75).toFixed(2)}
+                    </div>
+                    <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 inline-block">
+                      INCL. GST
+                    </span>
                   </div>
                 </div>
-
-                {/* Purpose / Occasion */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Training Event / Occasion Purpose
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={purpose}
-                    onChange={e => setPurpose(e.target.value)}
-                    placeholder="e.g. ATC, Cadre, Special Parade..."
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
-                  />
-                </div>
               </div>
-            )}
 
-            {/* =============================================================== */}
-            {/* LIVE SUMMARY TOTAL BAR */}
-            {/* =============================================================== */}
-            <div className="p-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-wrap items-center justify-between gap-2 shadow-sm shrink-0">
+              {/* Training Venue */}
               <div>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Total Requisition
-                </span>
-                <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-xl font-bold text-white">
-                    {demandMode === 'UNIT_DIRECT' ? unitPacketCount : instTotalQty}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-300">Packets</span>
-                  <span className="text-slate-500">•</span>
-                  <span className="text-[11px] text-slate-300">
-                    @ ₹{(demandMode === 'UNIT_DIRECT' ? effectiveRate : 75).toFixed(2)}/pkt
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 block">
-                  Total Amount
-                </span>
-                <div className="text-xl font-bold text-emerald-400 font-mono">
-                  ₹{(demandMode === 'UNIT_DIRECT' ? unitTotalAmount : instTotalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
+                  TRAINING VENUE (COMPLETE ADDRESS)
+                </label>
+                <div className="relative group">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+                  <input 
+                    type="text" 
+                    required
+                    value={venue}
+                    onChange={(e) => setVenue(e.target.value)}
+                    placeholder="Enter complete address..."
+                    className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 pt-1 shrink-0">
-              <button
+            {errorMsg && <div className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-100 p-2 rounded-lg shrink-0">{errorMsg}</div>}
+            {successMsg && <div className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 p-2 rounded-lg shrink-0">{successMsg}</div>}
+
+            {/* Buttons Row */}
+            <div className="flex gap-2 pt-2 shrink-0">
+              <button 
                 type="submit"
                 disabled={submitting}
-                className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-white text-xs shadow-sm transition-all duration-200 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${demandMode === 'UNIT_DIRECT'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500'
-                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
-                  }`}
+                className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-sm transition-all disabled:opacity-70 cursor-pointer"
               >
-                {submitting ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>
-                      {demandMode === 'UNIT_DIRECT' ? 'PLACE UNIT DIRECT DEMAND' : 'PLACE INSTITUTION DEMAND'}
-                    </span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </>
-                )}
+                {submitting ? 'PROCESSING...' : (demandMode === 'UNIT_DIRECT' ? 'PLACE UNIT DEMAND' : 'PLACE DEMAND')}
               </button>
-
               <button
                 type="button"
                 onClick={() => {
@@ -1015,119 +957,138 @@ export default function UnitDemandPage() {
                   setYear2('');
                   setYear3('');
                   setTotalPackets('100');
+                  setCustomRate('60');
+                  setVenue('');
+                  setPurpose('');
                   setErrorMsg('');
                   setSuccessMsg('');
                 }}
-                className="py-2.5 px-3.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-all cursor-pointer flex items-center gap-1"
+                className="px-4 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>CLEAR</span>
+                CLEAR
               </button>
             </div>
           </form>
         </div>
 
-        {/* Recent Demands Placed in this Jurisdiction (Right 72% Expanded Table) */}
-        <div className="w-full lg:w-[72%] flex-1 min-w-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm flex flex-col justify-between h-full">
-          <div className="flex items-center justify-between shrink-0 pb-3 border-b border-slate-100">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-blue-600" />
-                Recent Demands Placed in this Jurisdiction
-              </h3>
-              <p className="text-xs text-slate-500">Live feed of demands created directly by Unit or on behalf of institutions. Click any row to track on right margin.</p>
+        {/* RIGHT COLUMN: DEMAND HISTORY TABLE */}
+        <div className="xl:col-span-8 bg-white rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between h-full">
+          <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
+              <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">DEMAND HISTORY</h2>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 ml-1">
+                {recentUnitDemands.length}
+              </span>
             </div>
-            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">{recentUnitDemands.length} Records</span>
+            <div className="flex gap-2">
+              <button 
+                type="button"
+                onClick={() => fetchRecentDemands()} 
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-100 hover:bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <RefreshCw className={`w-3 h-3 ${loadingDemands ? 'animate-spin' : ''}`} />
+                SYNC
+              </button>
+              <button 
+                type="button"
+                onClick={() => window.print()} 
+                className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition-all shadow-xs cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
-          {loadingDemands ? (
-            <div className="flex-1 flex items-center justify-center py-16 text-center text-xs text-slate-400 font-semibold">Loading recent records...</div>
-          ) : recentUnitDemands.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-20 text-center text-slate-400 font-medium gap-2">
-              <FileCheck className="w-8 h-8 text-slate-300 stroke-[1.5]" />
-              <span>No recent demands found.</span>
-            </div>
-          ) : (
-            <div className="overflow-x-auto flex-1 flex flex-col mt-2">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/80 text-slate-500 font-extrabold uppercase border-b border-slate-200 shrink-0">
+          <div className="overflow-x-auto flex-1 p-3 flex flex-col">
+            <table className="w-full text-left text-sm border-separate border-spacing-y-2 flex-1">
+              <thead>
+                <tr>
+                  <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">NO</th>
+                  <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">DATE & TIME</th>
+                  <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">BENEFICIARY / TYPE</th>
+                  <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">PURPOSE / VENUE</th>
+                  <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">STATUS</th>
+                  <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest text-center">PKTS</th>
+                  <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">RATE</th>
+                  <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">COST</th>
+                  <th className="pr-4 pl-2 py-3 text-center font-black text-slate-400 text-[10px] uppercase tracking-widest">ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentUnitDemands.length === 0 ? (
                   <tr>
-                    <th className="py-3 px-3">Demand No</th>
-                    <th className="py-3 px-3">Type</th>
-                    <th className="py-3 px-3">Beneficiary</th>
-                    <th className="py-3 px-3">Date & Time</th>
-                    <th className="py-3 px-3 text-right">Packets</th>
-                    <th className="py-3 px-3 text-right">Rate</th>
-                    <th className="py-3 px-3 text-right">Total Amount</th>
-                    <th className="py-3 px-3 text-center">Status</th>
-                    <th className="py-3 px-3 text-center">Action</th>
+                    <td colSpan="9" className="py-28 text-center text-slate-400 font-bold bg-slate-50/50 rounded-2xl">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <History className="w-8 h-8 text-slate-300 stroke-[1.5]" />
+                        <span className="text-sm font-semibold text-slate-400">No demands found.</span>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {recentUnitDemands.map(d => (
+                ) : (
+                  recentUnitDemands.map((d, idx) => (
                     <tr 
                       key={d.id} 
                       onClick={() => setSelectedDemand(d)}
-                      className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                      className="group hover:bg-indigo-50/30 transition-colors cursor-pointer bg-slate-50/40 rounded-xl"
                     >
-                      <td className="py-3.5 px-3 font-bold text-blue-600 group-hover:text-indigo-600 font-mono">
-                        {d.demand_number}
+                      <td className="px-3 py-3 font-bold text-slate-500 text-xs rounded-l-xl">
+                        #{idx + 1}
                       </td>
-                      <td className="py-3.5 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                      <td className="px-3 py-3">
+                        <div className="font-black text-slate-800 tracking-tight text-xs">{d.demand_date}</div>
+                        <div className="text-[10px] font-bold text-slate-400 mt-0.5 tracking-wider">{d.demand_time || '08:00 AM'}</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="font-bold text-slate-800 uppercase text-xs truncate max-w-[180px]">
+                          {d.demand_type === 'UNIT_DIRECT' ? (d.unit_code || d.unit_name || 'UNIT HQ') : (d.institution_name || 'INSTITUTION')}
+                        </div>
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold inline-block mt-0.5 ${
                           d.demand_type === 'UNIT_DIRECT' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
                         }`}>
                           {d.demand_type === 'UNIT_DIRECT' ? 'UNIT DIRECT' : 'INSTITUTE'}
                         </span>
                       </td>
-                      <td className="py-3.5 px-3 font-semibold text-slate-800 truncate max-w-[240px]">
-                        {d.demand_type === 'UNIT_DIRECT'
-                          ? (d.unit_code || d.unit_name || 'Unit HQ')
-                          : (d.institution_name || 'Institution')}
+                      <td className="px-3 py-3">
+                        <div className="font-medium text-slate-700 text-xs truncate max-w-[200px]" title={d.purpose || d.delivery_location || d.venue}>
+                          {d.purpose || d.delivery_location || d.venue || 'Training Event'}
+                        </div>
                       </td>
-                      <td className="py-3.5 px-3 text-slate-500">
-                        {d.demand_date} • {d.demand_time || '08:00 AM'}
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-bold text-slate-900">
-                        {d.total_quantity || d.quantity || 0}
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-mono text-slate-600">
-                        ₹{d.custom_unit_rate ? Number(d.custom_unit_rate).toFixed(2) : (d.avg_unit_price ? Number(d.avg_unit_price).toFixed(2) : '75.00')}
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-bold text-emerald-600 font-mono">
-                        ₹{Number(d.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-3.5 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                          d.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
-                          d.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
-                          'bg-slate-100 text-slate-800'
+                      <td className="px-3 py-3">
+                        <span className={`px-2 py-1 text-[10px] font-bold rounded-lg border ${
+                          d.status === 'APPROVED' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                          d.status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                          d.status === 'ACCEPTED' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                          d.status === 'FULFILLED' || d.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                          'bg-slate-100 text-slate-700 border-slate-200'
                         }`}>
                           {d.status}
                         </span>
                       </td>
-                      <td className="py-3.5 px-3 text-center" onClick={e => e.stopPropagation()}>
+                      <td className="px-3 py-3 text-center font-black text-slate-800 text-xs">
+                        {d.total_quantity || d.quantity || 0}
+                      </td>
+                      <td className="px-3 py-3 text-right font-mono text-slate-600 text-xs">
+                        ₹{d.custom_unit_rate ? Number(d.custom_unit_rate).toFixed(2) : (d.avg_unit_price ? Number(d.avg_unit_price).toFixed(2) : '75.00')}
+                      </td>
+                      <td className="px-3 py-3 text-right font-black text-emerald-600 font-mono text-xs">
+                        ₹{Number(d.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="pr-4 pl-2 py-3 text-center rounded-r-xl" onClick={e => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={() => setSelectedDemand(d)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-all cursor-pointer shadow-2xs"
-                          title="View Details & Live Tracking"
                         >
                           <Eye className="w-3 h-3 text-indigo-600" />
                           <span>View</span>
                         </button>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Table Footer Strip to anchor bottom nicely */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 shrink-0">
-            <span className="font-medium">Showing latest jurisdictional records</span>
-            <span className="font-semibold text-slate-600">Auto-synced via Realtime SSE</span>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
