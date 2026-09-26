@@ -1105,6 +1105,7 @@ export default function UnitDemandPage() {
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">DATE &amp; TIME</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">TYPE</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">BENEFICIARY</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">ANO</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">VENUE</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">STATUS</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-center">PKTS</th>
@@ -1140,6 +1141,11 @@ export default function UnitDemandPage() {
                       <td className="px-3 py-4">
                         <div className="font-bold text-slate-800 uppercase text-xs truncate max-w-[160px]">
                           {d.demand_type === 'UNIT_DIRECT' ? (d.unit_code || d.unit_name || 'UNIT HQ') : (d.institution_name || 'INSTITUTION')}
+                        </div>
+                      </td>
+                      <td className="px-3 py-4">
+                        <div className="font-bold text-slate-600 uppercase text-[10px] bg-slate-100 px-2 py-1 rounded-md inline-block">
+                          {d.ano_cto_name || (d.demand_type === 'UNIT_DIRECT' ? 'UNIT HQ' : 'N/A')}
                         </div>
                       </td>
                       <td className="px-3 py-4">
