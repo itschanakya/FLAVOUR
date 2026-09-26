@@ -1120,4 +1120,54 @@ router.put('/:id/invoice', authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/demands/:id - Soft delete a demand
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const db = await getDB();
+    const demandId = req.params.id;
+    const isNumericId = /^\d+$/.test(demandId);
+
+    let demand = null;
+    if (isNumericId) {
+      demand = await db.get('SELECT * FROM demands WHERE id = ? AND is_deleted = 0', [demandId]);
+    } else {
+      demand = await db.get('SELECT * FROM demands WHERE demand_number = ? AND is_deleted = 0', [demandId]);
+    }
+
+    if (!demand) {
+      return res.status(404).json({ error: 'Demand not found or already deleted.' });
+    }
+
+    // Role security check
+    if (req.user.role === 'INSTITUTION' && demand.institution_id !== req.user.institution_id) {
+      return res.status(403).json({ error: 'Access denied to this demand.' });
+    }
+    if (req.user.role === 'UNIT' && demand.unit_id !== req.user.unit_id) {
+      return res.status(403).json({ error: 'Access denied to this demand.' });
+    }
+
+    if (isNumericId) {
+      await db.run('UPDATE demands SET is_deleted = 1 WHERE id = ?', [demandId]);
+    } else {
+      await db.run('UPDATE demands SET is_deleted = 1 WHERE demand_number = ?', [demandId]);
+    }
+
+    // Keep database.sqlite synchronized with data.sqlite
+    try {
+      const fs = require('fs');
+      const srcPath = path.join(__dirname, '../data.sqlite');
+      const destPath = path.join(__dirname, '../database.sqlite');
+      if (fs.existsSync(srcPath)) {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    } catch (e) {}
+
+    broadcastToAll('DEMAND_UPDATED', { message: `Demand ${demand.demand_number || demandId} deleted` });
+    res.json({ message: 'Demand deleted successfully.' });
+  } catch (err) {
+    console.error('Delete demand error:', err);
+    res.status(500).json({ error: 'Failed to delete demand.' });
+  }
+});
+
 module.exports = router;

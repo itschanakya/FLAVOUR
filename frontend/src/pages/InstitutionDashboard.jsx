@@ -14,6 +14,7 @@ import {
   FileText,
   FileCheck,
   Eye,
+  Pencil,
   Truck,
   CheckCircle2
 } from 'lucide-react';
@@ -405,10 +406,21 @@ export default function InstitutionDashboard() {
     setError('');
   };
 
-  const handleDelete = (id) => {
-    if(window.confirm('Are you sure you want to delete this demand?')) {
-      // Typically an API call here, for now just removing from state
-      setRecentDemands(recentDemands.filter(d => d.id !== id));
+  const handleDelete = async (id, demandNumber) => {
+    if (window.confirm(`Are you sure you want to delete demand ${demandNumber || '#' + id}?`)) {
+      try {
+        const res = await fetch(`/api/demands/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Failed to delete demand');
+        }
+        fetchData();
+      } catch (err) {
+        setError(err.message);
+      }
     }
   };
 
@@ -780,14 +792,13 @@ export default function InstitutionDashboard() {
                   <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">PKTS</th>
                   <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">RATE</th>
                   <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">COST</th>
-                  <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-center">DOCUMENTS</th>
-                  <th className="pr-6 pl-2 py-4 text-right"></th>
+                  <th className="pr-6 pl-2 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-center">ACTION</th>
                 </tr>
               </thead>
               <tbody>
                 {recentDemands.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="py-28 text-center text-slate-400 font-bold bg-slate-50/50 rounded-2xl">
+                    <td colSpan="10" className="py-28 text-center text-slate-400 font-bold bg-slate-50/50 rounded-2xl">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <History className="w-8 h-8 text-slate-300 stroke-[1.5]" />
                         <span className="text-sm font-semibold text-slate-400">No demands found.</span>
@@ -851,61 +862,30 @@ export default function InstitutionDashboard() {
                       <td className="px-3 py-4 font-black text-emerald-600 text-right">
                         ₹{(dem.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="px-3 py-4 text-center" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                          {dem.delivery_receipt_url ? (
-                            <a
-                              href={dem.delivery_receipt_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-all shadow-xs"
-                              title="View Signed Delivery Receipt"
-                            >
-                              <FileText className="w-3 h-3 text-emerald-600" /> Receipt
-                            </a>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200">
-                              Receipt (Pending)
-                            </span>
-                          )}
-
-                          {dem.invoice_url ? (
-                            <a
-                              href={dem.invoice_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition-all shadow-xs"
-                              title="View Bill / Invoice"
-                            >
-                              <FileCheck className="w-3 h-3 text-indigo-600" /> Bill
-                            </a>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200">
-                              Bill (Pending)
-                            </span>
-                          )}
+                      <td className="pr-6 pl-2 py-4 text-center rounded-r-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDemand(dem)}
+                            className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer"
+                            title="Edit / View Details"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
 
                           <button
-                            onClick={() => setSelectedDemand(dem)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all shadow-xs"
-                            title="View Demand Details & Verification"
+                            type="button"
+                            onClick={() => handleDelete(dem.id, dem.demand_number)}
+                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 border border-rose-200 shadow-2xs transition-all cursor-pointer"
+                            title="Delete Demand"
                           >
-                            <Eye className="w-3 h-3 text-blue-600" /> View Details
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
-                      <td className="pr-6 pl-2 py-4 rounded-r-2xl text-right" onClick={e => e.stopPropagation()}>
-                        <button 
-                          onClick={() => handleDelete(dem.id)}
-                          className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
+                  )))}
+                </tbody>
             </table>
           </div>
         </div>
