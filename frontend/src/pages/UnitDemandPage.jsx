@@ -527,10 +527,10 @@ export default function UnitDemandPage() {
         </div>
       )}
 
-      {/* Main Content: Form (Left 40%) & Recent Demands (Right 60%) Side-by-Side */}
+      {/* Main Content: Compact Form (Left 28%) & Expanded Table Data (Right 72%) */}
       <div className="flex flex-col lg:flex-row gap-5 items-start w-full">
-        {/* Main Form Container - Exactly 36% */}
-        <div className="w-full lg:w-[36%] shrink-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm space-y-4">
+        {/* Main Form Container - Compact 28% */}
+        <div className="w-full lg:w-[28%] shrink-0 glass-card p-4 border-slate-200 shadow-sm space-y-3.5">
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* =============================================================== */}
@@ -1069,8 +1069,8 @@ export default function UnitDemandPage() {
           </form>
         </div>
 
-        {/* Recent Demands Placed in this Jurisdiction (Right 60% Side-by-Side) */}
-        <div className="w-full lg:w-[56%] flex-1 min-w-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm space-y-3">
+        {/* Recent Demands Placed in this Jurisdiction (Right 72% Expanded Table) */}
+        <div className="w-full lg:w-[72%] flex-1 min-w-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
@@ -1119,7 +1119,7 @@ export default function UnitDemandPage() {
                           {d.demand_type === 'UNIT_DIRECT' ? 'UNIT DIRECT' : 'INSTITUTE'}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-800 truncate max-w-[150px]">
+                      <td className="py-2.5 px-3 font-semibold text-slate-800 truncate max-w-[240px]">
                         {d.demand_type === 'UNIT_DIRECT'
                           ? (d.unit_code || d.unit_name || 'Unit HQ')
                           : (d.institution_name || 'Institution')}
