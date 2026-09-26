@@ -1136,8 +1136,8 @@ export default function UnitDemandPage() {
                         </div>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="font-medium text-slate-700 text-xs truncate max-w-[180px]" title={d.delivery_location || d.venue}>
-                          {d.delivery_location || d.venue || '—'}
+                        <div className="font-medium text-slate-700 text-xs truncate max-w-[180px]" title={d.complete_address}>
+                          {d.complete_address || d.delivery_location || d.venue || '—'}
                         </div>
                       </td>
                       <td className="px-3 py-3">
