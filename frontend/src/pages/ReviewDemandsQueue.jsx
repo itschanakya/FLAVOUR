@@ -246,17 +246,21 @@ function DemandsTableView({ demands, onAction, onDelete, onClick }) {
                   </td>
                   <td className="py-3.5 px-4">
                     <div className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors line-clamp-1 max-w-[220px]" title={dem.institution_name}>
-                      {dem.institution_name}
+                      {dem.demand_type === 'UNIT_DIRECT' || !dem.institution_name || /^\d+$/.test(String(dem.institution_name).trim())
+                        ? (dem.unit_code || dem.unit_name || '2 DAB NCC')
+                        : dem.institution_name}
                     </div>
-                    {(dem.ano_cto_name || dem.ano_cto_phone) && (
-                      <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 truncate max-w-[220px]">
-                        <Users className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                        <span>{dem.ano_cto_name || 'ANO'}</span>
-                        {dem.ano_cto_phone && (
-                          <span className="text-slate-400 font-mono">({dem.ano_cto_phone})</span>
-                        )}
-                      </div>
-                    )}
+                    <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 truncate max-w-[220px]">
+                      <Users className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                      <span>
+                        {dem.demand_type === 'UNIT_DIRECT' || !dem.ano_cto_name || /^\d+$/.test(String(dem.ano_cto_name).trim())
+                          ? 'UNIT ADM'
+                          : dem.ano_cto_name}
+                      </span>
+                      {dem.ano_cto_phone && !/^\d+$/.test(String(dem.ano_cto_name).trim()) && (
+                        <span className="text-slate-400 font-mono">({dem.ano_cto_phone})</span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3.5 px-4 max-w-[220px]">
                     <div className="text-slate-700 font-medium line-clamp-2" title={dem.purpose}>

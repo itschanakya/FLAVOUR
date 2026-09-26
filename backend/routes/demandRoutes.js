@@ -59,9 +59,17 @@ router.get('/', authenticateToken, async (req, res) => {
 
     let baseQuery = `
       SELECT d.*, 
-        COALESCE(i.institution_name, CONCAT(u.unit_name, ' (Direct Unit Demand)')) as institution_name,
-        CASE WHEN d.demand_type = 'UNIT_DIRECT' THEN 'UNIT ADM' WHEN i.ano_cto_name GLOB '[0-9]*' THEN 'UNIT ADM' ELSE COALESCE(i.ano_cto_name, 'UNIT ADM') END as ano_cto_name,
-        COALESCE(i.complete_address, CASE WHEN d.delivery_venue IS NOT NULL AND d.delivery_venue NOT GLOB '[0-9]*' AND LENGTH(d.delivery_venue) > 3 THEN d.delivery_venue ELSE NULL END, u.location, u.unit_name, 'Unit Battalion HQ') as complete_address,
+        CASE 
+          WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name, '2 DAB NCC')
+          WHEN i.institution_name IS NULL OR i.institution_name = '1' OR i.institution_name REGEXP '^[0-9]+$' THEN COALESCE(u.unit_code, u.unit_name, '2 DAB NCC')
+          ELSE i.institution_name 
+        END as institution_name,
+        CASE 
+          WHEN d.demand_type = 'UNIT_DIRECT' THEN 'UNIT ADM' 
+          WHEN i.ano_cto_name IS NULL OR i.ano_cto_name = '1' OR i.ano_cto_name REGEXP '^[0-9]+$' THEN 'UNIT ADM' 
+          ELSE i.ano_cto_name 
+        END as ano_cto_name,
+        COALESCE(i.complete_address, CASE WHEN d.delivery_venue IS NOT NULL AND d.delivery_venue NOT REGEXP '^[0-9]+$' AND LENGTH(d.delivery_venue) > 3 THEN d.delivery_venue ELSE NULL END, u.location, u.unit_name, 'Unit Battalion HQ') as complete_address,
         COALESCE(i.google_location, '') as google_location,
         u.unit_name, u.unit_code, u.ncc_group,
         CASE WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name) ELSE COALESCE(i.institution_name, u.unit_name) END as beneficiary_name,
