@@ -537,11 +537,11 @@ export default function UnitDemandPage() {
             {/* OPTION 1 CONTENT: DEMAND FOR INSTITUTION ON THEIR BEHALF */}
             {/* =============================================================== */}
             {demandMode === 'INSTITUTION' && (
-              <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-3 animate-fadeIn">
                 {/* Searchable Institution Combobox */}
                 <div className="relative" ref={instDropdownRef}>
-                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
                       <School className="w-3.5 h-3.5 text-emerald-600" />
                       Select Affiliated Institution
                     </span>
@@ -554,47 +554,47 @@ export default function UnitDemandPage() {
 
                   {/* Search Input & Dropdown Trigger */}
                   <div className="relative group">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 group-focus-within:text-emerald-600 transition-colors pointer-events-none" />
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-emerald-600 transition-colors pointer-events-none" />
                     <input
                       type="text"
-                      placeholder={selectedInst ? `${selectedInst.institution_name} (Click to search...)` : "Search institution by name, ANO, or PIN..."}
+                      placeholder={selectedInst ? `${selectedInst.institution_name} (Click to search...)` : "Search institution..."}
                       value={instSearch}
                       onChange={(e) => {
                         setInstSearch(e.target.value);
                         if (!instDropdownOpen) setInstDropdownOpen(true);
                       }}
                       onFocus={() => setInstDropdownOpen(true)}
-                      className="w-full pl-10 pr-20 py-2.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 shadow-xs transition-all"
+                      className="w-full pl-8 pr-16 py-1.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 shadow-xs transition-all"
                     />
-                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                       {instSearch && (
                         <button
                           type="button"
                           onClick={() => setInstSearch('')}
-                          className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                          className="p-1 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                           title="Clear search"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-3 h-3" />
                         </button>
                       )}
                       <button
                         type="button"
                         onClick={() => setInstDropdownOpen(prev => !prev)}
-                        className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                        className="p-1 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                         title={instDropdownOpen ? "Close list" : "Open list"}
                       >
-                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${instDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${instDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
                       </button>
                     </div>
                   </div>
 
                   {/* Active Selected Institution Pill */}
                   {selectedInst && !instSearch && (
-                    <div className="mt-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
-                      <span className="font-extrabold text-emerald-900 truncate">
+                    <div className="mt-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-emerald-900 truncate">
                         {selectedInst.institution_name}
                       </span>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded ml-2 shrink-0">
+                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded ml-1.5 shrink-0">
                         ANO: {selectedInst.ano_cto_name || 'N/A'}
                       </span>
                     </div>
@@ -604,7 +604,7 @@ export default function UnitDemandPage() {
                   {instDropdownOpen && (
                     <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100 animate-fadeIn">
                       {filteredInstitutions.length === 0 ? (
-                        <div className="p-4 text-center text-xs font-semibold text-slate-400">
+                        <div className="p-3 text-center text-xs font-semibold text-slate-400">
                           No institutions found matching "{instSearch}"
                         </div>
                       ) : (
@@ -615,12 +615,12 @@ export default function UnitDemandPage() {
                               key={inst.id}
                               type="button"
                               onClick={() => selectInstitution(inst)}
-                              className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between gap-2 hover:bg-emerald-50/70 transition-colors cursor-pointer ${
+                              className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-emerald-50/70 transition-colors cursor-pointer ${
                                 isSelected ? 'bg-emerald-50/90 font-bold' : ''
                               }`}
                             >
                               <div className="min-w-0 flex-1">
-                                <div className="text-xs font-bold text-slate-900 truncate flex items-center gap-1.5">
+                                <div className="text-xs font-bold text-slate-900 truncate flex items-center gap-1">
                                   {inst.institution_name}
                                   {isSelected && (
                                     <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded">
@@ -628,7 +628,7 @@ export default function UnitDemandPage() {
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[10px] text-slate-500 truncate mt-0.5 flex items-center gap-2">
+                                <div className="text-[10px] text-slate-500 truncate mt-0.5 flex items-center gap-1.5">
                                   <span>ANO: {inst.ano_cto_name || 'N/A'}</span>
                                   <span>•</span>
                                   <span>PIN: {inst.pin_code || '110003'}</span>
@@ -645,41 +645,39 @@ export default function UnitDemandPage() {
                   )}
                 </div>
 
-
-
                 {/* =============================================================== */}
                 {/* COMMON FIELDS: DATE, TIME & VENUE */}
                 {/* =============================================================== */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-blue-600" />
                       Delivery Date (DD/MM/YYYY)
                     </label>
                     <CustomDateInput
                       value={demandDate}
                       onChange={setDemandDate}
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-800 text-sm shadow-xs"
+                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-blue-600" />
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-blue-600" />
                       Delivery Time (12-Hour)
                     </label>
                     <input
                       type="time"
                       value={demandTime}
                       onChange={e => setDemandTime(e.target.value)}
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-800 text-sm shadow-xs"
+                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-blue-600" />
                     Delivery Location / Venue
                   </label>
                   <input
@@ -687,22 +685,22 @@ export default function UnitDemandPage() {
                     required
                     value={venue}
                     onChange={e => setVenue(e.target.value)}
-                    placeholder="Enter exact battalion / institution delivery location"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 font-semibold text-slate-800 text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
+                    placeholder="Enter delivery location"
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
                   />
                 </div>
 
                 {/* Demand Type Toggle */}
                 <div>
-                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Demand Type
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setDemandPrefix('FIRST')}
-                      className={`py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all ${demandPrefix === 'FIRST'
-                          ? 'bg-emerald-600 text-white shadow-md'
+                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${demandPrefix === 'FIRST'
+                          ? 'bg-emerald-600 text-white shadow-xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                     >
@@ -711,8 +709,8 @@ export default function UnitDemandPage() {
                     <button
                       type="button"
                       onClick={() => setDemandPrefix('SECOND')}
-                      className={`py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all ${demandPrefix === 'SECOND'
-                          ? 'bg-emerald-600 text-white shadow-md'
+                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${demandPrefix === 'SECOND'
+                          ? 'bg-emerald-600 text-white shadow-xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                     >
@@ -723,29 +721,29 @@ export default function UnitDemandPage() {
 
                 {/* Cadet Attendance Steppers */}
                 <div>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                    <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                       Cadet Attendance Strength
                     </label>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-extrabold border border-slate-200">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold border border-slate-200">
                         <span>Total Auth: {(selectedInst?.strength_1st_year || 0) + (selectedInst?.strength_2nd_year || 0) + (selectedInst?.strength_3rd_year || 0)}</span>
                         <span className="text-slate-400">|</span>
-                        <span className="font-semibold text-slate-500">1st: {selectedInst?.strength_1st_year || 0}</span>
-                        <span className="font-semibold text-slate-500">2nd: {selectedInst?.strength_2nd_year || 0}</span>
+                        <span>1st: {selectedInst?.strength_1st_year || 0}</span>
+                        <span>2nd: {selectedInst?.strength_2nd_year || 0}</span>
                         {Number(selectedInst?.strength_3rd_year || 0) > 0 && (
-                          <span className="font-semibold text-slate-500">3rd: {selectedInst?.strength_3rd_year}</span>
+                          <span>3rd: {selectedInst?.strength_3rd_year}</span>
                         )}
                       </div>
-                      <span className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border shadow-inner ${instTotalQty > 0 ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${instTotalQty > 0 ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'
                         }`}>
-                        Total Demanded: {instTotalQty}
+                        Demanded: {instTotalQty}
                       </span>
                     </div>
                   </div>
-                  <div className={`grid grid-cols-1 ${Number(selectedInst?.strength_3rd_year || 0) > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
-                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
+                  <div className={`grid grid-cols-1 ${Number(selectedInst?.strength_3rd_year || 0) > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2.5`}>
+                    <div className="p-2.5 rounded-lg border border-slate-200 bg-white">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-0.5">
                         <span>1ST YEAR</span>
                         <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_1st_year || 50}</span>
                       </div>
@@ -756,12 +754,12 @@ export default function UnitDemandPage() {
                         value={year1}
                         onChange={e => setYear1(e.target.value)}
                         placeholder="0"
-                        className="w-full text-lg font-black text-slate-900 focus:outline-none"
+                        className="w-full text-base font-bold text-slate-900 focus:outline-none"
                       />
                     </div>
 
-                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
+                    <div className="p-2.5 rounded-lg border border-slate-200 bg-white">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-0.5">
                         <span>2ND YEAR</span>
                         <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_2nd_year || 50}</span>
                       </div>
@@ -772,13 +770,13 @@ export default function UnitDemandPage() {
                         value={year2}
                         onChange={e => setYear2(e.target.value)}
                         placeholder="0"
-                        className="w-full text-lg font-black text-slate-900 focus:outline-none"
+                        className="w-full text-base font-bold text-slate-900 focus:outline-none"
                       />
                     </div>
 
                     {Number(selectedInst?.strength_3rd_year || 0) > 0 && (
-                      <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
+                      <div className="p-2.5 rounded-lg border border-slate-200 bg-white">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-0.5">
                           <span>3RD YEAR</span>
                           <span className="text-slate-500 font-mono">Max: {selectedInst?.strength_3rd_year || 0}</span>
                         </div>
@@ -789,7 +787,7 @@ export default function UnitDemandPage() {
                           value={year3}
                           onChange={e => setYear3(e.target.value)}
                           placeholder="0"
-                          className="w-full text-lg font-black text-slate-900 focus:outline-none"
+                          className="w-full text-base font-bold text-slate-900 focus:outline-none"
                         />
                       </div>
                     )}
@@ -802,40 +800,38 @@ export default function UnitDemandPage() {
             {/* OPTION 2 CONTENT: DEMAND FOR UNIT (DIRECT WITH CUSTOM RATE) */}
             {/* =============================================================== */}
             {demandMode === 'UNIT_DIRECT' && (
-              <div className="space-y-6 animate-fadeIn">
-                {/* =============================================================== */}
+              <div className="space-y-3 animate-fadeIn">
                 {/* COMMON FIELDS: DATE, TIME & VENUE */}
-                {/* =============================================================== */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-blue-600" />
                       Delivery Date (DD/MM/YYYY)
                     </label>
                     <CustomDateInput
                       value={demandDate}
                       onChange={setDemandDate}
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-800 text-sm shadow-xs"
+                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-blue-600" />
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-blue-600" />
                       Delivery Time (12-Hour)
                     </label>
                     <input
                       type="time"
                       value={demandTime}
                       onChange={e => setDemandTime(e.target.value)}
-                      className="w-full py-2.5 px-3.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-800 text-sm shadow-xs"
+                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-blue-600" />
                     Delivery Location / Venue
                   </label>
                   <input
@@ -843,142 +839,106 @@ export default function UnitDemandPage() {
                     required
                     value={venue}
                     onChange={e => setVenue(e.target.value)}
-                    placeholder="Enter exact battalion / institution delivery location"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 font-semibold text-slate-800 text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
+                    placeholder="Enter delivery location"
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
                   />
                 </div>
 
                 {/* Packet Type Selection: Simple Clean Buttons */}
                 <div>
-                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Select Packet Type
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setPacketType('CUSTOMIZED')}
-                      className={`py-3 px-3.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all cursor-pointer ${packetType === 'CUSTOMIZED'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${packetType === 'CUSTOMIZED'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                           : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                         }`}
                     >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Customized Packet</span>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Customized</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setPacketType('REGULAR')}
-                      className={`py-3 px-3.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all cursor-pointer ${packetType === 'REGULAR'
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      className={`py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${packetType === 'REGULAR'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                           : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                         }`}
                     >
-                      <ShoppingBag className="w-4 h-4" />
-                      <span>Regular Packet (₹75)</span>
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      <span>Regular (₹75)</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Rate & Total Packets Inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Rate per packet */}
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">
+                  <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                        <IndianRupee className="w-3.5 h-3.5 text-blue-600" />
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                        <IndianRupee className="w-3 h-3 text-blue-600" />
                         Rate Per Packet (₹)
                       </label>
                       {packetType === 'REGULAR' && (
-                        <span className="text-[11px] font-bold text-slate-400">Locked @ ₹75</span>
+                        <span className="text-[10px] font-bold text-slate-400">Locked @ ₹75</span>
                       )}
                     </div>
 
                     {packetType === 'CUSTOMIZED' ? (
-                      <div>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-extrabold text-sm">
-                            ₹
-                          </span>
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="1"
-                            max="200"
-                            required
-                            value={customRate}
-                            onChange={e => setCustomRate(e.target.value)}
-                            placeholder="e.g. 50 or 60"
-                            className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-300 font-black text-slate-900 text-base focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                          />
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">Presets:</span>
-                          {['40', '45', '50', '55', '60', '65', '70'].map(p => (
-                            <button
-                              key={p}
-                              type="button"
-                              onClick={() => setCustomRate(p)}
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${customRate === p
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                                }`}
-                            >
-                              ₹{p}
-                            </button>
-                          ))}
-                        </div>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold text-xs">
+                          ₹
+                        </span>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="1"
+                          max="200"
+                          required
+                          value={customRate}
+                          onChange={e => setCustomRate(e.target.value)}
+                          placeholder="e.g. 50 or 60"
+                          className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-slate-300 font-bold text-slate-900 text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                        />
                       </div>
                     ) : (
-                      <div className="py-2.5 px-3 rounded-xl bg-slate-50 text-slate-800 font-black text-lg border border-slate-200">
+                      <div className="py-1.5 px-3 rounded-lg bg-slate-50 text-slate-800 font-bold text-sm border border-slate-200">
                         ₹75.00
                       </div>
                     )}
                   </div>
 
                   {/* Total Number of Packets */}
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">
+                  <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                        <Layers className="w-3.5 h-3.5 text-blue-600" />
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                        <Layers className="w-3 h-3 text-blue-600" />
                         Total No. of Packets
                       </label>
-                      <span className="text-[11px] font-bold text-blue-600">Direct Delivery</span>
+                      <span className="text-[10px] font-bold text-blue-600">Direct</span>
                     </div>
 
-                    <div>
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={totalPackets}
-                        onChange={e => setTotalPackets(e.target.value)}
-                        placeholder="e.g. 100 or 250"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 font-black text-slate-900 text-base focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                      />
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Quick Add:</span>
-                        {['50', '100', '150', '200', '300', '500'].map(cnt => (
-                          <button
-                            key={cnt}
-                            type="button"
-                            onClick={() => setTotalPackets(cnt)}
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${totalPackets === cnt
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                              }`}
-                          >
-                            {cnt}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={totalPackets}
+                      onChange={e => setTotalPackets(e.target.value)}
+                      placeholder="e.g. 100 or 250"
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-bold text-slate-900 text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                    />
                   </div>
                 </div>
 
                 {/* Purpose / Occasion */}
                 <div>
-                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Training Event / Occasion Purpose
                   </label>
                   <input
@@ -986,66 +946,64 @@ export default function UnitDemandPage() {
                     required
                     value={purpose}
                     onChange={e => setPurpose(e.target.value)}
-                    placeholder="e.g. Annual Training Camp (ATC), Cadre Shooting, Special Parade..."
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold text-slate-800 text-sm focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
+                    placeholder="e.g. ATC, Cadre, Special Parade..."
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs"
                   />
                 </div>
               </div>
             )}
 
-
-
             {/* =============================================================== */}
             {/* LIVE SUMMARY TOTAL BAR */}
             {/* =============================================================== */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-wrap items-center justify-between gap-3 shadow-md">
+            <div className="p-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-wrap items-center justify-between gap-2 shadow-sm">
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">
-                  Total Refreshment Requisition
+                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Total Requisition
                 </span>
-                <div className="flex items-baseline gap-2 mt-0.5">
-                  <span className="text-2xl sm:text-3xl font-black text-white">
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-xl font-bold text-white">
                     {demandMode === 'UNIT_DIRECT' ? unitPacketCount : instTotalQty}
                   </span>
-                  <span className="text-xs font-bold text-slate-300">Packets</span>
-                  <span className="text-slate-500 mx-1">•</span>
-                  <span className="text-xs font-semibold text-slate-300">
+                  <span className="text-xs font-semibold text-slate-300">Packets</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-[11px] text-slate-300">
                     @ ₹{(demandMode === 'UNIT_DIRECT' ? effectiveRate : 75).toFixed(2)}/pkt
                   </span>
                 </div>
               </div>
 
               <div className="text-right">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-400 block">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 block">
                   Total Amount
                 </span>
-                <div className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">
+                <div className="text-xl font-bold text-emerald-400 font-mono">
                   ₹{(demandMode === 'UNIT_DIRECT' ? unitTotalAmount : instTotalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-2 pt-1">
               <button
                 type="submit"
                 disabled={submitting}
-                className={`flex-1 py-3.5 px-6 rounded-xl font-extrabold text-white text-sm shadow-md transition-all duration-200 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 ${demandMode === 'UNIT_DIRECT'
-                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-600'
-                    : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-600'
+                className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-white text-xs shadow-sm transition-all duration-200 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${demandMode === 'UNIT_DIRECT'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
                   }`}
               >
                 {submitting ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    <span>Processing Demand Submission...</span>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    <span>Processing...</span>
                   </>
                 ) : (
                   <>
                     <span>
                       {demandMode === 'UNIT_DIRECT' ? 'PLACE UNIT DIRECT DEMAND' : 'PLACE INSTITUTION DEMAND'}
                     </span>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </>
                 )}
               </button>
@@ -1060,9 +1018,9 @@ export default function UnitDemandPage() {
                   setErrorMsg('');
                   setSuccessMsg('');
                 }}
-                className="py-3.5 px-5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-sm transition-all cursor-pointer flex items-center gap-1.5"
+                className="py-2.5 px-3.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-all cursor-pointer flex items-center gap-1"
               >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-3.5 h-3.5" />
                 <span>CLEAR</span>
               </button>
             </div>
