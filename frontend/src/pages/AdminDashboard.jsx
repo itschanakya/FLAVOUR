@@ -484,11 +484,11 @@ export default function AdminDashboard() {
                                 Unit Demand
                               </span>
                               <span className="text-slate-800 font-bold text-sm">
-                                {dem.unit_code || dem.unit_name || '—'}
+                                {dem.beneficiary_name || dem.unit_code || dem.unit_name || '—'}
                               </span>
                             </div>
                           ) : (
-                            dem.institution_name
+                            dem.beneficiary_name || dem.institution_name
                           )}
                         </td>
                         <td className="p-4 font-bold text-slate-700 text-xs">{formatDMY(dem.demand_date)}</td>

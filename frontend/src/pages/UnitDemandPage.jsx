@@ -1120,9 +1120,7 @@ export default function UnitDemandPage() {
                         </span>
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-slate-800 truncate max-w-[150px]">
-                        {d.demand_type === 'UNIT_DIRECT'
-                          ? (d.unit_code || d.unit_name || 'Unit HQ')
-                          : (d.institution_name || d.unit_name || 'Unit HQ')}
+                        {d.beneficiary_name || d.unit_code || d.unit_name || 'Unit HQ'}
                       </td>
                       <td className="py-2.5 px-3 text-slate-500">
                         {d.demand_date} • {d.demand_time || '08:00 AM'}

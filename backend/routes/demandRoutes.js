@@ -64,6 +64,7 @@ router.get('/', authenticateToken, async (req, res) => {
         COALESCE(i.complete_address, d.delivery_venue, u.location, 'Unit Battalion HQ') as complete_address,
         COALESCE(i.google_location, '') as google_location,
         u.unit_name, u.unit_code, u.ncc_group,
+        CASE WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name) ELSE COALESCE(i.institution_name, u.unit_name) END as beneficiary_name,
         usr.name as raised_by_name,
         rev.name as reviewed_by_name,
         (SELECT SUM(di.quantity * di.unit_price_snapshot) FROM demand_items di WHERE di.demand_id = d.id) as total_amount,
