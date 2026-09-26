@@ -477,7 +477,20 @@ export default function AdminDashboard() {
                       <tr key={dem.id} className="hover:bg-white/50 transition-colors">
                         <td className="p-4 font-mono font-bold text-blue-600">{dem.demand_number}</td>
                         <td className="p-4 text-slate-700 font-medium">{dem.unit_name}</td>
-                        <td className="p-4 font-semibold text-slate-900">{dem.institution_name}</td>
+                        <td className="p-4 font-semibold text-slate-900">
+                          {dem.demand_type === 'UNIT_DIRECT' ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="inline-flex w-fit items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-100 text-purple-800 uppercase tracking-wide">
+                                Unit Demand
+                              </span>
+                              <span className="text-slate-800 font-bold text-sm">
+                                {dem.unit_code || dem.unit_name || '—'}
+                              </span>
+                            </div>
+                          ) : (
+                            dem.institution_name
+                          )}
+                        </td>
                         <td className="p-4 font-bold text-slate-700 text-xs">{formatDMY(dem.demand_date)}</td>
                         <td className="p-4 font-bold text-emerald-600">₹{(dem.total_amount || 0).toLocaleString('en-IN')}</td>
                         <td className="p-4"><StatusBadge status={dem.status} /></td>
