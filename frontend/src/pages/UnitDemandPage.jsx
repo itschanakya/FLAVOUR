@@ -986,28 +986,28 @@ export default function UnitDemandPage() {
             {/* =============================================================== */}
             {/* LIVE SUMMARY TOTAL BAR */}
             {/* =============================================================== */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-wrap items-center justify-between gap-2 shadow-md">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-orange-50 via-amber-50 to-orange-100/80 border border-orange-200/90 flex flex-wrap items-center justify-between gap-2 shadow-xs">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-800/90 block">
                   Total Requisition
                 </span>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-2xl font-black text-white">
+                  <span className="text-2xl font-black text-slate-900">
                     {demandMode === 'UNIT_DIRECT' ? unitPacketCount : instTotalQty}
                   </span>
-                  <span className="text-xs font-semibold text-slate-300">Packets</span>
-                  <span className="text-slate-500">•</span>
-                  <span className="text-xs text-slate-300">
+                  <span className="text-xs font-bold text-slate-700">Packets</span>
+                  <span className="text-orange-400">•</span>
+                  <span className="text-xs font-semibold text-slate-600">
                     @ ₹{(demandMode === 'UNIT_DIRECT' ? effectiveRate : 75).toFixed(2)}/pkt
                   </span>
                 </div>
               </div>
 
               <div className="text-right">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-800/90 block">
                   Total Amount
                 </span>
-                <div className="text-2xl font-black text-emerald-400 font-mono">
+                <div className="text-2xl font-black text-emerald-600 font-mono">
                   ₹{(demandMode === 'UNIT_DIRECT' ? unitTotalAmount : instTotalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
