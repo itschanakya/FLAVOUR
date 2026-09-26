@@ -421,110 +421,97 @@ export default function InstitutionDashboard() {
   }
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-3 pb-6">
 
-      {/* 4 Summary Cards - Compact 2-Col on Mobile, 4-Col on Desktop */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+      {/* 4 Summary Cards - Ultra Compact Single Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         {/* Total Packets */}
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl shadow-indigo-500/20 text-white relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors"></div>
-          <div className="p-2 sm:p-3 bg-white/20 backdrop-blur-md rounded-xl sm:rounded-2xl w-fit mb-2 sm:mb-4">
-            <Coffee className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
-          </div>
+        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-2.5 sm:p-3 text-white shadow-xs flex items-center justify-between">
           <div>
-            <div className="text-[10px] sm:text-[11px] font-black tracking-widest text-indigo-100 uppercase mb-0.5 sm:mb-1">TOTAL PACKETS</div>
-            <div className="text-xl sm:text-3xl font-black">{(consumedQuota || 0).toLocaleString('en-IN')}</div>
+            <div className="text-[9px] font-black tracking-wider text-indigo-100 uppercase">TOTAL PACKETS</div>
+            <div className="text-lg sm:text-xl font-black mt-0.5">{(consumedQuota || 0).toLocaleString('en-IN')}</div>
+          </div>
+          <div className="p-2 bg-white/20 rounded-lg">
+            <Coffee className="w-4 h-4 text-white" />
           </div>
         </div>
 
         {/* Total Cost */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
-          <div className="p-2 sm:p-3 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl w-fit mb-2 sm:mb-4 group-hover:scale-110 transition-transform">
-            <IndianRupee className="w-4 h-4 sm:w-6 sm:h-6" />
-          </div>
+        <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
-            <div className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase mb-0.5 sm:mb-1">TOTAL COST</div>
-            <div className="text-xl sm:text-3xl font-black text-slate-800 truncate">₹{(totalCost || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+            <div className="text-[9px] font-black tracking-wider text-slate-400 uppercase">TOTAL COST</div>
+            <div className="text-lg sm:text-xl font-black text-slate-800 mt-0.5 font-mono">₹{(totalCost || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+          </div>
+          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+            <IndianRupee className="w-4 h-4" />
           </div>
         </div>
 
         {/* Total Entries */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
-          <div className="p-2 sm:p-3 bg-amber-50 text-amber-500 rounded-xl sm:rounded-2xl w-fit mb-2 sm:mb-4 group-hover:scale-110 transition-transform">
-            <History className="w-4 h-4 sm:w-6 sm:h-6" />
-          </div>
+        <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
-            <div className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase mb-0.5 sm:mb-1">TOTAL ENTRIES</div>
-            <div className="text-xl sm:text-3xl font-black text-slate-800">{recentDemands.length}</div>
+            <div className="text-[9px] font-black tracking-wider text-slate-400 uppercase">TOTAL ENTRIES</div>
+            <div className="text-lg sm:text-xl font-black text-slate-800 mt-0.5">{recentDemands.length}</div>
+          </div>
+          <div className="p-2 bg-amber-50 text-amber-500 rounded-lg">
+            <History className="w-4 h-4" />
           </div>
         </div>
 
         {/* Institution Profile */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl shadow-slate-200/40 border border-slate-100 flex flex-col justify-between group hover:scale-[1.02] transition-transform duration-300">
-          <div>
-            <div className="text-[10px] sm:text-[11px] font-black tracking-widest text-fuchsia-500 uppercase mb-1">PROFILE</div>
-            <div className="font-bold text-slate-800 text-xs sm:text-base leading-tight truncate">{instDetails?.institution_name || 'Loading...'}</div>
-            <div className="text-[10px] sm:text-xs font-semibold text-slate-500 truncate mt-0.5">{instDetails?.ano_cto_name || 'Loading...'}</div>
-          </div>
-          <div className="flex justify-between items-end mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-slate-100">
-            <div className="text-center">
-              <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">1st</div>
-              <div className="text-xs sm:text-sm font-black text-slate-700">{instDetails?.strength_1st_year || 0}</div>
+        <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="text-[9px] font-black tracking-wider text-fuchsia-500 uppercase">PROFILE</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500">
+              <span>1st: <strong className="text-slate-700">{instDetails?.strength_1st_year || 0}</strong></span>
+              <span>2nd: <strong className="text-slate-700">{instDetails?.strength_2nd_year || 0}</strong></span>
+              {s3 > 0 && <span>3rd: <strong className="text-slate-700">{instDetails?.strength_3rd_year || 0}</strong></span>}
             </div>
-            <div className="text-center">
-              <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">2nd</div>
-              <div className="text-xs sm:text-sm font-black text-slate-700">{instDetails?.strength_2nd_year || 0}</div>
-            </div>
-            {s3 > 0 && (
-              <div className="text-center">
-                <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">3rd</div>
-                <div className="text-xs sm:text-sm font-black text-slate-700">{instDetails?.strength_3rd_year || 0}</div>
-              </div>
-            )}
           </div>
+          <div className="font-bold text-slate-800 text-xs truncate mt-0.5">{instDetails?.institution_name || 'Loading...'}</div>
         </div>
       </div>
 
       {/* Main Grid: Form (Left) & Table (Right) */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 sm:gap-8 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-start">
         
-        {/* LEFT COLUMN: NEW ENTRY FORM */}
-        <div className="xl:col-span-4 bg-white rounded-2xl sm:rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 p-4 sm:p-6 md:p-8">
-          <div className="flex items-center gap-3 mb-6 sm:mb-8">
-            <div className="w-2.5 h-6 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
-            <h2 className="text-sm sm:text-base font-black tracking-widest text-slate-900 uppercase">NEW DEMAND ENTRY</h2>
+        {/* LEFT COLUMN: COMPACT NEW ENTRY FORM */}
+        <div className="xl:col-span-4 bg-white rounded-xl border border-slate-200/80 shadow-sm p-3 sm:p-4">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
+            <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">NEW DEMAND ENTRY</h2>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-2.5">
             {/* Institution Search */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">INSTITUTION</label>
+              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">INSTITUTION</label>
               <div className="relative group">
-                <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" />
                 <input 
                   type="text" 
                   value={instDetails?.institution_name || user?.name || ''}
                   readOnly
-                  className="w-full pl-11 pr-4 py-3.5 bg-slate-50/50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none transition-all"
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50/70 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none"
                 />
               </div>
             </div>
 
             {/* Demand Prefix */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">DEMAND TYPE</label>
-              <div className="flex gap-3">
+              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">DEMAND TYPE</label>
+              <div className="flex gap-2">
                 <button 
                   type="button"
                   onClick={() => handlePrefixChange('FIRST')}
-                  className={`flex-1 py-3.5 text-xs font-black rounded-2xl border-2 transition-all duration-300 ${demandPrefix === 'FIRST' ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-600/30 hover:bg-indigo-700' : 'bg-white text-slate-500 border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}
+                  className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all ${demandPrefix === 'FIRST' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                 >
                   FIRST DEMAND
                 </button>
                 <button 
                   type="button"
                   onClick={() => handlePrefixChange('SECOND')}
-                  className={`flex-1 py-3.5 text-xs font-black rounded-2xl border-2 transition-all duration-300 ${demandPrefix === 'SECOND' ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-600/30 hover:bg-indigo-700' : 'bg-white text-slate-500 border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}
+                  className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all ${demandPrefix === 'SECOND' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                 >
                   SECOND DEMAND
                 </button>
@@ -532,11 +519,11 @@ export default function InstitutionDashboard() {
             </div>
 
             {/* Date & Time (Strict DD/MM/YYYY) */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest">DATE</label>
-                  <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">DD/MM/YYYY</span>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">DATE</label>
+                  <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded">DD/MM/YYYY</span>
                 </div>
                 <CustomDateInput 
                   value={demandDate}
@@ -544,42 +531,42 @@ export default function InstitutionDashboard() {
                 />
               </div>
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest">TIME</label>
-                  <span className="text-[10px] font-bold text-slate-400">12-Hour</span>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">TIME</label>
+                  <span className="text-[9px] font-bold text-slate-400">12-Hour</span>
                 </div>
                 <div className="relative group">
-                  <Clock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+                  <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
                   <input 
                     type="time" 
                     value={demandTime}
                     onChange={(e) => setDemandTime(e.target.value)}
-                    className="w-full pl-10 pr-3 py-3 bg-white border-2 border-slate-100 rounded-2xl text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-500 transition-all hover:border-slate-200 tracking-wider"
+                    className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Quota Box */}
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200/60 space-y-3">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-500">Sanctioned Strength</span>
-                <span className="font-black text-slate-800">{totalSanctioned} Cadets</span>
+            {/* Quota Strip - Compact 3-col info */}
+            <div className="bg-slate-50 rounded-lg p-2 border border-slate-200/80 grid grid-cols-3 gap-1 text-center">
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase">Sanctioned</span>
+                <span className="text-xs font-black text-slate-800">{totalSanctioned}</span>
               </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-500">Auth Quota (25 Org)</span>
-                <span className="font-black text-slate-800">{annualQuota.toLocaleString()} Pkts</span>
+              <div className="border-x border-slate-200">
+                <span className="block text-[9px] font-bold text-slate-400 uppercase">Auth Quota</span>
+                <span className="text-xs font-black text-slate-800">{annualQuota.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200">
-                <span className="font-bold text-slate-500">Consumed / Remaining</span>
-                <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">{consumedQuota.toLocaleString()} / {remainingQuota.toLocaleString()}</span>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase">Consumed / Rem</span>
+                <span className="text-xs font-black text-indigo-600 font-mono">{consumedQuota.toLocaleString()} / {remainingQuota.toLocaleString()}</span>
               </div>
             </div>
 
             {/* Year Inputs */}
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest">CADET ATTENDANCE STRENGTH</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">CADET ATTENDANCE</label>
                 <button
                   type="button"
                   onClick={() => {
@@ -588,17 +575,17 @@ export default function InstitutionDashboard() {
                     setYear3(s3 > 0 ? s3 : 0);
                     setTotalDemanded(s1 + s2 + (s3 > 0 ? s3 : 0));
                   }}
-                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1"
+                  className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded transition-colors inline-flex items-center gap-1"
                   title="Auto-fill quantities directly from sanctioned cadet vacancy"
                 >
-                  <RefreshCw className="w-3 h-3" /> Fetch From Vacancy
+                  <RefreshCw className="w-2.5 h-2.5" /> Fill Vacancy
                 </button>
               </div>
-              <div className={`grid ${s3 > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
-                <div className="bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100 focus-within:border-indigo-500 transition-all">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">1ST YEAR</label>
-                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Vac: {s1}</span>
+              <div className={`grid ${s3 > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
+                <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-[9px] font-black text-slate-500">1ST YR</label>
+                    <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {s1}</span>
                   </div>
                   <input 
                     type="number" 
@@ -610,14 +597,14 @@ export default function InstitutionDashboard() {
                       setYear1(val);
                       setTotalDemanded((parseInt(val) || 0) + (parseInt(year2) || 0) + (s3 > 0 ? (parseInt(year3) || 0) : 0));
                     }}
-                    className="w-full px-2 py-2 bg-white border-2 border-slate-100 rounded-xl text-base font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500 transition-all"
+                    className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
-                <div className="bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100 focus-within:border-indigo-500 transition-all">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">2ND YEAR</label>
-                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Vac: {s2}</span>
+                <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-[9px] font-black text-slate-500">2ND YR</label>
+                    <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {s2}</span>
                   </div>
                   <input 
                     type="number" 
@@ -629,15 +616,15 @@ export default function InstitutionDashboard() {
                       setYear2(val);
                       setTotalDemanded((parseInt(year1) || 0) + (parseInt(val) || 0) + (s3 > 0 ? (parseInt(year3) || 0) : 0));
                     }}
-                    className="w-full px-2 py-2 bg-white border-2 border-slate-100 rounded-xl text-base font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500 transition-all"
+                    className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 {s3 > 0 && (
-                  <div className="bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100 focus-within:border-indigo-500 transition-all">
-                    <div className="flex justify-between items-center mb-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">3RD YEAR</label>
-                      <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Vac: {s3}</span>
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                    <div className="flex justify-between items-center mb-0.5">
+                      <label className="text-[9px] font-black text-slate-500">3RD YR</label>
+                      <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {s3}</span>
                     </div>
                     <input 
                       type="number" 
@@ -649,97 +636,92 @@ export default function InstitutionDashboard() {
                         setYear3(val);
                         setTotalDemanded((parseInt(year1) || 0) + (parseInt(year2) || 0) + (parseInt(val) || 0));
                       }}
-                      className="w-full px-2 py-2 bg-white border-2 border-slate-100 rounded-xl text-base font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500 transition-all"
+                      className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Live Demand Summary: Compact single-row layout */}
-            <div className="bg-gradient-to-br from-slate-50 to-indigo-50/60 rounded-2xl p-3 sm:p-3.5 border border-indigo-100/90 shadow-2xs space-y-2">
-              <div className="grid grid-cols-12 items-center gap-2">
+            {/* Live Demand Summary: Ultra Compact single-row */}
+            <div className="bg-gradient-to-br from-indigo-50/70 to-purple-50/50 rounded-lg p-2 border border-indigo-100/90 shadow-2xs">
+              <div className="grid grid-cols-12 items-center gap-1.5">
                 {/* 1. TOTAL QTY */}
                 <div className="col-span-4">
-                  <label className="block text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 truncate">
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate">
                     TOTAL QTY
                   </label>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <input 
                       type="number" 
                       min="0" 
                       max={totalSanctioned}
                       value={totalDemanded}
                       onChange={(e) => handleTotalDemandedChange(e.target.value)}
-                      className="w-18 sm:w-20 px-2 py-1 bg-white border-2 border-indigo-400 focus:border-indigo-600 rounded-xl text-lg sm:text-xl font-black text-indigo-700 text-center focus:outline-none shadow-2xs transition-all"
+                      className="w-14 px-1 py-0.5 bg-white border border-indigo-400 focus:border-indigo-600 rounded-md text-sm font-black text-indigo-700 text-center focus:outline-none"
                       title="Edit total demanded packets directly"
                     />
-                    <span className="text-xs font-bold text-slate-500">Pkts</span>
+                    <span className="text-[10px] font-bold text-slate-500">Pkts</span>
                   </div>
                 </div>
 
                 {/* 2. TOTAL AMOUNT */}
-                <div className="col-span-4 border-l border-slate-200 pl-2 sm:pl-3">
-                  <label className="block text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 truncate">
+                <div className="col-span-4 border-l border-indigo-100 pl-1.5">
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate">
                     TOTAL AMOUNT
                   </label>
-                  <div className="text-sm sm:text-base font-black text-emerald-600 truncate">
+                  <div className="text-xs sm:text-sm font-black text-emerald-600 truncate font-mono">
                     ₹{demandTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
 
-                {/* 3. PER PKT AMOUNT INCLUDING GST */}
-                <div className="col-span-4 border-l border-slate-200 pl-2 sm:pl-3 text-right">
-                  <label className="block text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5 truncate" title="Per Packet Amount Including GST">
-                    PER PKT AMOUNT
+                {/* 3. PER PKT AMOUNT */}
+                <div className="col-span-4 border-l border-indigo-100 pl-1.5 text-right">
+                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate" title="Per Packet Amount Including GST">
+                    PER PKT
                   </label>
-                  <div className="text-sm sm:text-base font-black text-slate-800">
+                  <div className="text-xs font-black text-slate-800 font-mono">
                     ₹{perPacketPrice.toFixed(2)}
                   </div>
-                  <span className="text-[8px] sm:text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 inline-block tracking-tight">
+                  <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 inline-block">
                     INCL. GST
                   </span>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60 text-[10px] text-slate-400 font-medium">
-                <span>Editable directly or via year strengths</span>
-                <span>Max: <strong className="text-slate-600 font-bold">{totalSanctioned}</strong></span>
               </div>
             </div>
 
             {/* Training Venue */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
                 TRAINING VENUE (COMPLETE ADDRESS)
               </label>
               <div className="relative group">
-                <MapPin className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" />
+                <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" />
                 <input 
                   type="text" 
                   value={venue}
                   onChange={(e) => setVenue(e.target.value)}
-                  placeholder="Enter complete address of institution..."
-                  className="w-full pl-11 pr-4 py-3.5 bg-white border-2 border-slate-100 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 transition-all hover:border-slate-200"
+                  placeholder="Enter complete address..."
+                  className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
 
-            {error && <div className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 p-4 rounded-2xl">{error}</div>}
+            {error && <div className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-100 p-2 rounded-lg">{error}</div>}
 
             {/* Buttons */}
-            <div className="flex gap-4 pt-4">
+            <div className="flex gap-2 pt-1">
               <button 
                 type="submit"
                 disabled={submitting}
-                className="flex-1 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-600/30 transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0"
+                className="flex-1 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-sm transition-all disabled:opacity-70"
               >
                 {submitting ? 'Placing...' : 'PLACE DEMAND'}
               </button>
               <button 
                 type="button"
                 onClick={handleClear}
-                className="px-6 py-4 bg-white border-2 border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-black uppercase tracking-wider transition-all"
               >
                 CLEAR
               </button>
@@ -748,21 +730,21 @@ export default function InstitutionDashboard() {
         </div>
 
         {/* RIGHT COLUMN: REFRESHMENT DEMAND HISTORY */}
-        <div className="xl:col-span-8 bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col h-full">
-          <div className="p-8 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/30">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-50 rounded-xl">
-                <History className="w-5 h-5 text-indigo-600" />
+        <div className="xl:col-span-8 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col h-full">
+          <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-indigo-50 rounded-lg">
+                <History className="w-4 h-4 text-indigo-600" />
               </div>
-              <h2 className="text-base font-black tracking-widest text-slate-900 uppercase">DEMAND HISTORY</h2>
+              <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">DEMAND HISTORY</h2>
             </div>
-            <div className="flex gap-3">
-              <button onClick={() => fetchData()} className="flex items-center gap-2 px-6 py-2.5 bg-white border-2 border-slate-100 hover:border-indigo-100 hover:bg-indigo-50 text-indigo-600 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-sm">
-                <RefreshCw className="w-3.5 h-3.5" />
+            <div className="flex gap-2">
+              <button onClick={() => fetchData()} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-100 hover:bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold transition-all shadow-xs">
+                <RefreshCw className="w-3 h-3" />
                 SYNC
               </button>
-              <button className="p-2.5 bg-white border-2 border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition-all shadow-sm">
-                <Printer className="w-4 h-4" />
+              <button className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition-all shadow-xs">
+                <Printer className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
