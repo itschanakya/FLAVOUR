@@ -421,10 +421,10 @@ export default function InstitutionDashboard() {
   }
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-4 flex flex-col min-h-[calc(100vh-6.5rem)]">
 
       {/* 4 Summary Cards - Ultra Compact Single Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 shrink-0">
         {/* Total Packets */}
         <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-2.5 sm:p-3 text-white shadow-xs flex items-center justify-between">
           <div>
@@ -472,256 +472,258 @@ export default function InstitutionDashboard() {
         </div>
       </div>
 
-      {/* Main Grid: Form (Left) & Table (Right) */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-start">
+      {/* Main Grid: Form (Left) & Table (Right) - Full Viewport Vertical Justification */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-stretch flex-1">
         
         {/* LEFT COLUMN: COMPACT NEW ENTRY FORM */}
-        <div className="xl:col-span-4 bg-white rounded-xl border border-slate-200/80 shadow-sm p-3 sm:p-4">
-          <div className="flex items-center gap-2 mb-2.5">
+        <div className="xl:col-span-4 bg-white rounded-xl border border-slate-200/80 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between h-full">
+          <div className="flex items-center gap-2 mb-2 shrink-0">
             <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
             <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">NEW DEMAND ENTRY</h2>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-2.5">
-            {/* Institution Search */}
-            <div>
-              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">INSTITUTION</label>
-              <div className="relative group">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" />
-                <input 
-                  type="text" 
-                  value={instDetails?.institution_name || user?.name || ''}
-                  readOnly
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50/70 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Demand Prefix */}
-            <div>
-              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">DEMAND TYPE</label>
-              <div className="flex gap-2">
-                <button 
-                  type="button"
-                  onClick={() => handlePrefixChange('FIRST')}
-                  className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all ${demandPrefix === 'FIRST' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                >
-                  FIRST DEMAND
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => handlePrefixChange('SECOND')}
-                  className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all ${demandPrefix === 'SECOND' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                >
-                  SECOND DEMAND
-                </button>
-              </div>
-            </div>
-
-            {/* Date & Time (Strict DD/MM/YYYY) */}
-            <div className="grid grid-cols-2 gap-2">
+          <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between gap-2.5">
+            <div className="flex-1 flex flex-col justify-between gap-2">
+              {/* Institution Search */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">DATE</label>
-                  <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded">DD/MM/YYYY</span>
-                </div>
-                <CustomDateInput 
-                  value={demandDate}
-                  onChange={(isoVal) => setDemandDate(isoVal)}
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">TIME</label>
-                  <span className="text-[9px] font-bold text-slate-400">12-Hour</span>
-                </div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">INSTITUTION</label>
                 <div className="relative group">
-                  <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" />
                   <input 
-                    type="time" 
-                    value={demandTime}
-                    onChange={(e) => setDemandTime(e.target.value)}
-                    className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                    type="text" 
+                    value={instDetails?.institution_name || user?.name || ''}
+                    readOnly
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50/70 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none"
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Quota Strip - Compact 3-col info */}
-            <div className="bg-slate-50 rounded-lg p-2 border border-slate-200/80 grid grid-cols-3 gap-1 text-center">
+              {/* Demand Prefix */}
               <div>
-                <span className="block text-[9px] font-bold text-slate-400 uppercase">Sanctioned</span>
-                <span className="text-xs font-black text-slate-800">{totalSanctioned}</span>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">DEMAND TYPE</label>
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => handlePrefixChange('FIRST')}
+                    className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all ${demandPrefix === 'FIRST' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                  >
+                    FIRST DEMAND
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => handlePrefixChange('SECOND')}
+                    className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all ${demandPrefix === 'SECOND' ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                  >
+                    SECOND DEMAND
+                  </button>
+                </div>
               </div>
-              <div className="border-x border-slate-200">
-                <span className="block text-[9px] font-bold text-slate-400 uppercase">Auth Quota</span>
-                <span className="text-xs font-black text-slate-800">{annualQuota.toLocaleString()}</span>
+
+              {/* Date & Time (Strict DD/MM/YYYY) */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">DATE</label>
+                    <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded">DD/MM/YYYY</span>
+                  </div>
+                  <CustomDateInput 
+                    value={demandDate}
+                    onChange={(isoVal) => setDemandDate(isoVal)}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">TIME</label>
+                    <span className="text-[9px] font-bold text-slate-400">12-Hour</span>
+                  </div>
+                  <div className="relative group">
+                    <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+                    <input 
+                      type="time" 
+                      value={demandTime}
+                      onChange={(e) => setDemandTime(e.target.value)}
+                      className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
               </div>
+
+              {/* Quota Strip - Compact 3-col info */}
+              <div className="bg-slate-50 rounded-lg p-2 border border-slate-200/80 grid grid-cols-3 gap-1 text-center">
+                <div>
+                  <span className="block text-[9px] font-bold text-slate-400 uppercase">Sanctioned</span>
+                  <span className="text-xs font-black text-slate-800">{totalSanctioned}</span>
+                </div>
+                <div className="border-x border-slate-200">
+                  <span className="block text-[9px] font-bold text-slate-400 uppercase">Auth Quota</span>
+                  <span className="text-xs font-black text-slate-800">{annualQuota.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] font-bold text-slate-400 uppercase">Consumed / Rem</span>
+                  <span className="text-xs font-black text-indigo-600 font-mono">{consumedQuota.toLocaleString()} / {remainingQuota.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Year Inputs */}
               <div>
-                <span className="block text-[9px] font-bold text-slate-400 uppercase">Consumed / Rem</span>
-                <span className="text-xs font-black text-indigo-600 font-mono">{consumedQuota.toLocaleString()} / {remainingQuota.toLocaleString()}</span>
-              </div>
-            </div>
-
-            {/* Year Inputs */}
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">CADET ATTENDANCE</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setYear1(s1);
-                    setYear2(s2);
-                    setYear3(s3 > 0 ? s3 : 0);
-                    setTotalDemanded(s1 + s2 + (s3 > 0 ? s3 : 0));
-                  }}
-                  className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded transition-colors inline-flex items-center gap-1"
-                  title="Auto-fill quantities directly from sanctioned cadet vacancy"
-                >
-                  <RefreshCw className="w-2.5 h-2.5" /> Fill Vacancy
-                </button>
-              </div>
-              <div className={`grid ${s3 > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
-                <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
-                  <div className="flex justify-between items-center mb-0.5">
-                    <label className="text-[9px] font-black text-slate-500">1ST YR</label>
-                    <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {s1}</span>
-                  </div>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    max={s1}
-                    value={year1}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setYear1(val);
-                      setTotalDemanded((parseInt(val) || 0) + (parseInt(year2) || 0) + (s3 > 0 ? (parseInt(year3) || 0) : 0));
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">CADET ATTENDANCE</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setYear1(s1);
+                      setYear2(s2);
+                      setYear3(s3 > 0 ? s3 : 0);
+                      setTotalDemanded(s1 + s2 + (s3 > 0 ? s3 : 0));
                     }}
-                    className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
-                  />
+                    className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded transition-colors inline-flex items-center gap-1"
+                    title="Auto-fill quantities directly from sanctioned cadet vacancy"
+                  >
+                    <RefreshCw className="w-2.5 h-2.5" /> Fill Vacancy
+                  </button>
                 </div>
-
-                <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
-                  <div className="flex justify-between items-center mb-0.5">
-                    <label className="text-[9px] font-black text-slate-500">2ND YR</label>
-                    <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {s2}</span>
-                  </div>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    max={s2}
-                    value={year2}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setYear2(val);
-                      setTotalDemanded((parseInt(year1) || 0) + (parseInt(val) || 0) + (s3 > 0 ? (parseInt(year3) || 0) : 0));
-                    }}
-                    className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                {s3 > 0 && (
+                <div className={`grid ${s3 > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
                   <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
                     <div className="flex justify-between items-center mb-0.5">
-                      <label className="text-[9px] font-black text-slate-500">3RD YR</label>
-                      <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {s3}</span>
+                      <label className="text-[9px] font-black text-slate-500">1ST YR</label>
+                      <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {s1}</span>
                     </div>
                     <input 
                       type="number" 
                       min="0" 
-                      max={s3}
-                      value={year3}
+                      max={s1}
+                      value={year1}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setYear3(val);
-                        setTotalDemanded((parseInt(year1) || 0) + (parseInt(year2) || 0) + (parseInt(val) || 0));
+                        setYear1(val);
+                        setTotalDemanded((parseInt(val) || 0) + (parseInt(year2) || 0) + (s3 > 0 ? (parseInt(year3) || 0) : 0));
                       }}
                       className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
                     />
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* Live Demand Summary: Ultra Compact single-row */}
-            <div className="bg-gradient-to-br from-indigo-50/70 to-purple-50/50 rounded-lg p-2 border border-indigo-100/90 shadow-2xs">
-              <div className="grid grid-cols-12 items-center gap-1.5">
-                {/* 1. TOTAL QTY */}
-                <div className="col-span-4">
-                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate">
-                    TOTAL QTY
-                  </label>
-                  <div className="flex items-center gap-1">
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                    <div className="flex justify-between items-center mb-0.5">
+                      <label className="text-[9px] font-black text-slate-500">2ND YR</label>
+                      <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {s2}</span>
+                    </div>
                     <input 
                       type="number" 
                       min="0" 
-                      max={totalSanctioned}
-                      value={totalDemanded}
-                      onChange={(e) => handleTotalDemandedChange(e.target.value)}
-                      className="w-14 px-1 py-0.5 bg-white border border-indigo-400 focus:border-indigo-600 rounded-md text-sm font-black text-indigo-700 text-center focus:outline-none"
-                      title="Edit total demanded packets directly"
+                      max={s2}
+                      value={year2}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setYear2(val);
+                        setTotalDemanded((parseInt(year1) || 0) + (parseInt(val) || 0) + (s3 > 0 ? (parseInt(year3) || 0) : 0));
+                      }}
+                      className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
                     />
-                    <span className="text-[10px] font-bold text-slate-500">Pkts</span>
+                  </div>
+
+                  {s3 > 0 && (
+                    <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-[9px] font-black text-slate-500">3RD YR</label>
+                        <span className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 rounded">Vac: {s3}</span>
+                      </div>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        max={s3}
+                        value={year3}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setYear3(val);
+                          setTotalDemanded((parseInt(year1) || 0) + (parseInt(year2) || 0) + (parseInt(val) || 0));
+                        }}
+                        className="w-full px-1 py-1 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Live Demand Summary: Ultra Compact single-row */}
+              <div className="bg-gradient-to-br from-indigo-50/70 to-purple-50/50 rounded-lg p-2 border border-indigo-100/90 shadow-2xs">
+                <div className="grid grid-cols-12 items-center gap-1.5">
+                  {/* 1. TOTAL QTY */}
+                  <div className="col-span-4">
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate">
+                      TOTAL QTY
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input 
+                        type="number" 
+                        min="0" 
+                        max={totalSanctioned}
+                        value={totalDemanded}
+                        onChange={(e) => handleTotalDemandedChange(e.target.value)}
+                        className="w-14 px-1 py-0.5 bg-white border border-indigo-400 focus:border-indigo-600 rounded-md text-sm font-black text-indigo-700 text-center focus:outline-none"
+                        title="Edit total demanded packets directly"
+                      />
+                      <span className="text-[10px] font-bold text-slate-500">Pkts</span>
+                    </div>
+                  </div>
+
+                  {/* 2. TOTAL AMOUNT */}
+                  <div className="col-span-4 border-l border-indigo-100 pl-1.5">
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate">
+                      TOTAL AMOUNT
+                    </label>
+                    <div className="text-xs sm:text-sm font-black text-emerald-600 truncate font-mono">
+                      ₹{demandTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  {/* 3. PER PKT AMOUNT */}
+                  <div className="col-span-4 border-l border-indigo-100 pl-1.5 text-right">
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate" title="Per Packet Amount Including GST">
+                      PER PKT
+                    </label>
+                    <div className="text-xs font-black text-slate-800 font-mono">
+                      ₹{perPacketPrice.toFixed(2)}
+                    </div>
+                    <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 inline-block">
+                      INCL. GST
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                {/* 2. TOTAL AMOUNT */}
-                <div className="col-span-4 border-l border-indigo-100 pl-1.5">
-                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate">
-                    TOTAL AMOUNT
-                  </label>
-                  <div className="text-xs sm:text-sm font-black text-emerald-600 truncate font-mono">
-                    ₹{demandTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                </div>
-
-                {/* 3. PER PKT AMOUNT */}
-                <div className="col-span-4 border-l border-indigo-100 pl-1.5 text-right">
-                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider mb-0.5 truncate" title="Per Packet Amount Including GST">
-                    PER PKT
-                  </label>
-                  <div className="text-xs font-black text-slate-800 font-mono">
-                    ₹{perPacketPrice.toFixed(2)}
-                  </div>
-                  <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 inline-block">
-                    INCL. GST
-                  </span>
+              {/* Training Venue */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
+                  TRAINING VENUE (COMPLETE ADDRESS)
+                </label>
+                <div className="relative group">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" />
+                  <input 
+                    type="text" 
+                    value={venue}
+                    onChange={(e) => setVenue(e.target.value)}
+                    placeholder="Enter complete address..."
+                    className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Training Venue */}
-            <div>
-              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
-                TRAINING VENUE (COMPLETE ADDRESS)
-              </label>
-              <div className="relative group">
-                <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" />
-                <input 
-                  type="text" 
-                  value={venue}
-                  onChange={(e) => setVenue(e.target.value)}
-                  placeholder="Enter complete address..."
-                  className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            {error && <div className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-100 p-2 rounded-lg">{error}</div>}
+            {error && <div className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-100 p-2 rounded-lg shrink-0">{error}</div>}
 
             {/* Buttons */}
-            <div className="flex gap-2 pt-1">
+            <div className="flex gap-2 pt-2 shrink-0">
               <button 
                 type="submit"
                 disabled={submitting}
-                className="flex-1 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-sm transition-all disabled:opacity-70"
+                className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-sm transition-all disabled:opacity-70 cursor-pointer"
               >
                 {submitting ? 'Placing...' : 'PLACE DEMAND'}
               </button>
               <button 
                 type="button"
                 onClick={handleClear}
-                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-black uppercase tracking-wider transition-all"
+                className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
               >
                 CLEAR
               </button>
@@ -730,8 +732,8 @@ export default function InstitutionDashboard() {
         </div>
 
         {/* RIGHT COLUMN: REFRESHMENT DEMAND HISTORY */}
-        <div className="xl:col-span-8 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+        <div className="xl:col-span-8 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col h-full min-h-[520px]">
+          <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 shrink-0">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-indigo-50 rounded-lg">
                 <History className="w-4 h-4 text-indigo-600" />
@@ -739,18 +741,18 @@ export default function InstitutionDashboard() {
               <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">DEMAND HISTORY</h2>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => fetchData()} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-100 hover:bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold transition-all shadow-xs">
+              <button onClick={() => fetchData()} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-100 hover:bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer">
                 <RefreshCw className="w-3 h-3" />
                 SYNC
               </button>
-              <button className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition-all shadow-xs">
+              <button className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition-all shadow-xs cursor-pointer">
                 <Printer className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto flex-1 p-4">
-            <table className="w-full text-left text-sm border-separate border-spacing-y-2">
+          <div className="overflow-x-auto flex-1 p-3 flex flex-col">
+            <table className="w-full text-left text-sm border-separate border-spacing-y-2 flex-1">
               <thead>
                 <tr>
                   <th className="pl-6 pr-2 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">
@@ -771,7 +773,12 @@ export default function InstitutionDashboard() {
               <tbody>
                 {recentDemands.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="p-12 text-center text-slate-400 font-bold bg-slate-50/50 rounded-2xl">No demands found.</td>
+                    <td colSpan="11" className="py-28 text-center text-slate-400 font-bold bg-slate-50/50 rounded-2xl">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <History className="w-8 h-8 text-slate-300 stroke-[1.5]" />
+                        <span className="text-sm font-semibold text-slate-400">No demands found.</span>
+                      </div>
+                    </td>
                   </tr>
                 ) : (
                   recentDemands.map((dem, idx) => (
