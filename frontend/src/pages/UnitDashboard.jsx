@@ -21,7 +21,7 @@ export default function UnitDashboard() {
   const [demands, setDemands] = useState([]);
   const [institutionsCount, setInstitutionsCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [chartView, setChartView] = useState('weekly'); // 'weekly' | 'monthly'
+  const [chartView, setChartView] = useState('institute'); // 'institute' | 'weekly' | 'monthly'
 
   const fetchUnitData = useCallback(async () => {
     if (!token) return;
@@ -138,6 +138,46 @@ export default function UnitDashboard() {
     };
   }, [demands]);
 
+  // Institute-Wise Demand Breakdown Data
+  const instituteChartData = useMemo(() => {
+    const instMap = {};
+    demands.forEach(d => {
+      const isUnit = d.demand_type === 'UNIT_DIRECT';
+      const name = isUnit 
+        ? `${d.unit_code || d.unit_name || 'Unit HQ'} (Direct Unit Demand)` 
+        : (d.institution_name || 'Affiliated Institution');
+
+      if (!instMap[name]) {
+        instMap[name] = {
+          name,
+          packets: 0,
+          amount: 0,
+          count: 0,
+          deliveredPackets: 0,
+          approvedPackets: 0,
+          isUnitDirect: isUnit,
+          latestDate: d.demand_date || ''
+        };
+      }
+      const qty = Number(d.total_quantity || d.quantity) || 0;
+      const amt = Number(d.total_amount) || 0;
+      instMap[name].packets += qty;
+      instMap[name].amount += amt;
+      instMap[name].count += 1;
+      if (d.status === 'DELIVERED' || d.status === 'FULFILLED') {
+        instMap[name].deliveredPackets += qty;
+      } else {
+        instMap[name].approvedPackets += qty;
+      }
+    });
+
+    const sorted = Object.values(instMap).sort((a, b) => b.packets - a.packets);
+    return sorted.map(item => ({
+      ...item,
+      label: item.name.length > 20 ? item.name.slice(0, 18) + '…' : item.name
+    }));
+  }, [demands]);
+
   // Weekly Trend Chart Data
   const weeklyChartData = useMemo(() => {
     const dayMap = {};
@@ -194,6 +234,13 @@ export default function UnitDashboard() {
       };
     });
   }, [demands]);
+
+  // Active chart dataset
+  const activeChartData = useMemo(() => {
+    if (chartView === 'institute') return instituteChartData;
+    if (chartView === 'weekly') return weeklyChartData;
+    return monthlyChartData;
+  }, [chartView, instituteChartData, weeklyChartData, monthlyChartData]);
 
   // Pie Chart: Institution vs Unit Direct
   const categoryChartData = useMemo(() => {
@@ -355,25 +402,43 @@ export default function UnitDashboard() {
       {/* ANALYTICS CHARTS SECTION: WEEKLY & MONTHLY TRENDS + CATEGORY SHARE */}
       {/* =================================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Main Chart (Left 2 cols): Trend Analysis */}
+        {/* Main Chart (Left 2 cols): Trend & Institution Analysis */}
         <div className="lg:col-span-2 glass-card p-4 sm:p-6 border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-blue-600" />
-                Demand Volume & Expenditure Trend
+                {chartView === 'institute' 
+                  ? 'Institute-Wise Demand Breakdown' 
+                  : 'Demand Volume & Expenditure Trend'}
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {chartView === 'weekly' ? 'Daily/Weekly breakdown of packets demanded' : 'Monthly aggregated demand volume and expenditure'}
+                {chartView === 'institute' 
+                  ? 'Total refreshment packets and expenditure demanded by each institution' 
+                  : chartView === 'weekly' 
+                    ? 'Daily/Weekly breakdown of packets demanded' 
+                    : 'Monthly aggregated demand volume and expenditure'}
               </p>
             </div>
 
-            {/* Weekly vs Monthly Toggle */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-auto">
+            {/* View Selector: Institute Wise / Weekly / Monthly */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-auto overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setChartView('institute')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  chartView === 'institute' 
+                    ? 'bg-blue-600 text-white shadow-xs' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <School className="w-3.5 h-3.5" />
+                Institute Wise
+              </button>
               <button
                 type="button"
                 onClick={() => setChartView('weekly')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   chartView === 'weekly' 
                     ? 'bg-white text-blue-700 shadow-xs' 
                     : 'text-slate-600 hover:text-slate-900'
@@ -384,7 +449,7 @@ export default function UnitDashboard() {
               <button
                 type="button"
                 onClick={() => setChartView('monthly')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   chartView === 'monthly' 
                     ? 'bg-white text-blue-700 shadow-xs' 
                     : 'text-slate-600 hover:text-slate-900'
@@ -397,22 +462,25 @@ export default function UnitDashboard() {
 
           {/* Chart Canvas */}
           <div className="h-72 w-full pt-2">
-            {(chartView === 'weekly' ? weeklyChartData : monthlyChartData).length === 0 ? (
+            {activeChartData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-xs text-slate-400 font-semibold">
                 No demand records available to plot trends.
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={chartView === 'weekly' ? weeklyChartData : monthlyChartData}
-                  margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                  data={activeChartData}
+                  margin={{ top: 10, right: 10, left: -10, bottom: 25 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis 
                     dataKey="label" 
-                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
+                    tick={{ fill: '#475569', fontSize: 10, fontWeight: 700 }} 
                     axisLine={{ stroke: '#cbd5e1' }}
                     tickLine={false}
+                    interval={0}
+                    angle={chartView === 'institute' ? -15 : 0}
+                    textAnchor={chartView === 'institute' ? 'end' : 'middle'}
                   />
                   <YAxis 
                     tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
@@ -420,21 +488,42 @@ export default function UnitDashboard() {
                     tickLine={false}
                   />
                   <Tooltip
-                    content={({ active, payload, label }) => {
+                    content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs space-y-1 border border-slate-700 font-sans">
-                            <p className="font-bold text-slate-300 border-b border-slate-700 pb-1">{label}</p>
-                            <p className="text-cyan-400 font-black text-sm">
-                              📦 {data.packets} Packets
+                          <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs space-y-1.5 border border-slate-700 font-sans max-w-xs">
+                            <p className="font-bold text-white border-b border-slate-700 pb-1 leading-snug">
+                              {data.name || data.label}
                             </p>
-                            <p className="text-emerald-400 font-black font-mono">
-                              ₹{Number(data.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                            </p>
-                            <p className="text-[10px] text-slate-400">
-                              {data.count} demand requisition(s)
-                            </p>
+                            {chartView === 'institute' && (
+                              <div className="flex items-center gap-2">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  data.isUnitDirect ? 'bg-purple-900/80 text-purple-300 border border-purple-700' : 'bg-blue-900/80 text-blue-300 border border-blue-700'
+                                }`}>
+                                  {data.isUnitDirect ? 'Unit Direct Demand' : 'Institution Demand'}
+                                </span>
+                              </div>
+                            )}
+                            <div className="pt-0.5 space-y-1">
+                              <p className="text-cyan-400 font-black text-sm flex items-center justify-between">
+                                <span>Total Packets:</span>
+                                <span>{data.packets} Pkts</span>
+                              </p>
+                              <p className="text-emerald-400 font-black font-mono flex items-center justify-between">
+                                <span>Total Value:</span>
+                                <span>₹{Number(data.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                              </p>
+                              {chartView === 'institute' && (
+                                <div className="pt-1 border-t border-slate-800 text-[10px] text-slate-300 flex items-center justify-between">
+                                  <span>Delivered: <strong className="text-emerald-400">{data.deliveredPackets || 0}</strong></span>
+                                  <span>In Progress: <strong className="text-amber-400">{(data.packets - (data.deliveredPackets || 0))}</strong></span>
+                                </div>
+                              )}
+                              <p className="text-[10px] text-slate-400 pt-0.5">
+                                {data.count} demand requisition(s)
+                              </p>
+                            </div>
                           </div>
                         );
                       }
@@ -443,10 +532,19 @@ export default function UnitDashboard() {
                   />
                   <Bar 
                     dataKey="packets" 
-                    fill="#3b82f6" 
                     radius={[6, 6, 0, 0]} 
                     name="Packets Demanded"
-                  />
+                  >
+                    {activeChartData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={chartView === 'institute' 
+                          ? (entry.isUnitDirect ? '#8b5cf6' : '#2563eb')
+                          : '#3b82f6'
+                        } 
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -547,6 +645,144 @@ export default function UnitDashboard() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* =================================================================== */}
+      {/* INSTITUTE-WISE DEMAND BREAKDOWN LEDGER TABLE */}
+      {/* =================================================================== */}
+      <div className="glass-card border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <School className="w-4 h-4 text-blue-600" />
+              Institute-Wise Demand Ledger
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Consolidated demand requisition totals, packet distribution, and fulfillment status per institution
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+            <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-bold">
+              {instituteChartData.length} Beneficiaries Active
+            </span>
+            <Link
+              to="/my-demands"
+              className="px-3 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold flex items-center gap-1 transition-all shadow-xs"
+            >
+              <span>View All Demands</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-extrabold uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-4">Institution / Beneficiary</th>
+                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4 text-center">Requisitions</th>
+                <th className="py-3 px-4">Packets Demanded</th>
+                <th className="py-3 px-4">Fulfillment Progress</th>
+                <th className="py-3 px-4 text-right">Total Expenditure</th>
+                <th className="py-3 px-4 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {instituteChartData.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
+                    No demands recorded for this unit yet.
+                  </td>
+                </tr>
+              ) : (
+                instituteChartData.map((inst, idx) => {
+                  const fulfillmentRate = inst.packets > 0 
+                    ? Math.round((inst.deliveredPackets / inst.packets) * 100) 
+                    : 0;
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-slate-900 text-sm">{inst.name}</div>
+                        {inst.latestDate && (
+                          <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3" />
+                            Latest: {inst.latestDate}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {inst.isUnitDirect ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">
+                            UNIT DIRECT
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200">
+                            INSTITUTION
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 font-black text-slate-800">
+                          {inst.count} {inst.count === 1 ? 'Req' : 'Reqs'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-black text-slate-900 text-sm">
+                          {inst.packets.toLocaleString('en-IN')} <span className="text-xs font-semibold text-slate-500">Pkts</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {inst.deliveredPackets} Del • {inst.packets - inst.deliveredPackets} Pipeline
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 min-w-[140px]">
+                        <div className="flex items-center justify-between text-[11px] font-bold mb-1">
+                          <span className="text-slate-600">{fulfillmentRate}%</span>
+                          <span className="text-slate-400 text-[10px]">{inst.deliveredPackets}/{inst.packets} pkts</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/60">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              fulfillmentRate === 100 
+                                ? 'bg-emerald-500' 
+                                : fulfillmentRate > 0 
+                                  ? 'bg-blue-600' 
+                                  : 'bg-amber-400'
+                            }`}
+                            style={{ width: `${fulfillmentRate}%` }}
+                          />
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <span className="font-black text-emerald-600 font-mono text-sm">
+                          ₹{inst.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        {fulfillmentRate === 100 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Fulfilled
+                          </span>
+                        ) : inst.approvedPackets > 0 || inst.deliveredPackets > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                            <RefreshCw className="w-3 h-3 text-blue-600" />
+                            In Progress
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                            <AlertCircle className="w-3 h-3 text-amber-600" />
+                            Pending Review
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
