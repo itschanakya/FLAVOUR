@@ -61,7 +61,7 @@ router.get('/', authenticateToken, async (req, res) => {
       SELECT d.*, 
         COALESCE(i.institution_name, CONCAT(u.unit_name, ' (Direct Unit Demand)')) as institution_name,
         COALESCE(i.ano_cto_name, CONCAT(usr.name, ' (Unit HQ)')) as ano_cto_name,
-        COALESCE(i.complete_address, d.delivery_venue, u.location, 'Unit Battalion HQ') as complete_address,
+        COALESCE(i.complete_address, CASE WHEN d.delivery_venue IS NOT NULL AND d.delivery_venue NOT GLOB '[0-9]*' AND LENGTH(d.delivery_venue) > 3 THEN d.delivery_venue ELSE NULL END, u.location, u.unit_name, 'Unit Battalion HQ') as complete_address,
         COALESCE(i.google_location, '') as google_location,
         u.unit_name, u.unit_code, u.ncc_group,
         CASE WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name) ELSE COALESCE(i.institution_name, u.unit_name) END as beneficiary_name,

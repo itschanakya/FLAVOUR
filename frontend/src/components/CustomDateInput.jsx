@@ -105,16 +105,12 @@ export default function CustomDateInput({
     }
   };
 
+  const defaultInputClass = compact 
+    ? "w-full bg-slate-50 border border-slate-200 rounded-lg px-2 pr-7 py-1 text-xs text-slate-800 font-semibold text-center outline-none focus:border-blue-500 focus:bg-white transition-all tracking-normal"
+    : "w-full pl-3 pr-8 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 shadow-xs transition-all";
+
   return (
     <div className={`relative group w-full ${compact ? 'min-w-[110px]' : ''}`}>
-      {/* Left Calendar Icon (hidden in compact table mode) */}
-      {!compact && (
-        <Calendar
-          onClick={openCalendar}
-          className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors cursor-pointer"
-        />
-      )}
-
       {/* Visible Input formatted strictly as DD/MM/YYYY */}
       <input
         id={id}
@@ -125,10 +121,7 @@ export default function CustomDateInput({
         onBlur={handleBlur}
         placeholder="DD/MM/YYYY"
         maxLength={10}
-        className={compact 
-          ? `w-full bg-slate-50 border border-slate-200 rounded-lg px-2 pr-7 py-1 text-xs text-slate-800 font-semibold text-center outline-none focus:border-blue-500 focus:bg-white transition-all tracking-normal ${className}`
-          : `w-full pl-10 pr-10 py-3 bg-white border-2 border-slate-100 rounded-2xl text-xs font-black text-slate-800 tracking-wider focus:outline-none focus:border-indigo-500 transition-all hover:border-slate-200 ${className}`
-        }
+        className={className || defaultInputClass}
       />
 
       {/* Right Calendar Picker Trigger Button */}
@@ -137,11 +130,11 @@ export default function CustomDateInput({
         onClick={openCalendar}
         className={compact 
           ? "absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
-          : "absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors"
+          : "absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
         }
         title="Open Calendar Picker"
       >
-        <Calendar className={compact ? "w-3.5 h-3.5" : "w-3.5 h-3.5"} />
+        <Calendar className="w-3.5 h-3.5" />
       </button>
 
       {/* Hidden Native Date Input for Picker GUI */}

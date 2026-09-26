@@ -16,6 +16,7 @@ import {
   ArrowRight,
   RotateCcw,
   FileCheck,
+  FileText,
   Shield,
   Layers,
   Search,
@@ -533,8 +534,8 @@ export default function UnitDemandPage() {
       {/* Main Grid: Form (Left) & Table (Right) - Full Viewport Vertical Justification Identical to ANO Dashboard */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-stretch flex-1">
         {/* LEFT COLUMN: COMPACT NEW DEMAND ENTRY FORM */}
-        <div className="xl:col-span-4 bg-white rounded-xl border border-slate-200/80 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between h-full">
-          <div className="flex items-center justify-between mb-2 shrink-0">
+        <div className="xl:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 sm:p-5 flex flex-col justify-between h-full min-h-[700px]">
+          <div className="flex items-center justify-between mb-3 shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
               <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">NEW DEMAND ENTRY</h2>
@@ -684,7 +685,7 @@ export default function UnitDemandPage() {
                     <CustomDateInput
                       value={demandDate}
                       onChange={setDemandDate}
-                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
+                      className="w-full py-1.5 pl-3 pr-8 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                     />
                   </div>
 
@@ -697,7 +698,7 @@ export default function UnitDemandPage() {
                       type="time"
                       value={demandTime}
                       onChange={e => setDemandTime(e.target.value)}
-                      className="w-full py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs"
+                      className="w-full py-1.5 px-3 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800 text-xs shadow-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -1055,7 +1056,7 @@ export default function UnitDemandPage() {
         </div>
 
         {/* RIGHT COLUMN: DEMAND HISTORY TABLE */}
-        <div className="xl:col-span-8 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
+        <div className="xl:col-span-9 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
           <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
@@ -1097,16 +1098,19 @@ export default function UnitDemandPage() {
               <table className="w-full text-left text-sm border-separate border-spacing-y-2">
                 <thead>
                   <tr>
-                    <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">NO</th>
-                    <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">DATE &amp; TIME</th>
-                    <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">TYPE</th>
-                    <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">BENEFICIARY</th>
-                    <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">VENUE</th>
-                    <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">STATUS</th>
-                    <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest text-center">PKTS</th>
-                    <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">RATE</th>
-                    <th className="px-3 py-3 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">COST</th>
-                    <th className="pr-4 pl-2 py-3 text-center font-black text-slate-400 text-[10px] uppercase tracking-widest">ACTION</th>
+                    <th className="pl-4 pr-2 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">
+                      <input type="checkbox" className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
+                    </th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">NO</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">DATE &amp; TIME</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">TYPE</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">BENEFICIARY</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">VENUE</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">STATUS</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-center">PKTS</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">RATE</th>
+                    <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">COST</th>
+                    <th className="pr-4 pl-2 py-4 text-center font-black text-slate-400 text-[10px] uppercase tracking-widest">DOCUMENTS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1116,31 +1120,36 @@ export default function UnitDemandPage() {
                       onClick={() => setSelectedDemand(d)}
                       className="group hover:bg-indigo-50/30 transition-colors cursor-pointer bg-slate-50/40 rounded-xl"
                     >
-                      <td className="px-3 py-3 font-bold text-slate-500 text-xs rounded-l-xl">
+                      <td className="pl-4 pr-2 py-4 rounded-l-xl" onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 transition-colors" />
+                      </td>
+                      <td className="px-3 py-4 font-bold text-slate-500 text-xs">
                         #{idx + 1}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-4">
                         <div className="font-black text-slate-800 tracking-tight text-xs">{d.demand_date}</div>
                         <div className="text-[10px] font-bold text-slate-400 mt-0.5 tracking-wider">{d.demand_time || '08:00 AM'}</div>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-4">
                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold inline-block ${
                           d.demand_type === 'UNIT_DIRECT' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
                         }`}>
                           {d.demand_type === 'UNIT_DIRECT' ? 'UNIT DIRECT' : 'INSTITUTE'}
                         </span>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-4">
                         <div className="font-bold text-slate-800 uppercase text-xs truncate max-w-[160px]">
                           {d.demand_type === 'UNIT_DIRECT' ? (d.unit_code || d.unit_name || 'UNIT HQ') : (d.institution_name || 'INSTITUTION')}
                         </div>
                       </td>
-                      <td className="px-3 py-3">
-                        <div className="font-medium text-slate-700 text-xs truncate max-w-[180px]" title={d.complete_address}>
-                          {d.complete_address || d.delivery_location || d.venue || '—'}
+                      <td className="px-3 py-4">
+                        <div className="font-medium text-slate-700 text-xs truncate max-w-[180px]" title={d.complete_address || d.unit_name}>
+                          {d.complete_address && !/^\d+$/.test(d.complete_address.trim())
+                            ? d.complete_address 
+                            : (d.unit_name ? `${d.unit_name} HQ` : 'Unit Battalion HQ')}
                         </div>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-4">
                         <span className={`px-2 py-1 text-[10px] font-bold rounded-lg border ${
                           d.status === 'APPROVED' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                           d.status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-200' :
@@ -1151,29 +1160,64 @@ export default function UnitDemandPage() {
                           {d.status}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-center font-black text-slate-800 text-xs">
-                        {d.total_quantity || d.quantity || 0}
+                      <td className="px-3 py-4 text-center">
+                        <span className="font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg inline-block text-xs">
+                          {d.total_quantity || d.quantity || 0}
+                        </span>
                       </td>
-                      <td className="px-3 py-3 text-right font-mono text-slate-600 text-xs">
+                      <td className="px-3 py-4 text-right font-mono text-slate-600 text-xs">
                         ₹{d.custom_unit_rate ? Number(d.custom_unit_rate).toFixed(2) : (d.avg_unit_price ? Number(d.avg_unit_price).toFixed(2) : '75.00')}
                       </td>
-                      <td className="px-3 py-3 text-right font-black text-emerald-600 font-mono text-xs">
+                      <td className="px-3 py-4 text-right font-black text-emerald-600 font-mono text-xs">
                         ₹{Number(d.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="pr-4 pl-2 py-3 text-center rounded-r-xl" onClick={e => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDemand(d)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-all cursor-pointer shadow-2xs"
-                        >
-                          <Eye className="w-3 h-3 text-indigo-600" />
-                          <span>View</span>
-                        </button>
+                      <td className="pr-4 pl-2 py-4 text-center rounded-r-xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          {d.delivery_receipt_url ? (
+                            <a
+                              href={d.delivery_receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-all shadow-xs"
+                              title="View Signed Delivery Receipt"
+                            >
+                              <FileText className="w-3 h-3 text-emerald-600" /> Receipt
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200">
+                              Receipt (Pending)
+                            </span>
+                          )}
+
+                          {d.invoice_url ? (
+                            <a
+                              href={d.invoice_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition-all shadow-xs"
+                              title="View Bill / Invoice"
+                            >
+                              <FileCheck className="w-3 h-3 text-indigo-600" /> Bill
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200">
+                              Bill (Pending)
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDemand(d)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all shadow-xs cursor-pointer"
+                            title="View Demand Details & Verification"
+                          >
+                            <Eye className="w-3 h-3 text-blue-600" /> View Details
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-
               </table>
             )}
           </div>

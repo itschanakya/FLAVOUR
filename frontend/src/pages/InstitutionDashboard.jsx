@@ -468,7 +468,21 @@ export default function InstitutionDashboard() {
               {s3 > 0 && <span>3rd: <strong className="text-slate-700">{instDetails?.strength_3rd_year || 0}</strong></span>}
             </div>
           </div>
-          <div className="font-bold text-slate-800 text-xs truncate mt-0.5">{instDetails?.institution_name || 'Loading...'}</div>
+          <div className="mt-0.5 flex flex-col gap-0.5 min-w-0">
+            <div className="font-extrabold text-slate-900 text-xs truncate" title={instDetails?.institution_name}>
+              {instDetails?.institution_name || 'Loading...'}
+            </div>
+            <div className="text-[10px] font-bold text-indigo-600 truncate flex items-center gap-1">
+              <span className="bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded text-[9px] text-indigo-700 font-black">
+                ANO: {instDetails?.ano_cto_name || user?.name || 'N/A'}
+              </span>
+              {(instDetails?.contact_number || instDetails?.ano_mobile || instDetails?.phone) && (
+                <span className="text-[9px] text-slate-400 font-medium">
+                  • {instDetails?.contact_number || instDetails?.ano_mobile || instDetails?.phone}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -476,7 +490,7 @@ export default function InstitutionDashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-stretch flex-1">
         
         {/* LEFT COLUMN: COMPACT NEW ENTRY FORM */}
-        <div className="xl:col-span-4 bg-white rounded-xl border border-slate-200/80 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between h-full">
+        <div className="xl:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 sm:p-5 flex flex-col justify-between h-full min-h-[700px]">
           <div className="flex items-center gap-2 mb-2 shrink-0">
             <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
             <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">NEW DEMAND ENTRY</h2>
@@ -732,7 +746,7 @@ export default function InstitutionDashboard() {
         </div>
 
         {/* RIGHT COLUMN: REFRESHMENT DEMAND HISTORY */}
-        <div className="xl:col-span-8 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col h-full min-h-[520px]">
+        <div className="xl:col-span-9 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col h-full min-h-[520px]">
           <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 shrink-0">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-indigo-50 rounded-lg">
@@ -751,8 +765,8 @@ export default function InstitutionDashboard() {
             </div>
           </div>
 
-          <div className="overflow-x-auto flex-1 p-3 flex flex-col">
-            <table className="w-full text-left text-sm border-separate border-spacing-y-2 flex-1">
+          <div className="overflow-x-auto p-3">
+            <table className="w-full text-left text-sm border-separate border-spacing-y-2">
               <thead>
                 <tr>
                   <th className="pl-6 pr-2 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">
