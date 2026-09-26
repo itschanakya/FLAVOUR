@@ -529,8 +529,8 @@ export default function UnitDemandPage() {
 
       {/* Main Content: Form (Left 40%) & Recent Demands (Right 60%) Side-by-Side */}
       <div className="flex flex-col lg:flex-row gap-5 items-start w-full">
-        {/* Main Form Container - Exactly 40% */}
-        <div className="w-full lg:w-[40%] shrink-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm space-y-4">
+        {/* Main Form Container - Exactly 36% */}
+        <div className="w-full lg:w-[36%] shrink-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* =============================================================== */}
@@ -1070,7 +1070,7 @@ export default function UnitDemandPage() {
         </div>
 
         {/* Recent Demands Placed in this Jurisdiction (Right 60% Side-by-Side) */}
-        <div className="w-full lg:w-[60%] flex-1 min-w-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm space-y-3">
+        <div className="w-full lg:w-[56%] flex-1 min-w-0 glass-card p-4 sm:p-5 border-slate-200 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
