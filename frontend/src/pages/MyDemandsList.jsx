@@ -200,19 +200,18 @@ export default function MyDemandsList() {
               <tr>
                 <th className="p-4">Demand Ref</th>
                 <th className="p-4">Demand Date</th>
-                <th className="p-4">Purpose</th>
+                <th className="p-4">Venue</th>
                 <th className="p-4">Total Items</th>
                 <th className="p-4">Rate/Pkt</th>
                 <th className="p-4">Grand Total</th>
                 <th className="p-4">Status</th>
                 <th className="p-4 text-center">Proofs / Bills</th>
-                <th className="p-4 text-right">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredDemands.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="p-8 text-center text-slate-500 font-medium">
+                  <td colSpan="8" className="p-8 text-center text-slate-500 font-medium">
                     {demands.length === 0 ? 'No demands placed yet.' : 'No demands match the selected slicer / filter.'}
                   </td>
                 </tr>
@@ -221,7 +220,11 @@ export default function MyDemandsList() {
                   <tr key={dem.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-4 font-mono font-bold text-blue-600">{dem.demand_number}</td>
                     <td className="p-4 text-slate-700">{formatDMY(dem.demand_date)}</td>
-                    <td className="p-4 text-slate-800 font-medium">{dem.purpose}</td>
+                    <td className="p-4 text-slate-800 font-medium max-w-xs truncate" title={dem.complete_address || dem.purpose}>
+                      {dem.complete_address && !/^\d+$/.test(dem.complete_address.trim())
+                        ? dem.complete_address 
+                        : (dem.purpose || 'Venue HQ')}
+                    </td>
                     <td className="p-4 text-slate-700">{dem.total_quantity || 0} items</td>
                     <td className="p-4 text-slate-700 font-medium">₹{dem.total_quantity ? (dem.total_amount / dem.total_quantity).toFixed(2) : '0.00'}</td>
                     <td className="p-4 font-bold text-emerald-600">₹{(dem.total_amount || 0).toLocaleString('en-IN')}</td>
@@ -277,14 +280,6 @@ export default function MyDemandsList() {
                           </span>
                         )}
                       </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <button
-                        onClick={() => setSelectedDemand(dem)}
-                        className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold inline-flex items-center gap-1.5 border border-blue-200 transition-all shadow-2xs"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-blue-600" /> View Details
-                      </button>
                     </td>
                   </tr>
                 ))
