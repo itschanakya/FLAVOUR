@@ -130,6 +130,7 @@ export default function UnitDemandPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [recentUnitDemands, setRecentUnitDemands] = useState([]);
   const [loadingDemands, setLoadingDemands] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedDemand, setSelectedDemand] = useState(null);
 
   const getNextDate = (dayName) => {
@@ -178,10 +179,13 @@ export default function UnitDemandPage() {
       .catch(err => console.error('Error fetching institutions:', err));
   }, [token]);
 
-  // Fetch Recent Unit Demands
-  const fetchRecentDemands = useCallback(async () => {
+  // Fetch Recent Unit Demands (silent in background unless initial empty load)
+  const fetchRecentDemands = useCallback(async (showFullLoader = false) => {
     if (!token) return;
-    setLoadingDemands(true);
+    if (showFullLoader) {
+      setLoadingDemands(true);
+    }
+    setIsSyncing(true);
     try {
       const res = await fetch('/api/demands?unit_id=' + (user?.unit_id || ''), {
         headers: { Authorization: `Bearer ${token}` }
@@ -194,19 +198,38 @@ export default function UnitDemandPage() {
       console.error(err);
     } finally {
       setLoadingDemands(false);
+      setIsSyncing(false);
     }
   }, [token, user?.unit_id]);
 
   useEffect(() => {
-    fetchRecentDemands();
+    fetchRecentDemands(true);
   }, [fetchRecentDemands]);
 
-  // Real-time updates
+  // Real-time updates — in-place update + silent background fetch (ZERO flicker)
   useEffect(() => {
     if (events?.DEMAND_UPDATED) {
-      fetchRecentDemands();
+      const update = events.DEMAND_UPDATED;
+      // 1. Immediately patch the matching record in-place if it exists
+      setRecentUnitDemands(prev =>
+        prev.map(d => {
+          if (String(d.id) === String(update.id)) {
+            return {
+              ...d,
+              ...(update.status ? { status: update.status } : {}),
+              ...(update.delivery_status ? { delivery_status: update.delivery_status } : {}),
+              ...(update.delivery_mode ? { delivery_mode: update.delivery_mode } : {}),
+              ...(update.dispatched_at ? { dispatched_at: update.dispatched_at } : {}),
+              ...(update.delivered_at ? { delivered_at: update.delivered_at } : {})
+            };
+          }
+          return d;
+        })
+      );
+      // 2. Refresh data silently in background without unmounting the table
+      fetchRecentDemands(false);
     }
-  }, [events, fetchRecentDemands]);
+  }, [events?.DEMAND_UPDATED, fetchRecentDemands]);
 
   // Keep selected demand synchronized with recent demands if one is already open
   useEffect(() => {
@@ -412,7 +435,29 @@ export default function UnitDemandPage() {
         if (!res.ok) throw new Error(data.error || 'Failed to submit unit demand');
 
         setSuccessMsg(`Demand ${data.demand_number} placed successfully! Packets: ${unitPacketCount} @ ₹${effectiveRate.toFixed(2)} (Total: ₹${unitTotalAmount.toLocaleString('en-IN')}).`);
-        fetchRecentDemands();
+        
+        // Optimistically show newly created demand in Demand History immediately
+        const newDemandItem = {
+          id: data.demand_id,
+          demand_number: data.demand_number,
+          demand_date: demandDate,
+          demand_time: demandTime,
+          demand_type: 'UNIT_DIRECT',
+          packet_type: packetType,
+          custom_unit_rate: effectiveRate,
+          total_quantity: unitPacketCount,
+          total_amount: unitTotalAmount,
+          purpose: purpose.trim(),
+          delivery_venue: venue.trim() || (user?.unit_name ? `${user.unit_name} HQ` : 'Battalion HQ'),
+          unit_code: user?.unit_code || 'UNIT HQ',
+          unit_name: user?.unit_name || 'Unit Battalion',
+          ano_cto_name: 'UNIT ADM',
+          status: 'APPROVED',
+          delivery_status: 'PENDING',
+          created_at: new Date().toISOString()
+        };
+        setRecentUnitDemands(prev => [newDemandItem, ...prev.filter(d => d.id !== data.demand_id)]);
+        fetchRecentDemands(false);
       } else {
         // Institutional on-behalf
         if (!selectedInstId) {
@@ -457,7 +502,29 @@ export default function UnitDemandPage() {
         if (!res.ok) throw new Error(data.error || 'Failed to place demand on behalf of institution');
 
         setSuccessMsg(`Institutional Demand ${data.demand_number} raised on behalf of ${selectedInst?.institution_name} and approved! Total: ${instTotalQty} Pkts (₹${instTotalAmount.toLocaleString('en-IN')}).`);
-        fetchRecentDemands();
+        
+        // Optimistically show newly created institutional demand in Demand History immediately
+        const newInstDemandItem = {
+          id: data.demand_id,
+          demand_number: data.demand_number,
+          demand_date: demandDate,
+          demand_time: demandTime,
+          demand_type: 'INSTITUTION',
+          institution_id: selectedInstId,
+          institution_name: selectedInst?.institution_name || 'INSTITUTION',
+          ano_cto_name: selectedInst?.ano_cto_name || 'UNIT ADM',
+          complete_address: venue.trim() || selectedInst?.complete_address,
+          total_quantity: instTotalQty,
+          total_amount: instTotalAmount,
+          custom_unit_rate: 75,
+          avg_unit_price: 75,
+          purpose: `${demandPrefix} DEMAND - Institutional Parade on behalf by Unit HQ`,
+          status: 'APPROVED',
+          delivery_status: 'PENDING',
+          created_at: new Date().toISOString()
+        };
+        setRecentUnitDemands(prev => [newInstDemandItem, ...prev.filter(d => d.id !== data.demand_id)]);
+        fetchRecentDemands(false);
       }
     } catch (err) {
       setErrorMsg(err.message);
@@ -1072,11 +1139,12 @@ export default function UnitDemandPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => fetchRecentDemands()}
+                onClick={() => fetchRecentDemands(false)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-100 hover:bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                title="Sync recent demands"
               >
-                <RefreshCw className={`w-3 h-3 ${loadingDemands ? 'animate-spin' : ''}`} />
-                SYNC
+                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'SYNCING...' : 'SYNC'}</span>
               </button>
               <button
                 type="button"
@@ -1089,8 +1157,11 @@ export default function UnitDemandPage() {
           </div>
 
           <div className="overflow-x-auto p-3">
-            {loadingDemands ? (
-              <div className="py-12 text-center text-xs text-slate-400 font-semibold">Loading recent records...</div>
+            {loadingDemands && recentUnitDemands.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400 font-semibold flex items-center justify-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin text-indigo-500" />
+                <span>Loading recent records...</span>
+              </div>
             ) : recentUnitDemands.length === 0 ? (
               <div className="py-16 text-center text-slate-400 font-bold">
                 <div className="flex flex-col items-center justify-center gap-2">
