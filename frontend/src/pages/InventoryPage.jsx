@@ -32,7 +32,9 @@ import {
   PackageCheck,
   Zap,
   ArrowRight,
-  Search
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 export const getItemPhoto = (itemName, customImageUrl) => {
@@ -751,12 +753,75 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const getTodayDateStr = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const todayStr = getTodayDateStr();
+  const [selectedStockDate, setSelectedStockDate] = useState(getTodayDateStr);
+
+  const shiftStockDate = (dateStr, days) => {
+    try {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const date = new Date(y, m - 1, d + days);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const handlePrevStockDay = () => {
+    const prevDate = shiftStockDate(selectedStockDate, -1);
+    setSelectedStockDate(prevDate);
+    fetchCatalog(prevDate);
+  };
+
+  const handleNextStockDay = () => {
+    const nextDate = shiftStockDate(selectedStockDate, 1);
+    setSelectedStockDate(nextDate);
+    fetchCatalog(nextDate);
+  };
+
+  const handleStockDateChange = (newDateStr) => {
+    if (newDateStr) {
+      setSelectedStockDate(newDateStr);
+      fetchCatalog(newDateStr);
+    }
+  };
+
+  const handleTodayStockDay = () => {
+    const today = getTodayDateStr();
+    setSelectedStockDate(today);
+    fetchCatalog(today);
+  };
+
+  const formatDisplayStockDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      return dt.toLocaleDateString('en-GB', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
 
   const addToast = () => {}; // Toast notifications removed per user request
 
   useEffect(() => {
-    fetchCatalog();
+    fetchCatalog(selectedStockDate);
     fetchPacketTemplate();
     fetchStockDemands();
     fetchAllStockLogs();
@@ -777,9 +842,11 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
     }
   }, [showStockModal]);
 
-  const fetchCatalog = async () => {
+  const fetchCatalog = async (dateOverride) => {
     try {
-      const res = await fetch('/api/catalog', {
+      const targetDate = dateOverride !== undefined ? dateOverride : selectedStockDate;
+      const url = targetDate ? `/api/catalog?date=${targetDate}` : '/api/catalog';
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -1875,196 +1942,297 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
           {/* SUB-VIEW 1: LIVE BALANCES LEDGER */}
           {stockSubTab === 'ledger' && (
             <div className="space-y-4">
+              {/* DATE SELECTOR & NAVIGATION CONTROLS */}
+              <div className="p-4 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 rounded-2xl border border-amber-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0">
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                        Daywise Stock Balance & Consumption
+                      </h4>
+                      {selectedStockDate === getTodayDateStr() ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          LIVE TODAY
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                          Historical Balance
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Showing closing stock balance & consumption as on <span className="font-bold text-slate-900">{formatDisplayStockDate(selectedStockDate)}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Date Controls: Previous Day (Arrow Left), Date Picker, Next Day (Arrow Right), Today Button */}
+                <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs">
+                  {/* Left Arrow: Previous Day */}
+                  <button
+                    type="button"
+                    onClick={handlePrevStockDay}
+                    title="Previous Day"
+                    className="p-2 rounded-xl bg-slate-50 hover:bg-amber-100 text-slate-700 hover:text-amber-900 transition-all font-bold cursor-pointer active:scale-95 border border-slate-200"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  {/* Date Input & Formatted Date Display */}
+                  <div className="relative flex items-center gap-2 px-3 py-1 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition-all cursor-pointer">
+                    <Calendar className="w-4 h-4 text-amber-600 shrink-0 pointer-events-none" />
+                    <span className="font-black text-xs text-slate-900 select-none">
+                      {formatDisplayStockDate(selectedStockDate)}
+                    </span>
+                    <input
+                      type="date"
+                      value={selectedStockDate}
+                      onChange={(e) => handleStockDateChange(e.target.value)}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      title="Click to pick a specific date"
+                    />
+                  </div>
+
+                  {/* Right Arrow: Next Day */}
+                  <button
+                    type="button"
+                    onClick={handleNextStockDay}
+                    title="Next Day"
+                    className="p-2 rounded-xl bg-slate-50 hover:bg-amber-100 text-slate-700 hover:text-amber-900 transition-all font-bold cursor-pointer active:scale-95 border border-slate-200"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+
+                  {/* Today Quick Jump */}
+                  {selectedStockDate !== getTodayDateStr() && (
+                    <button
+                      type="button"
+                      onClick={handleTodayStockDay}
+                      title="Jump to Today"
+                      className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-xs transition-all cursor-pointer ml-1"
+                    >
+                      Today
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Stock KPI Metric Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-            {/* 1. Total Items */}
-            <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-indigo-500 shadow-2xs">
-              <span className="text-[10px] font-black text-indigo-700 uppercase tracking-wider block">Total Items</span>
-              <div className="text-xl font-black text-indigo-950 mt-0.5">
-                {String(items.length).padStart(2, '0')}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                {/* 1. Total Items */}
+                <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-indigo-500 shadow-2xs">
+                  <span className="text-[10px] font-black text-indigo-700 uppercase tracking-wider block">Total Items</span>
+                  <div className="text-xl font-black text-indigo-950 mt-0.5">
+                    {String(items.length).padStart(2, '0')}
+                  </div>
+                </div>
+
+                {/* 2. In Stock */}
+                <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-emerald-500 shadow-2xs">
+                  <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider block">In Stock</span>
+                  <div className="text-xl font-black text-emerald-700 mt-0.5">
+                    {String(items.filter(i => i.is_active === 1 && !i.is_expired && (i.date_stock_balance !== undefined ? i.date_stock_balance > 0 : !i.is_out_of_stock)).length).padStart(2, '0')}
+                  </div>
+                </div>
+
+                {/* 3. TOTAL VALUE */}
+                <div className="p-3 bg-white rounded-2xl border border-teal-300 border-t-4 border-t-teal-600 shadow-2xs">
+                  <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider flex items-center justify-between">
+                    <span>TOTAL VALUE</span>
+                    <span className="text-teal-600 font-bold text-xs">₹</span>
+                  </span>
+                  <div className="text-xl font-black text-teal-700 mt-0.5">
+                    ₹{items.reduce((sum, i) => {
+                      const qty = Number(i.date_stock_balance !== undefined ? i.date_stock_balance : (i.current_stock || 0));
+                      const r = Number(i.unit_price || 0);
+                      const g = i.default_gst_rate !== undefined && i.default_gst_rate !== null ? Number(i.default_gst_rate) : 5.0;
+                      const sub = qty * r;
+                      return sum + sub + (sub * (g / 100));
+                    }, 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+
+                {/* 4. Consumed on Date */}
+                <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-blue-500 shadow-2xs">
+                  <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider block">
+                    {selectedStockDate === getTodayDateStr() ? 'Consumed Today' : `Consumed (${selectedStockDate})`}
+                  </span>
+                  <div className="text-xl font-black text-blue-700 mt-0.5">
+                    {String(items.reduce((acc, i) => acc + (parseInt(i.consumed_on_date !== undefined ? i.consumed_on_date : (i.consumed_today || 0), 10) || 0), 0)).padStart(2, '0')}
+                  </div>
+                </div>
+
+                {/* 5. Low Stock */}
+                <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-amber-500 shadow-2xs">
+                  <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider block">Low Stock</span>
+                  <div className="text-xl font-black text-amber-700 mt-0.5">
+                    {String(items.filter(i => {
+                      const bal = i.date_stock_balance !== undefined ? i.date_stock_balance : (i.current_stock || 0);
+                      return bal > 0 && bal <= (i.min_threshold || 10);
+                    }).length).padStart(2, '0')}
+                  </div>
+                </div>
+
+                {/* 6. Out of Stock */}
+                <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-rose-500 shadow-2xs">
+                  <span className="text-[10px] font-black text-rose-700 uppercase tracking-wider block">Out of Stock</span>
+                  <div className="text-xl font-black text-rose-700 mt-0.5">
+                    {String(items.filter(i => {
+                      const bal = i.date_stock_balance !== undefined ? i.date_stock_balance : (i.current_stock || 0);
+                      return bal <= 0;
+                    }).length).padStart(2, '0')}
+                  </div>
+                </div>
+
+                {/* 7. Expired Batches */}
+                <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-red-600 shadow-2xs">
+                  <span className="text-[10px] font-black text-red-700 uppercase tracking-wider block">Expired Batches</span>
+                  <div className="text-xl font-black text-red-700 mt-0.5">
+                    {String(items.filter(i => i.expiry_date && i.expiry_date <= selectedStockDate).length).padStart(2, '0')}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* 2. In Stock */}
-            <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-emerald-500 shadow-2xs">
-              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider block">In Stock</span>
-              <div className="text-xl font-black text-emerald-700 mt-0.5">
-                {String(items.filter(i => i.is_active === 1 && !i.is_expired && !i.is_out_of_stock && !i.is_low_stock).length).padStart(2, '0')}
-              </div>
-            </div>
+              {/* Stock Table */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500 border-b border-slate-200">
+                      <tr>
+                        <th className="p-4">Refreshment Item</th>
+                        <th className="p-4">Unit of Measure</th>
+                        <th className="p-4">
+                          Stock Balance
+                          <span className="block text-[10px] text-slate-400 font-normal">
+                            as on {selectedStockDate}
+                          </span>
+                        </th>
+                        <th className="p-4 text-right">Rate</th>
+                        <th className="p-4 text-center">GST%</th>
+                        <th className="p-4 text-right">Total Amount</th>
+                        <th className="p-4">
+                          {selectedStockDate === getTodayDateStr() ? 'Consumed Today' : `Consumed (${selectedStockDate})`}
+                        </th>
+                        <th className="p-4">Stock Health</th>
+                        <th className="p-4 text-right">Stock Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {items.length === 0 ? (
+                        <tr>
+                          <td colSpan="9" className="p-8 text-center text-slate-400 text-xs">
+                            No items found in stock ledger.
+                          </td>
+                        </tr>
+                      ) : (
+                        items.map(item => {
+                          const stockQty = Number(item.date_stock_balance !== undefined ? item.date_stock_balance : (item.current_stock || 0));
+                          const itemConsumed = Number(item.consumed_on_date !== undefined ? item.consumed_on_date : (item.consumed_today || 0));
+                          const isExpired = item.expiry_date ? item.expiry_date <= selectedStockDate : item.is_expired;
+                          const isOutOfStock = stockQty <= 0;
+                          const isLowStock = !isOutOfStock && stockQty <= (item.min_threshold || 10);
+                          const photo = getItemPhoto(item.item_name, item.image_url);
+                          const itemRate = Number(item.unit_price || 0);
+                          const itemGst = item.default_gst_rate !== undefined && item.default_gst_rate !== null ? Number(item.default_gst_rate) : 5.0;
+                          const itemSub = stockQty * itemRate;
+                          const itemTotalAmount = itemSub + (itemSub * (itemGst / 100));
 
-            {/* 3. TOTAL VALUE */}
-            <div className="p-3 bg-white rounded-2xl border border-teal-300 border-t-4 border-t-teal-600 shadow-2xs">
-              <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider flex items-center justify-between">
-                <span>TOTAL VALUE</span>
-                <span className="text-teal-600 font-bold text-xs">₹</span>
-              </span>
-              <div className="text-xl font-black text-teal-700 mt-0.5">
-                ₹{items.reduce((sum, i) => {
-                  const qty = Number(i.current_stock || 0);
-                  const r = Number(i.unit_price || 0);
-                  const g = i.default_gst_rate !== undefined && i.default_gst_rate !== null ? Number(i.default_gst_rate) : 5.0;
-                  const sub = qty * r;
-                  return sum + sub + (sub * (g / 100));
-                }, 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
+                          return (
+                            <tr
+                              key={item.id}
+                              className={`transition-colors ${
+                                isExpired
+                                  ? 'bg-rose-50/40 hover:bg-rose-50/70'
+                                  : 'hover:bg-slate-50/70'
+                              }`}
+                            >
+                              {/* Item with Photo */}
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={photo}
+                                    alt={item.item_name}
+                                    className="w-11 h-11 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = '/items/samosa.jpg';
+                                    }}
+                                  />
+                                  <div>
+                                    <span className={`font-bold text-sm ${isExpired ? 'text-rose-950 line-through' : 'text-slate-900'}`}>
+                                      {item.item_name}
+                                    </span>
+                                    {isExpired && (
+                                      <span className="block text-[10px] font-black text-rose-600 uppercase tracking-tight">
+                                        ⛔ EXPIRED ({item.expiry_date}) - Restock to enable
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
 
-            {/* 4. Consumed Today */}
-            <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-blue-500 shadow-2xs">
-              <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider block">Consumed Today</span>
-              <div className="text-xl font-black text-blue-700 mt-0.5">
-                {String(items.reduce((acc, i) => acc + (parseInt(i.consumed_today, 10) || 0), 0)).padStart(2, '0')}
-              </div>
-            </div>
+                              {/* Unit of Measure */}
+                              <td className="p-4 text-slate-600 font-medium text-xs">
+                                {item.unit_of_measure}
+                              </td>
 
-            {/* 5. Low Stock */}
-            <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-amber-500 shadow-2xs">
-              <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider block">Low Stock</span>
-              <div className="text-xl font-black text-amber-700 mt-0.5">
-                {String(items.filter(i => i.is_low_stock).length).padStart(2, '0')}
-              </div>
-            </div>
-
-            {/* 6. Out of Stock */}
-            <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-rose-500 shadow-2xs">
-              <span className="text-[10px] font-black text-rose-700 uppercase tracking-wider block">Out of Stock</span>
-              <div className="text-xl font-black text-rose-700 mt-0.5">
-                {String(items.filter(i => i.is_out_of_stock).length).padStart(2, '0')}
-              </div>
-            </div>
-
-            {/* 7. Expired Batches */}
-            <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-red-600 shadow-2xs">
-              <span className="text-[10px] font-black text-red-700 uppercase tracking-wider block">Expired Batches</span>
-              <div className="text-xl font-black text-red-700 mt-0.5">
-                {String(expiredItems.length).padStart(2, '0')}
-              </div>
-            </div>
-          </div>
-
-          {/* Stock Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500 border-b border-slate-200">
-                  <tr>
-                    <th className="p-4">Refreshment Item</th>
-                    <th className="p-4">Unit of Measure</th>
-                    <th className="p-4">Stock Balance</th>
-                    <th className="p-4 text-right">Rate</th>
-                    <th className="p-4 text-center">GST%</th>
-                    <th className="p-4 text-right">Total Amount</th>
-                    <th className="p-4">Consumed Today</th>
-                    <th className="p-4">Stock Health</th>
-                    <th className="p-4 text-right">Stock Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.length === 0 ? (
-                    <tr>
-                      <td colSpan="9" className="p-8 text-center text-slate-400 text-xs">
-                        No items found in stock ledger.
-                      </td>
-                    </tr>
-                  ) : (
-                    items.map(item => {
-                      const isExpired = item.is_expired;
-                      const isOutOfStock = item.is_out_of_stock;
-                      const isLowStock = item.is_low_stock;
-                      const photo = getItemPhoto(item.item_name, item.image_url);
-                      const stockQty = Number(item.current_stock || 0);
-                      const itemRate = Number(item.unit_price || 0);
-                      const itemGst = item.default_gst_rate !== undefined && item.default_gst_rate !== null ? Number(item.default_gst_rate) : 5.0;
-                      const itemSub = stockQty * itemRate;
-                      const itemTotalAmount = itemSub + (itemSub * (itemGst / 100));
-
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`transition-colors ${
-                            isExpired
-                              ? 'bg-rose-50/40 hover:bg-rose-50/70'
-                              : 'hover:bg-slate-50/70'
-                          }`}
-                        >
-                          {/* Item with Photo */}
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={photo}
-                                alt={item.item_name}
-                                className="w-11 h-11 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0"
-                                onError={(e) => {
-                                  e.target.onerror = null;
-                                  e.target.src = '/items/samosa.jpg';
-                                }}
-                              />
-                              <div>
-                                <span className={`font-bold text-sm ${isExpired ? 'text-rose-950 line-through' : 'text-slate-900'}`}>
-                                  {item.item_name}
-                                </span>
-                                {isExpired && (
-                                  <span className="block text-[10px] font-black text-rose-600 uppercase tracking-tight">
-                                    ⛔ EXPIRED ({item.expiry_date}) - Restock to enable
+                              {/* Stock Balance */}
+                              <td className="p-4">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`font-black text-sm px-3 py-1 rounded-xl border ${
+                                      isOutOfStock
+                                        ? 'bg-red-100 text-red-800 border-red-300'
+                                        : isLowStock
+                                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                        : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    }`}
+                                  >
+                                    {stockQty}
                                   </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
+                                  <span className="text-[11px] text-slate-400 font-medium">
+                                    {item.unit_of_measure}s
+                                  </span>
+                                </div>
+                              </td>
 
-                          {/* Unit of Measure */}
-                          <td className="p-4 text-slate-600 font-medium text-xs">
-                            {item.unit_of_measure}
-                          </td>
+                              {/* Rate - Live Approved Catalog / Inward Rate */}
+                              <td className="p-4 text-right">
+                                <span className="font-bold text-xs text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                                  ₹{itemRate.toFixed(2)}
+                                </span>
+                              </td>
 
-                          {/* Stock Balance */}
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`font-black text-sm px-3 py-1 rounded-xl border ${
-                                  isOutOfStock
-                                    ? 'bg-red-100 text-red-800 border-red-300'
-                                    : isLowStock
-                                    ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                }`}
-                              >
-                                {stockQty}
-                              </span>
-                              <span className="text-[11px] text-slate-400 font-medium">
-                                {item.unit_of_measure}s
-                              </span>
-                            </div>
-                          </td>
+                              {/* GST% - Live Statutory Rate */}
+                              <td className="p-4 text-center">
+                                <span className="font-bold text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                                  {itemGst}%
+                                </span>
+                              </td>
 
-                          {/* Rate - Live Approved Catalog / Inward Rate */}
-                          <td className="p-4 text-right">
-                            <span className="font-bold text-xs text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
-                              ₹{itemRate.toFixed(2)}
-                            </span>
-                          </td>
+                              {/* Total Amount - True Live Stock Valuation */}
+                              <td className="p-4 text-right">
+                                <span className="font-black text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
+                                  ₹{itemTotalAmount.toFixed(2)}
+                                </span>
+                              </td>
 
-                          {/* GST% - Live Statutory Rate */}
-                          <td className="p-4 text-center">
-                            <span className="font-bold text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
-                              {itemGst}%
-                            </span>
-                          </td>
-
-                          {/* Total Amount - True Live Stock Valuation */}
-                          <td className="p-4 text-right">
-                            <span className="font-black text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
-                              ₹{itemTotalAmount.toFixed(2)}
-                            </span>
-                          </td>
-
-                          {/* Consumed Today */}
-                          <td className="p-4">
-                            <span className="font-bold text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
-                              {item.consumed_today || 0} units
-                            </span>
-                          </td>
+                              {/* Consumed on Date */}
+                              <td className="p-4">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-block w-fit">
+                                    {itemConsumed} units
+                                  </span>
+                                  {Number(item.stock_in_on_date || 0) > 0 && (
+                                    <span className="text-[10px] text-purple-700 font-bold mt-0.5">
+                                      +{item.stock_in_on_date} inward
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
 
                           {/* Status Badge */}
                           <td className="p-4">

@@ -41,11 +41,13 @@ router.post('/upload-photo', authenticateToken, authorizeRoles('ADMIN'), uploadC
   }
 });
 
-// GET /api/catalog - List active catalog items with live stock, today's consumption & expiry
+// GET /api/catalog - List active catalog items with live stock, daywise consumption & stock balance for specified date
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const db = await getDB();
     const todayStr = new Date().toISOString().split('T')[0];
+    const targetDate = (req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) ? req.query.date : todayStr;
+    const isToday = targetDate === todayStr;
 
     // Admin sees all, Unit & Institution see only active items by default
     const query = req.user.role === 'ADMIN' 
@@ -54,18 +56,66 @@ router.get('/', authenticateToken, async (req, res) => {
     
     const items = await db.all(query);
 
-    // Calculate today's consumed quantity for each item
     const enhancedItems = await Promise.all(items.map(async (item) => {
-      const consumedRes = await db.get(
-        `SELECT COALESCE(SUM(di.quantity), 0) as consumed_today
+      // 1. Daywise Stock-Out / Consumption on targetDate:
+      // A) Stock logs charged off or consumed on targetDate
+      const logOutRes = await db.get(
+        `SELECT COALESCE(SUM(quantity), 0) as log_consumed
+         FROM item_stock_logs
+         WHERE item_id = ? 
+           AND (change_type = 'STOCK_OUT' OR log_type IN ('DISPATCH_CHARGE_OFF', 'CONSUMED', 'STOCK_OUT', 'WASTAGE', 'EXPIRED', 'DAMAGE', 'CONDEMNED'))
+           AND DATE(created_at) = ?`,
+        [item.id, targetDate]
+      );
+      const logConsumed = logOutRes ? Number(logOutRes.log_consumed || 0) : 0;
+
+      // B) Demands scheduled for targetDate (for direct item demands)
+      const demandRes = await db.get(
+        `SELECT COALESCE(SUM(di.quantity), 0) as demand_consumed
          FROM demand_items di
          JOIN demands d ON di.demand_id = d.id
          WHERE di.item_id = ? 
-           AND d.status IN ('ACCEPTED', 'FULFILLED')
+           AND d.status IN ('ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED')
            AND DATE(d.demand_date) = ?`,
-        [item.id, todayStr]
+        [item.id, targetDate]
       );
+      const demandConsumed = demandRes ? Number(demandRes.demand_consumed || 0) : 0;
 
+      // Consumed quantity for targetDate
+      const consumedOnDate = Math.max(logConsumed, demandConsumed);
+
+      // 2. Daywise Inflow (Stock In) on targetDate:
+      const logInRes = await db.get(
+        `SELECT COALESCE(SUM(quantity), 0) as log_in_qty
+         FROM item_stock_logs
+         WHERE item_id = ? 
+           AND (change_type = 'STOCK_IN' OR log_type = 'STOCK_IN')
+           AND DATE(created_at) = ?`,
+        [item.id, targetDate]
+      );
+      const stockedInOnDate = logInRes ? Number(logInRes.log_in_qty || 0) : 0;
+
+      // 3. Stock Balance on targetDate:
+      const currentStock = item.current_stock !== undefined && item.current_stock !== null ? Number(item.current_stock) : 0;
+      let dateStockBalance = currentStock;
+
+      if (!isToday && targetDate < todayStr) {
+        // Calculate historical balance at end of targetDate:
+        // Current Stock - (inflows after targetDate) + (outflows after targetDate)
+        const netAfterRes = await db.get(
+          `SELECT 
+             COALESCE(SUM(CASE WHEN change_type = 'STOCK_IN' OR log_type = 'STOCK_IN' THEN quantity ELSE 0 END), 0) as in_after,
+             COALESCE(SUM(CASE WHEN change_type = 'STOCK_OUT' OR log_type IN ('DISPATCH_CHARGE_OFF', 'CONSUMED', 'STOCK_OUT', 'WASTAGE', 'EXPIRED', 'DAMAGE', 'CONDEMNED') THEN quantity ELSE 0 END), 0) as out_after
+           FROM item_stock_logs
+           WHERE item_id = ? AND DATE(created_at) > ?`,
+          [item.id, targetDate]
+        );
+        const inAfter = netAfterRes ? Number(netAfterRes.in_after || 0) : 0;
+        const outAfter = netAfterRes ? Number(netAfterRes.out_after || 0) : 0;
+        dateStockBalance = Math.max(0, currentStock - inAfter + outAfter);
+      }
+
+      // Total lifetime wastage
       const wastageRes = await db.get(
         `SELECT COALESCE(SUM(quantity), 0) as total_wastage
          FROM item_stock_logs
@@ -73,18 +123,20 @@ router.get('/', authenticateToken, async (req, res) => {
            AND (change_type = 'STOCK_OUT' OR log_type IN ('WASTAGE', 'EXPIRED', 'DAMAGE', 'CONDEMNED'))`,
         [item.id]
       );
+      const totalWastage = wastageRes ? Number(wastageRes.total_wastage || 0) : 0;
 
-      const consumedToday = consumedRes ? (consumedRes.consumed_today || 0) : 0;
-      const totalWastage = wastageRes ? (wastageRes.total_wastage || 0) : 0;
-      const currentStock = item.current_stock !== undefined && item.current_stock !== null ? item.current_stock : 0;
-      const isExpired = !!(item.expiry_date && item.expiry_date <= todayStr);
-      const isOutOfStock = currentStock <= 0;
-      const isLowStock = currentStock > 0 && currentStock <= (item.min_threshold || 10);
+      const isExpired = !!(item.expiry_date && item.expiry_date <= targetDate);
+      const isOutOfStock = dateStockBalance <= 0;
+      const isLowStock = dateStockBalance > 0 && dateStockBalance <= (item.min_threshold || 10);
 
       return {
         ...item,
         current_stock: currentStock,
-        consumed_today: consumedToday,
+        date_stock_balance: dateStockBalance,
+        consumed_today: consumedOnDate,
+        consumed_on_date: consumedOnDate,
+        stock_in_on_date: stockedInOnDate,
+        target_date: targetDate,
         total_wastage: totalWastage,
         is_expired: isExpired,
         is_out_of_stock: isOutOfStock,
