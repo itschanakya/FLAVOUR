@@ -767,12 +767,15 @@ export default function InstitutionDashboard() {
               </div>
               <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">DEMAND HISTORY</h2>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => fetchData()} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-100 hover:bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer">
-                <RefreshCw className="w-3 h-3" />
-                SYNC
-              </button>
-              <button className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition-all shadow-xs cursor-pointer">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                LIVE AUTO-UPDATE
+              </span>
+              <button onClick={() => window.print()} className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg transition-all shadow-xs cursor-pointer" title="Print Demand History">
                 <Printer className="w-3.5 h-3.5" />
               </button>
             </div>
