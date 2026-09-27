@@ -45,25 +45,27 @@ export default function RaiseDemandPage() {
       });
       const catData = await catRes.json();
       setCatalog(catData);
-      if (catData.length > 0) {
-        const defaultItemId = catData[0].id.toString();
-        const initial = [];
-        if (currentInst) {
-          if ((currentInst.strength_1st_year || 0) > 0) {
-            initial.push({ item_id: defaultItemId, year_group: '1st Year', quantity: currentInst.strength_1st_year });
-          }
-          if ((currentInst.strength_2nd_year || 0) > 0) {
-            initial.push({ item_id: defaultItemId, year_group: '2nd Year', quantity: currentInst.strength_2nd_year });
-          }
-          if ((currentInst.strength_3rd_year || 0) > 0) {
-            initial.push({ item_id: defaultItemId, year_group: '3rd Year', quantity: currentInst.strength_3rd_year });
-          }
+      const stdItem = Array.isArray(catData)
+        ? catData.find(c => c.item_name === 'Standard Refreshment Packet') || catData[0]
+        : null;
+      const defaultItemId = stdItem ? stdItem.id.toString() : '60001';
+
+      const initial = [];
+      if (currentInst) {
+        if ((currentInst.strength_1st_year || 0) > 0) {
+          initial.push({ item_id: defaultItemId, year_group: '1st Year', quantity: currentInst.strength_1st_year });
         }
-        if (initial.length === 0) {
-          initial.push({ item_id: defaultItemId, year_group: '1st Year', quantity: currentInst?.strength_1st_year || 0 });
+        if ((currentInst.strength_2nd_year || 0) > 0) {
+          initial.push({ item_id: defaultItemId, year_group: '2nd Year', quantity: currentInst.strength_2nd_year });
         }
-        setSelectedItems(initial);
+        if ((currentInst.strength_3rd_year || 0) > 0) {
+          initial.push({ item_id: defaultItemId, year_group: '3rd Year', quantity: currentInst.strength_3rd_year });
+        }
       }
+      if (initial.length === 0) {
+        initial.push({ item_id: defaultItemId, year_group: '1st Year', quantity: currentInst?.strength_1st_year || 10 });
+      }
+      setSelectedItems(initial);
     } catch (err) {
       console.error(err);
     } finally {
@@ -72,7 +74,6 @@ export default function RaiseDemandPage() {
   };
 
   const handleAddItem = () => {
-    if (catalog.length === 0) return;
     const existingYears = selectedItems.map(i => i.year_group);
     let nextYear = '1st Year';
     let defaultQty = institution?.strength_1st_year || 0;
@@ -86,9 +87,10 @@ export default function RaiseDemandPage() {
       nextYear = '3rd Year';
       defaultQty = institution?.strength_3rd_year || 0;
     }
+    const stdId = selectedItems[0]?.item_id || '60001';
     setSelectedItems([
       ...selectedItems,
-      { item_id: catalog[0].id.toString(), year_group: nextYear, quantity: defaultQty }
+      { item_id: stdId, year_group: nextYear, quantity: defaultQty }
     ]);
   };
 
@@ -324,59 +326,46 @@ export default function RaiseDemandPage() {
           </div>
         </div>
 
-        {/* ITEMS SELECTION */}
+        {/* ITEMS SELECTION: STANDARD REFRESHMENT PACKETS ONLY */}
         <div className="space-y-4 pt-4 border-t border-slate-200">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-900 text-base">Select Refreshment Items & Year Groups</h3>
+            <div>
+              <h3 className="font-bold text-slate-900 text-base">Cadet Attendance & Refreshment Allocation</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Standard Refreshment Packet @ fixed statutory rate of <strong className="text-slate-800">₹75.00 per cadet</strong>.
+              </p>
+            </div>
             <button
               type="button"
               onClick={handleAddItem}
               className="px-3 py-1.5 rounded-xl bg-blue-600/20 text-blue-600 hover:bg-blue-600/30 border border-blue-500/30 text-xs font-bold inline-flex items-center gap-1.5 transition-all"
             >
-              <Plus className="w-4 h-4" /> Add Item Line
+              <Plus className="w-4 h-4" /> Add Year Group Line
             </button>
           </div>
 
           {selectedItems.map((itemRow, index) => {
-            const currentItem = catalog.find((c) => c.id.toString() === itemRow.item_id.toString());
-            const lineTotal = (parseInt(itemRow.quantity) || 0) * (currentItem?.unit_price || 0);
-            const isItemExpired = currentItem?.is_expired;
+            const qty = parseInt(itemRow.quantity) || 0;
+            const lineTotal = qty * 75;
 
             return (
-              <div key={index} className={`p-4 rounded-xl border grid grid-cols-1 sm:grid-cols-12 gap-3 items-center ${
-                isItemExpired ? 'bg-rose-50/80 border-rose-300' : 'bg-white/80 border-slate-200'
-              }`}>
-                {/* Catalog Item select */}
+              <div key={index} className="p-4 rounded-xl border bg-white/80 border-slate-200 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                {/* Standard Refreshment Item Description */}
                 <div className="sm:col-span-5">
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Refreshment Item</label>
-                  <select
-                    value={itemRow.item_id}
-                    onChange={(e) => handleItemChange(index, 'item_id', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border text-xs focus:outline-none ${
-                      isItemExpired ? 'bg-rose-100 border-rose-300 text-rose-900 font-bold' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500'
-                    }`}
-                  >
-                    {catalog.map((c) => (
-                      <option key={c.id} value={c.id} disabled={c.is_expired}>
-                        {c.item_name} (₹{c.unit_price} / {c.unit_of_measure})
-                        {c.is_expired ? ` ⛔ EXPIRED (${c.expiry_date})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {isItemExpired && (
-                    <span className="text-[10px] font-black text-rose-600 block mt-1">
-                      ⛔ EXPIRED on {currentItem.expiry_date} — Cannot place demand.
-                    </span>
-                  )}
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Refreshment Package</label>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50/70 border border-amber-200 text-xs font-extrabold text-amber-900">
+                    <Package className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Standard Refreshment Packet (₹75.00)</span>
+                  </div>
                 </div>
 
                 {/* Year Group select */}
                 <div className="sm:col-span-3">
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Year Group</label>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Cadet Year Group</label>
                   <select
                     value={itemRow.year_group}
                     onChange={(e) => handleItemChange(index, 'year_group', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-xs text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
                   >
                     <option value="1st Year">1st Year Cadets</option>
                     <option value="2nd Year">2nd Year Cadets</option>
@@ -386,24 +375,28 @@ export default function RaiseDemandPage() {
 
                 {/* Quantity */}
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Quantity</label>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Cadet Count / Pkts</label>
                   <input
                     type="number"
                     min="1"
                     value={itemRow.quantity}
                     onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-xs text-slate-900 font-bold focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
                 {/* Line Total & Remove */}
                 <div className="sm:col-span-2 flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0">
-                  <span className="text-xs font-bold text-emerald-600">₹{lineTotal.toLocaleString('en-IN')}</span>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 block font-semibold">Subtotal</span>
+                    <span className="text-xs font-black text-emerald-600">₹{lineTotal.toLocaleString('en-IN')}</span>
+                  </div>
                   {selectedItems.length > 1 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(index)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-500/10 transition-all"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                      title="Remove Year Group"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

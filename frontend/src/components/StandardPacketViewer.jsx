@@ -4,10 +4,12 @@ import { Sparkles, Calendar, CheckCircle2, AlertTriangle, ShieldCheck, ChevronDo
 import { getItemPhoto, formatExpiryDate } from '../pages/ManageCatalog';
 
 export default function StandardPacketViewer({ defaultOpen = false, className = '' }) {
-  const { token } = useAuth();
+  const { user, token } = useAuth();
   const [packet, setPacket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  const isAdmin = user?.role === 'ADMIN';
 
   useEffect(() => {
     if (token) {
@@ -31,16 +33,18 @@ export default function StandardPacketViewer({ defaultOpen = false, className = 
     }
   };
 
-  if (loading || !packet || !packet.items || packet.items.length === 0) {
+  if (loading || !packet) {
     return null;
   }
+
+  const grandTotal = packet.grand_total || 75.0;
 
   return (
     <div className={`bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-600/10 rounded-2xl border border-amber-200/90 shadow-xs overflow-hidden ${className}`}>
       {/* Header Bar */}
       <div
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-4 flex items-center justify-between cursor-pointer select-none hover:bg-amber-50/50 transition-colors"
+        onClick={() => { if (isAdmin) setIsOpen(!isOpen); }}
+        className={`p-4 flex items-center justify-between transition-colors ${isAdmin ? 'cursor-pointer select-none hover:bg-amber-50/50' : ''}`}
       >
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
@@ -52,30 +56,39 @@ export default function StandardPacketViewer({ defaultOpen = false, className = 
                 Standard Refreshment Packet
               </h4>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white shadow-2xs">
-                ₹{packet.grand_total?.toFixed(2)} (Incl. 5% GST)
+                ₹{grandTotal.toFixed(2)} (Statutory Allowance)
               </span>
-              <span className="text-[10px] font-bold text-slate-500 hidden sm:inline">
-                • {packet.items.length} Refreshment Items Included
-              </span>
+              {isAdmin && packet.items && (
+                <span className="text-[10px] font-bold text-slate-500 hidden sm:inline">
+                  • {packet.items.length} Refreshment Items Configured
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-600 mt-0.5">
-              Approved per-cadet refreshment allocation with verified batch expiry dates.
+              Approved per-cadet statutory refreshment allocation @ ₹75/-. Prepared and quality-certified by State Supply Point.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-amber-800 hidden md:inline">
-            {isOpen ? 'Collapse Details' : 'View Packet Items & Expiry'}
-          </span>
-          <div className="p-1 rounded-lg bg-white border border-amber-200 text-amber-700">
-            {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        {isAdmin ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-amber-800 hidden md:inline">
+              {isOpen ? 'Collapse Details' : 'View Packet Items & Expiry'}
+            </span>
+            <div className="p-1 rounded-lg bg-white border border-amber-200 text-amber-700">
+              {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold shrink-0">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Certified Allocation</span>
+          </div>
+        )}
       </div>
 
-      {/* Expanded Items & Expiry Details */}
-      {isOpen && (
+      {/* Expanded Items & Expiry Details (Admin Only) */}
+      {isAdmin && isOpen && packet.items && (
         <div className="px-4 pb-4 pt-1 border-t border-amber-200/60 space-y-3 bg-white/70">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-2">
             {packet.items.map((it, idx) => {

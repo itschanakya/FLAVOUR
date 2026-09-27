@@ -140,6 +140,34 @@ router.get('/', authenticateToken, async (req, res) => {
         [d.id]
       );
       d.items = items;
+
+      if (req.user.role === 'ADMIN' && d.unit_id) {
+        let uMenu = await db.all(`
+          SELECT umi.item_id, umi.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock
+          FROM unit_menu_items umi
+          JOIN refreshment_items ri ON umi.item_id = ri.id
+          WHERE umi.unit_id = ?
+          ORDER BY ri.item_name ASC
+        `, [d.unit_id]);
+
+        if (!uMenu || uMenu.length === 0) {
+          const defaultTpl = await db.get("SELECT id FROM packet_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+          if (defaultTpl) {
+            uMenu = await db.all(`
+              SELECT pti.item_id, pti.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock
+              FROM packet_template_items pti
+              JOIN refreshment_items ri ON pti.item_id = ri.id
+              WHERE pti.template_id = ?
+              ORDER BY ri.item_name ASC
+            `, [defaultTpl.id]);
+          }
+        }
+
+        d.unit_menu = (uMenu || []).map(m => ({
+          ...m,
+          total_needed: (m.qty_per_packet || 1) * (d.total_quantity || 1)
+        }));
+      }
     }
 
     res.json(demands);
@@ -193,6 +221,34 @@ router.get('/:id', authenticateToken, async (req, res) => {
       [demand.id]
     );
     demand.items = items;
+
+    if (req.user.role === 'ADMIN' && demand.unit_id) {
+      let uMenu = await db.all(`
+        SELECT umi.item_id, umi.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock
+        FROM unit_menu_items umi
+        JOIN refreshment_items ri ON umi.item_id = ri.id
+        WHERE umi.unit_id = ?
+        ORDER BY ri.item_name ASC
+      `, [demand.unit_id]);
+
+      if (!uMenu || uMenu.length === 0) {
+        const defaultTpl = await db.get("SELECT id FROM packet_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+        if (defaultTpl) {
+          uMenu = await db.all(`
+            SELECT pti.item_id, pti.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock
+            FROM packet_template_items pti
+            JOIN refreshment_items ri ON pti.item_id = ri.id
+            WHERE pti.template_id = ?
+            ORDER BY ri.item_name ASC
+          `, [defaultTpl.id]);
+        }
+      }
+
+      demand.unit_menu = (uMenu || []).map(m => ({
+        ...m,
+        total_needed: (m.qty_per_packet || 1) * (demand.total_quantity || 1)
+      }));
+    }
 
     res.json(demand);
   } catch (error) {
@@ -467,11 +523,14 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
     const activeTmpl = await db.get('SELECT target_budget FROM packet_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1');
     const fixedRate = activeTmpl?.target_budget || 75.0;
 
+    let packetItem = await db.get("SELECT id FROM refreshment_items WHERE item_name = 'Standard Refreshment Packet'");
+    const standardPacketItemId = packetItem ? packetItem.id : (items[0]?.item_id || 1);
+
     for (const item of items) {
       await db.run(
         `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot)
          VALUES (?, ?, ?, ?, ?)`,
-        [demandId, item.item_id, item.year_group, item.quantity, fixedRate]
+        [demandId, standardPacketItemId, item.year_group, item.quantity, fixedRate]
       );
     }
 
@@ -658,7 +717,7 @@ router.post('/:id/accept', authenticateToken, authorizeRoles('ADMIN'), async (re
   }
 });
 
-// POST /api/demands/:id/prepare - ADMIN marks ACCEPTED demand as PREPARING
+// POST /api/demands/:id/prepare - ADMIN marks ACCEPTED demand as PREPARING and charges off inventory stock
 router.post('/:id/prepare', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const demandId = req.params.id;
@@ -669,15 +728,83 @@ router.post('/:id/prepare', authenticateToken, authorizeRoles('ADMIN'), async (r
     if (demand.status === 'PREPARING') return res.json({ message: 'Demand is already preparing.', status: 'PREPARING' });
     if (demand.status !== 'ACCEPTED') return res.status(400).json({ error: `Only ACCEPTED demands can be prepared. Current status: ${demand.status}` });
 
+    // Fetch the dedicated menu for this demand's unit
+    let menuItems = [];
+    if (demand.unit_id) {
+      menuItems = await db.all(`
+        SELECT umi.item_id, umi.quantity as qty_per_packet, ri.item_name, ri.current_stock, ri.unit_of_measure, ri.expiry_date
+        FROM unit_menu_items umi
+        JOIN refreshment_items ri ON umi.item_id = ri.id
+        WHERE umi.unit_id = ?
+      `, [demand.unit_id]);
+    }
+
+    // Fallback to default packet template if unit has no custom menu
+    if (!menuItems || menuItems.length === 0) {
+      const defaultTemplate = await db.get("SELECT id FROM packet_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+      if (defaultTemplate) {
+        menuItems = await db.all(`
+          SELECT pti.item_id, pti.quantity as qty_per_packet, ri.item_name, ri.current_stock, ri.unit_of_measure, ri.expiry_date
+          FROM packet_template_items pti
+          JOIN refreshment_items ri ON pti.item_id = ri.id
+          WHERE pti.template_id = ?
+        `, [defaultTemplate.id]);
+      }
+    }
+
+    // Determine total packets
+    const qtyRow = await db.get('SELECT SUM(quantity) as total_qty FROM demand_items WHERE demand_id = ?', [demandId]);
+    const totalPackets = qtyRow?.total_qty || demand.total_quantity || 1;
+    const chargedItems = [];
+
+    // Deduct stock if not already charged off
+    if (!demand.stock_charged_off && menuItems.length > 0) {
+      for (const mItem of menuItems) {
+        const requiredQty = (mItem.qty_per_packet || 1) * totalPackets;
+        const currentItem = await db.get("SELECT * FROM refreshment_items WHERE id = ?", [mItem.item_id]);
+        if (!currentItem) continue;
+
+        const currentStock = currentItem.current_stock || 0;
+        const newStock = Math.max(0, currentStock - requiredQty);
+
+        // Update stock in refreshment_items
+        await db.run(
+          "UPDATE refreshment_items SET current_stock = ? WHERE id = ?",
+          [newStock, mItem.item_id]
+        );
+
+        // Record stock log
+        await db.run(
+          `INSERT INTO item_stock_logs (item_id, log_type, quantity, balance_after, expiry_date, notes, created_by)
+           VALUES (?, 'DISPATCH_CHARGE_OFF', ?, ?, ?, ?, ?)`,
+          [
+            mItem.item_id,
+            requiredQty,
+            newStock,
+            currentItem.expiry_date || null,
+            `Preparation Charge-Off: Demand ${demand.demand_number} (${totalPackets} pkts × ${mItem.qty_per_packet} = ${requiredQty} ${currentItem.unit_of_measure || 'units'})`,
+            req.user.id
+          ]
+        );
+
+        chargedItems.push({
+          item_id: mItem.item_id,
+          item_name: currentItem.item_name,
+          deducted_quantity: requiredQty,
+          remaining_stock: newStock
+        });
+      }
+    }
+
     await db.run(
-      `UPDATE demands SET status = 'PREPARING' WHERE id = ?`,
+      `UPDATE demands SET status = 'PREPARING', stock_charged_off = 1, stock_charged_off_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [demandId]
     );
 
     // Timeline Activity Log
     await db.run(
       'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
-      [demandId, req.user.id, 'STATUS_CHANGE', 'ACCEPTED', 'PREPARING', 'Demand preparation started at Supply Point.']
+      [demandId, req.user.id, 'STATUS_CHANGE', 'ACCEPTED', 'PREPARING', `Demand preparation started at Supply Point. Stock charged off (${totalPackets} packets).`]
     );
 
     const updatedDemand = await db.get('SELECT * FROM demands WHERE id = ?', [demandId]);
@@ -688,10 +815,14 @@ router.post('/:id/prepare', authenticateToken, authorizeRoles('ADMIN'), async (r
     broadcastToRole('UNIT', 'DEMAND_UPDATED', eventPayload);
     broadcastToRole('ADMIN', 'DEMAND_UPDATED', eventPayload);
 
-    res.json({ message: 'Demand successfully marked as PREPARING.', status: 'PREPARING' });
+    res.json({
+      message: 'Demand successfully marked as PREPARING and stock charged off.',
+      status: 'PREPARING',
+      charged_items: chargedItems
+    });
   } catch (error) {
     console.error('Prepare demand error:', error);
-    res.status(500).json({ error: 'Failed to prepare demand.' });
+    res.status(500).json({ error: 'Failed to prepare demand and charge off stock.' });
   }
 });
 

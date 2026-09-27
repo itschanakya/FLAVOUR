@@ -55,11 +55,12 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
   useEffect(() => {
     if (!currentDemand?.id) return;
     if (events?.DEMAND_UPDATED && String(events.DEMAND_UPDATED.id) === String(currentDemand.id)) {
-      const { delivery_status, dispatched_at, delivered_at } = events.DEMAND_UPDATED;
+      const { status, delivery_status, dispatched_at, delivered_at } = events.DEMAND_UPDATED;
       setCurrentDemand(prev => {
         if (!prev) return prev;
         return {
           ...prev,
+          status: status || prev.status,
           delivery_status: delivery_status || prev.delivery_status,
           dispatched_at: dispatched_at || prev.dispatched_at,
           delivered_at: delivered_at || prev.delivered_at
@@ -151,7 +152,12 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
   const STATUS_CONFIG = {
     PENDING: { header: 'from-amber-600 via-orange-500 to-amber-700', badge: 'bg-amber-100 text-amber-800 border-amber-300', icon: '📋', label: 'Pending Review' },
     APPROVED: { header: 'from-blue-700 via-indigo-600 to-blue-800', badge: 'bg-blue-100 text-blue-800 border-blue-300', icon: '✅', label: 'Approved' },
-    ACCEPTED: { header: 'from-indigo-700 via-violet-600 to-indigo-800', badge: 'bg-indigo-100 text-indigo-800 border-indigo-300', icon: '🏭', label: 'Accepted' },
+    ACCEPTED: { header: 'from-indigo-700 via-violet-600 to-indigo-800', badge: 'bg-indigo-100 text-indigo-800 border-indigo-300', icon: '🏭', label: 'Accepted by Depot' },
+    PREPARING: { header: 'from-indigo-700 via-purple-600 to-indigo-800', badge: 'bg-purple-100 text-purple-800 border-purple-300', icon: '🥣', label: 'Preparing Packets' },
+    READY_FOR_DISPATCH: { header: 'from-amber-600 via-yellow-600 to-amber-700', badge: 'bg-amber-100 text-amber-800 border-amber-300', icon: '📦', label: 'Ready for Dispatch' },
+    OUT_FOR_DELIVERY: { header: 'from-blue-600 via-indigo-600 to-blue-800', badge: 'bg-blue-100 text-blue-800 border-blue-300', icon: '🚚', label: 'In Transit (On Route)' },
+    ARRIVED: { header: 'from-purple-700 via-indigo-600 to-purple-800', badge: 'bg-purple-100 text-purple-800 border-purple-300', icon: '📍', label: 'Arrived at Gate' },
+    DELIVERED: { header: 'from-emerald-700 via-teal-600 to-emerald-800', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: '✅', label: 'Delivered & Verified' },
     FULFILLED: { header: 'from-emerald-700 via-teal-600 to-emerald-800', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: '🎯', label: 'Fulfilled' },
     REJECTED: { header: 'from-rose-700 via-red-600 to-rose-800', badge: 'bg-rose-100 text-rose-800 border-rose-300', icon: '❌', label: 'Rejected' },
     CANCELLED: { header: 'from-slate-600 via-zinc-600 to-slate-700', badge: 'bg-slate-100 text-slate-700 border-slate-300', icon: '🚫', label: 'Cancelled' },
@@ -189,8 +195,21 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
 
   if (!currentDemand) return null;
 
+  // Real-time effective status prioritizing live logistics movement
+  const getEffectiveStatus = () => {
+    const delStatus = currentDemand?.delivery_status;
+    const demStat = currentDemand?.status || 'PENDING';
+
+    if (delStatus === 'DELIVERED' || demStat === 'DELIVERED' || demStat === 'FULFILLED') return 'DELIVERED';
+    if (delStatus === 'REJECTED') return 'REJECTED';
+    if (delStatus === 'ARRIVED') return 'ARRIVED';
+    if (delStatus === 'OUT_FOR_DELIVERY') return 'OUT_FOR_DELIVERY';
+    return demStat;
+  };
+
+  const effectiveStatus = getEffectiveStatus();
   const demStatus = currentDemand.status || 'PENDING';
-  const statusCfg = STATUS_CONFIG[demStatus] || STATUS_CONFIG.PENDING;
+  const statusCfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG[demStatus] || STATUS_CONFIG.PENDING;
 
   const currentStage = currentDemand.delivery_status || 'PENDING';
   const delivCfg = DELIVERY_CONFIG[currentStage] || DELIVERY_CONFIG.PENDING;
@@ -233,11 +252,14 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
               <h2 className="text-base font-black text-white">
                 {currentDemand.demand_number}
               </h2>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-white text-slate-800 tracking-wide shadow">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-white text-slate-800 tracking-wide shadow flex items-center gap-1">
+                {effectiveStatus === 'OUT_FOR_DELIVERY' && (
+                  <span className="inline-flex h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
+                )}
                 {statusCfg.label}
               </span>
             </div>
-            <div className={`flex items-center gap-1.5 text-xs font-bold ${statusCfg.subtext} truncate`}>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-white/90 truncate">
               <Building2 className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">{currentDemand.institution_name || currentDemand.unit_name || user?.unit_name || 'Unit Demand'}</span>
               {currentDemand.demand_date && (
@@ -261,16 +283,28 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
         <div className="flex-1 overflow-y-auto">
           <div className="p-3 border-b border-slate-100 space-y-2">
 
-            {/* ── DEMAND STATUS PILL ROW ───────────────────────────────── */}
-            <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg border ${demStatus === 'FULFILLED' ? 'bg-emerald-50 border-emerald-200' :
-              demStatus === 'APPROVED' ? 'bg-blue-50 border-blue-200' :
-                demStatus === 'ACCEPTED' ? 'bg-indigo-50 border-indigo-200' :
-                  demStatus === 'REJECTED' ? 'bg-rose-50 border-rose-200' :
-                    'bg-amber-50 border-amber-200'
-              }`}>
-              <span className="text-xs font-black uppercase tracking-wider text-slate-600">Demand Status</span>
-              <span className={`px-4 py-1.5 rounded-full text-xs font-black border-2 ${statusCfg.badge}`}>
-                {statusCfg.icon} {demStatus}
+            {/* ── REAL-TIME DEMAND STATUS PILL ROW ───────────────────────────────── */}
+            <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg border ${
+              effectiveStatus === 'DELIVERED' || effectiveStatus === 'FULFILLED' ? 'bg-emerald-50 border-emerald-200' :
+              effectiveStatus === 'OUT_FOR_DELIVERY' ? 'bg-blue-50 border-blue-200' :
+              effectiveStatus === 'ARRIVED' ? 'bg-purple-50 border-purple-200' :
+              effectiveStatus === 'READY_FOR_DISPATCH' ? 'bg-amber-50 border-amber-200' :
+              effectiveStatus === 'PREPARING' || effectiveStatus === 'ACCEPTED' ? 'bg-indigo-50 border-indigo-200' :
+              effectiveStatus === 'APPROVED' ? 'bg-blue-50 border-blue-200' :
+              effectiveStatus === 'REJECTED' ? 'bg-rose-50 border-rose-200' :
+              'bg-amber-50 border-amber-200'
+            }`}>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-600">Demand Status</span>
+                {effectiveStatus === 'OUT_FOR_DELIVERY' && (
+                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-100 text-blue-700 animate-pulse">
+                    LIVE
+                  </span>
+                )}
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-black border-2 flex items-center gap-1.5 ${statusCfg.badge}`}>
+                <span>{statusCfg.icon}</span>
+                <span>{statusCfg.label.toUpperCase()}</span>
               </span>
             </div>
 

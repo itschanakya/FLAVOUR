@@ -391,7 +391,7 @@ router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         [demandId, req.user.id, 'STATUS_CHANGE', 'ACCEPTED', 'OUT_FOR_DELIVERY', `Dispatched via ${modeLogText}.`]
       );
 
-      broadcastToAll('DEMAND_UPDATED', { id: demandId, delivery_status: 'OUT_FOR_DELIVERY', delivery_mode: mode, timestamp: Date.now() });
+      broadcastToAll('DEMAND_UPDATED', { id: demandId, status: 'READY_FOR_DISPATCH', delivery_status: 'OUT_FOR_DELIVERY', delivery_mode: mode, timestamp: Date.now() });
     }
 
     res.json({ message: `Successfully assigned ${demandIds.length} demand(s) for physical delivery.` });
@@ -505,6 +505,7 @@ router.post('/status', authenticateToken, authorizeRoles('ADMIN'), async (req, r
     // Real-time broadcast
     broadcastToAll('DEMAND_UPDATED', {
       id: demandId,
+      status: deliveryStatus === 'DELIVERED' ? 'DELIVERED' : (deliveryStatus === 'REJECTED' ? 'REJECTED' : undefined),
       delivery_status: deliveryStatus,
       dispatched_at: deliveryStatus === 'OUT_FOR_DELIVERY' ? now : undefined,
       delivered_at: deliveryStatus === 'DELIVERED' ? now : undefined,

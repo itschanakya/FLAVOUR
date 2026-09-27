@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import CustomDateInput from '../components/CustomDateInput';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
+import StatusBadge from '../components/StatusBadge';
 
 export default function UnitDemandPage() {
   const { user, token } = useAuth();
@@ -1161,15 +1162,7 @@ export default function UnitDemandPage() {
                         </div>
                       </td>
                       <td className="px-3 py-4">
-                        <span className={`px-2 py-1 text-[10px] font-bold rounded-lg border ${
-                          d.status === 'APPROVED' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                          d.status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                          d.status === 'ACCEPTED' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
-                          d.status === 'FULFILLED' || d.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                          'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}>
-                          {d.status}
-                        </span>
+                        <StatusBadge status={d.status} deliveryStatus={d.delivery_status} demand={d} />
                       </td>
                       <td className="px-3 py-4 text-center">
                         <span className="font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg inline-block text-xs">

@@ -5,7 +5,7 @@ import {
   School, Calendar, ArrowRight, IndianRupee, ChevronDown,
   ChevronUp, Users, Package, MessageSquare, ShieldCheck,
   AlertTriangle, Clock3, Inbox, RefreshCw, Eye, Truck, Phone,
-  Layers, TrendingUp, Sparkles, LayoutList, LayoutGrid
+  Layers, TrendingUp, Sparkles, LayoutList, LayoutGrid, MapPin
 } from 'lucide-react';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
 import StandardPacketViewer from '../components/StandardPacketViewer';
@@ -94,7 +94,28 @@ function StatusPill({ status, deliveryStatus }) {
       </span>
     );
   }
-  if (['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY'].includes(status)) {
+  if (deliveryStatus === 'ARRIVED') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-purple-100 text-purple-800 border-purple-200 animate-bounce">
+        <MapPin className="w-3 h-3 text-purple-600" /> At Gate
+      </span>
+    );
+  }
+  if (deliveryStatus === 'OUT_FOR_DELIVERY') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-blue-100 text-blue-800 border-blue-200 animate-pulse">
+        <Truck className="w-3 h-3 text-blue-600" /> In Transit
+      </span>
+    );
+  }
+  if (status === 'READY_FOR_DISPATCH') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-amber-100 text-amber-800 border-amber-200">
+        <Package className="w-3 h-3 text-amber-600" /> Ready for Dispatch
+      </span>
+    );
+  }
+  if (['APPROVED', 'ACCEPTED', 'PREPARING'].includes(status)) {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-blue-100 text-blue-800 border-blue-200">
         <ShieldCheck className="w-3 h-3" /> Authorized

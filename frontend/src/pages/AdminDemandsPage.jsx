@@ -711,7 +711,7 @@ export default function AdminDemandsPage() {
                           ₹{(dem.total_amount || 0).toLocaleString('en-IN')}
                         </td>
                         <td className="p-3.5 whitespace-nowrap">
-                          <StatusBadge status={dem.status} />
+                          <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} />
                         </td>
                         <td className="p-3.5 text-right whitespace-nowrap">
                           {dem.status === 'APPROVED' ? (

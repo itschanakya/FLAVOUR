@@ -120,7 +120,53 @@ function DemandCard({ dem, onPrepare, onSendToFleet, loadingId }) {
           </p>
         )}
 
-        {dem.items && dem.items.length > 0 && (
+        {/* Dedicated Unit Packing Menu / Raw Inventory BOM */}
+        {dem.unit_menu && dem.unit_menu.length > 0 ? (
+          <div className="mt-3 pt-2.5 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="w-full flex items-center justify-between text-xs font-bold text-slate-700 hover:text-indigo-600 py-1 transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Unit Packing Menu ({dem.unit_menu.length} Items)</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                {dem.stock_charged_off ? (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    Stock Charged Off ✓
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                    Charge-Off on Prepare
+                  </span>
+                )}
+                {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+              </div>
+            </button>
+            {expanded && (
+              <div className="mt-2 bg-indigo-50/50 border border-indigo-100/80 rounded-xl overflow-hidden p-2.5 space-y-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 px-0.5 flex items-center justify-between">
+                  <span>Unit Recipe Checklist</span>
+                  <span className="font-mono text-indigo-600">{dem.total_quantity || 0} Packets</span>
+                </div>
+                {dem.unit_menu.map((menuItem, idx) => (
+                  <div key={menuItem.item_id || idx} className="px-2.5 py-1.5 text-xs bg-white rounded-lg border border-indigo-100 flex items-center justify-between shadow-2xs">
+                    <div>
+                      <span className="font-bold text-slate-800">{menuItem.item_name}</span>
+                      <span className="text-[10px] text-slate-400 ml-1.5 font-medium">({menuItem.qty_per_packet} / pkt)</span>
+                    </div>
+                    <div className="text-right flex items-center gap-2">
+                      <span className="text-[10px] text-slate-400 hidden sm:inline">Stock: {menuItem.current_stock ?? '—'}</span>
+                      <span className="font-black text-indigo-700">{menuItem.total_needed} {menuItem.unit_of_measure || 'units'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : dem.items && dem.items.length > 0 ? (
           <div className="mt-2">
             <button
               type="button"
@@ -144,10 +190,17 @@ function DemandCard({ dem, onPrepare, onSendToFleet, loadingId }) {
               </div>
             )}
           </div>
-        )}
+        ) : null}
       </div>
 
-      <div className="p-3 bg-slate-50/90 border-t border-slate-100 flex flex-wrap items-center justify-end gap-2">
+      <div className="p-3 bg-slate-50/90 border-t border-slate-100 flex flex-col gap-1.5">
+        {dem.stock_charged_off ? (
+          <div className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+            <span>Stock charged off from inventory</span>
+          </div>
+        ) : null}
+
         {dem.status === 'ACCEPTED' ? (
           <button
             onClick={() => onPrepare(dem.id)}
@@ -155,7 +208,7 @@ function DemandCard({ dem, onPrepare, onSendToFleet, loadingId }) {
             className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-md shadow-indigo-500/20 disabled:opacity-50"
           >
             {loadingId === dem.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PackageCheck className="w-3.5 h-3.5" />}
-            Prepare
+            Prepare & Charge-Off Stock
           </button>
         ) : dem.status === 'PREPARING' ? (
           <button

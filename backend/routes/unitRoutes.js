@@ -286,4 +286,113 @@ router.delete('/:id', authenticateToken, authorizeRoles('ADMIN'), async (req, re
   }
 });
 
+// GET /api/units/:id/menu - ADMIN gets the dedicated menu for a specific unit
+router.get('/:id/menu', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const unitId = req.params.id;
+    const db = await getDB();
+    const unit = await db.get('SELECT id, unit_name, unit_code, ncc_group FROM units WHERE id = ?', [unitId]);
+    if (!unit) return res.status(404).json({ error: 'Unit not found.' });
+
+    let items = await db.all(`
+      SELECT umi.id, umi.unit_id, umi.item_id, umi.quantity,
+             ri.item_name, ri.unit_price, ri.unit_of_measure, ri.current_stock, ri.is_active, ri.expiry_date, ri.image_url
+      FROM unit_menu_items umi
+      JOIN refreshment_items ri ON umi.item_id = ri.id
+      WHERE umi.unit_id = ?
+      ORDER BY ri.item_name ASC
+    `, [unitId]);
+
+    let isCustomized = items.length > 0;
+
+    // If unit has no custom menu, fallback to default packet template
+    if (!isCustomized) {
+      const template = await db.get("SELECT id FROM packet_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+      if (template) {
+        items = await db.all(`
+          SELECT 0 as id, ? as unit_id, pti.item_id, pti.quantity,
+                 ri.item_name, ri.unit_price, ri.unit_of_measure, ri.current_stock, ri.is_active, ri.expiry_date, ri.image_url
+          FROM packet_template_items pti
+          JOIN refreshment_items ri ON pti.item_id = ri.id
+          WHERE pti.template_id = ?
+          ORDER BY ri.item_name ASC
+        `, [unitId, template.id]);
+      }
+    }
+
+    let subtotal = 0;
+    const formattedItems = items.map(it => {
+      const lineCost = (it.unit_price || 0) * (it.quantity || 1);
+      subtotal += lineCost;
+      return {
+        ...it,
+        line_total: lineCost
+      };
+    });
+
+    res.json({
+      unit,
+      is_customized: isCustomized,
+      items: formattedItems,
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      target_budget: 75.0
+    });
+  } catch (error) {
+    console.error('Fetch unit menu error:', error);
+    res.status(500).json({ error: 'Failed to retrieve unit menu chart.' });
+  }
+});
+
+// POST /api/units/:id/menu - ADMIN updates the dedicated menu for a specific unit
+router.post('/:id/menu', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const unitId = req.params.id;
+    const { items } = req.body;
+    const db = await getDB();
+
+    const unit = await db.get('SELECT id, unit_name, unit_code FROM units WHERE id = ?', [unitId]);
+    if (!unit) return res.status(404).json({ error: 'Unit not found.' });
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Menu chart must contain at least one item.' });
+    }
+
+    // Validate items and calculate total cost
+    let totalCost = 0;
+    for (const it of items) {
+      const catItem = await db.get('SELECT * FROM refreshment_items WHERE id = ?', [it.item_id]);
+      if (!catItem) {
+        return res.status(400).json({ error: `Item ID ${it.item_id} not found in catalog.` });
+      }
+      const qty = parseInt(it.quantity, 10) || 1;
+      totalCost += (catItem.unit_price || 0) * qty;
+    }
+
+    // Delete existing items and insert new ones
+    await db.run('DELETE FROM unit_menu_items WHERE unit_id = ?', [unitId]);
+
+    for (const it of items) {
+      const qty = parseInt(it.quantity, 10) || 1;
+      await db.run(
+        'INSERT INTO unit_menu_items (unit_id, item_id, quantity) VALUES (?, ?, ?)',
+        [unitId, it.item_id, qty]
+      );
+    }
+
+    await db.run(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
+      ['UNIT_MENU', unitId, 'UPDATED', req.user.id, `Configured custom menu chart for unit ${unit.unit_name} (${items.length} items, total ₹${totalCost.toFixed(2)})`]
+    );
+
+    res.json({
+      message: `Menu chart for ${unit.unit_name} successfully saved.`,
+      unit_id: unitId,
+      total_cost: totalCost
+    });
+  } catch (error) {
+    console.error('Save unit menu error:', error);
+    res.status(500).json({ error: 'Failed to save unit menu chart.' });
+  }
+});
+
 module.exports = router;

@@ -456,7 +456,26 @@ async function initializeSchema(db) {
       FOREIGN KEY (indent_id) REFERENCES stock_demand_indents(id) ON DELETE CASCADE,
       FOREIGN KEY (item_id) REFERENCES refreshment_items(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS unit_menu_items (
+      id INTEGER PRIMARY KEY AUTO_INCREMENT,
+      unit_id INTEGER NOT NULL,
+      item_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE,
+      FOREIGN KEY (item_id) REFERENCES refreshment_items(id) ON DELETE CASCADE,
+      UNIQUE KEY unique_unit_item (unit_id, item_id)
+    );
   `);
+
+  try {
+    await db.run("ALTER TABLE demands ADD COLUMN stock_charged_off TINYINT(1) DEFAULT 0");
+  } catch (err) { }
+  try {
+    await db.run("ALTER TABLE demands ADD COLUMN stock_charged_off_at DATETIME NULL");
+  } catch (err) { }
 
   // Ensure stock and expiry columns exist in refreshment_items table
   try {

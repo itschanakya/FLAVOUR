@@ -304,7 +304,7 @@ export default function MyDemandsList() {
                 <span className="text-xs font-mono text-blue-600 font-bold">{selectedDemand.demand_number}</span>
                 <h3 className="text-xl font-bold text-slate-900">{selectedDemand.purpose}</h3>
               </div>
-              <StatusBadge status={selectedDemand.status} />
+              <StatusBadge status={selectedDemand.status} deliveryStatus={selectedDemand.delivery_status} demand={selectedDemand} />
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-xs">

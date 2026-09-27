@@ -5,11 +5,12 @@ import {
   Search, Edit3, ShieldAlert, X, ShoppingBag, Users, MapPin, ExternalLink,
   Truck, Plus, Trash2, Phone, ShieldCheck, Wifi, Eye, EyeOff, Boxes,
   Gauge, AlertCircle, Info, Navigation, Scale, Compass, Map, CalendarDays, History,
-  Download, Upload, RotateCcw, DatabaseBackup, Lock, ShieldOff, FileJson
+  Download, Upload, RotateCcw, DatabaseBackup, Lock, ShieldOff, FileJson, Layers, ClipboardList
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManageCatalog from './ManageCatalog';
 import ManageUnits from './ManageUnits';
+import UnitMenuManager from '../components/UnitMenuManager';
 import CustomDateInput from '../components/CustomDateInput';
 import DataBackupPanel from '../components/DataBackupPanel';
 
@@ -903,6 +904,13 @@ export default function AppSettings() {
                   Manage NCC Units
                 </button>
                 <button
+                  onClick={() => setActiveTab('unit-menus')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'unit-menus' ? 'bg-purple-50 text-purple-700 font-bold border border-purple-200' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Layers className="w-4 h-4 text-purple-600" />
+                  Unit Menu Charts
+                </button>
+                <button
                   onClick={() => setActiveTab('inventory')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'inventory' || activeTab === 'catalog' ? 'bg-amber-50 text-amber-700 font-bold border border-amber-200' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
@@ -1011,6 +1019,7 @@ export default function AppSettings() {
             <div>
               <h1 className={`font-bold text-slate-800 ${activeTab === 'catalog' || activeTab === 'stock' ? 'text-lg' : 'text-xl'}`}>
                 {activeTab === 'units' && 'Manage NCC Units (Battalions & Regiments)'}
+                {activeTab === 'unit-menus' && 'Dedicated Unit Refreshment Menu Charts (BOM)'}
                 {activeTab === 'catalog' && 'Refreshment Catalog & Standard Packet'}
                 {activeTab === 'inventory' && 'Inventory Management'}
                 {activeTab === 'stock' && 'Stock Management'}
@@ -1026,6 +1035,7 @@ export default function AppSettings() {
               </h1>
               <p className={`text-slate-500 ${activeTab === 'catalog' || activeTab === 'stock' || activeTab === 'inventory' ? 'text-xs mt-0.5' : 'text-sm mt-1'}`}>
                 {activeTab === 'units' && 'Onboard NCC Units, issue Unit logins & manage jurisdiction scopes.'}
+                {activeTab === 'unit-menus' && 'Configure custom items composition for each NCC Unit (Admin only). Supply Point automatically charges off stock when preparing.'}
                 {(activeTab === 'catalog' || activeTab === 'inventory') && 'Configure catalog items, approved pricing, photos, and Standard ₹75 Refreshment Packet builder.'}
                 {activeTab === 'stock' && 'Live stock balance ledger, batch expiry tracking, consumed today metrics, and incoming restock shipments.'}
                 {activeTab === 'unit-credentials' && 'View, manage, and reset User ID & Passwords for all NCC Units under headquarters.'}
@@ -1101,6 +1111,11 @@ export default function AppSettings() {
                 {/* 0. ADMIN: MANAGE UNITS */}
                 {activeTab === 'units' && (
                   <ManageUnits embedded={true} />
+                )}
+
+                {/* 0.05 ADMIN: UNIT MENU CHARTS */}
+                {activeTab === 'unit-menus' && (
+                  <UnitMenuManager />
                 )}
 
                 {/* 0.1 ADMIN: INVENTORY (ITEMS, RATES, PACKETS) */}
