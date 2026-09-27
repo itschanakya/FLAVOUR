@@ -27,6 +27,7 @@ import DocumentationPage from './pages/DocumentationPage';
 import DriverDeliverySummaryPage from './pages/DriverDeliverySummaryPage';
 import UnitDemandPage from './pages/UnitDemandPage';
 import AdminDeliveryTracking from './pages/AdminDeliveryTracking';
+import AdminDemandsPage from './pages/AdminDemandsPage';
 function SummaryRouter() {
   const { user } = useAuth();
   if (user?.role === 'DELIVERY') {
@@ -64,6 +65,7 @@ export default function App() {
                 <Route path="/login" element={<LoginPage />} />
 
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/demands" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDemandsPage /></ProtectedRoute>} />
                 <Route path="/raise-demand" element={<ProtectedRoute allowedRoles={['INSTITUTION']}><RaiseDemandPage /></ProtectedRoute>} />
                 <Route path="/unit-demand" element={<ProtectedRoute allowedRoles={['UNIT']}><UnitDemandPage /></ProtectedRoute>} />
                 <Route path="/my-demands" element={<ProtectedRoute><MyDemandsList /></ProtectedRoute>} />

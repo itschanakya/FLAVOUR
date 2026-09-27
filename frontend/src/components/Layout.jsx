@@ -23,7 +23,8 @@ import {
   Monitor,
   Smartphone,
   Navigation,
-  Boxes
+  Boxes,
+  LayoutDashboard
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useSSE } from '../context/SSEContext';
@@ -97,7 +98,8 @@ export default function Layout({ children }) {
   });
 
   const getRawBadgeCount = (path) => {
-    if (path === '/dashboard' && user?.role === 'ADMIN') return adminDemandsCount;
+    if (path === '/demands' && user?.role === 'ADMIN') return adminDemandsCount;
+    if (path === '/dashboard' && user?.role === 'ADMIN') return 0;
     if (path === '/approved-demands') return supplyPointCount;
     if (path === '/delivery') return fleetDeliveryCount;
     if (path === '/documentation') return documentationCount;
@@ -132,8 +134,8 @@ export default function Layout({ children }) {
       handleClearBadge('/approved-demands');
     } else if (location.pathname === '/review-demands' && unitReviewCount > 0) {
       handleClearBadge('/review-demands');
-    } else if (location.pathname === '/dashboard' && user?.role === 'ADMIN' && adminDemandsCount > 0) {
-      handleClearBadge('/dashboard');
+    } else if (location.pathname === '/demands' && user?.role === 'ADMIN' && adminDemandsCount > 0) {
+      handleClearBadge('/demands');
     } else if (location.pathname === '/delivery' && fleetDeliveryCount > 0) {
       handleClearBadge('/delivery');
     } else if (location.pathname === '/documentation' && documentationCount > 0) {
@@ -157,7 +159,8 @@ export default function Layout({ children }) {
 
   const navItems = {
     ADMIN: [
-      { path: '/dashboard', label: 'Demands', icon: BarChart3 },
+      { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { path: '/demands', label: 'Demands', icon: ShoppingBag },
       { path: '/approved-demands', label: 'Supply Point', icon: Truck },
       { path: '/delivery', label: 'Fleet Delivery', icon: Truck },
       { path: '/admin/delivery-tracking', label: 'Live Tracking', icon: Navigation },
@@ -188,13 +191,14 @@ export default function Layout({ children }) {
 
   const mobileNavItems = {
     ADMIN: [
-      { path: '/dashboard', label: 'Overview', icon: BarChart3 },
+      { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { path: '/demands', label: 'Demands', icon: ShoppingBag },
       { path: '/approved-demands', label: 'Supply', icon: Truck },
       { path: '/delivery', label: 'Fleet', icon: Truck },
       { path: '/admin/delivery-tracking', label: 'Live', icon: Navigation },
-      { path: '/stock', label: 'Stock Mgmt', icon: Boxes },
-      { path: '/bill-collection', label: 'Bills', icon: Receipt },
-      { path: '/reports', label: 'Reports', icon: Layers }
+      { path: '/stock', label: 'Stock', icon: Boxes },
+      { path: '/reports', label: 'Reports', icon: Layers },
+      { path: '/bill-collection', label: 'Bills', icon: Receipt }
     ],
     UNIT: [
       { path: '/dashboard', label: 'Home', icon: BarChart3 },
@@ -223,6 +227,12 @@ export default function Layout({ children }) {
       inactive: 'text-blue-950 hover:text-blue-700 hover:bg-blue-50/90 border-blue-200/80 hover:border-blue-400 bg-white/90',
       iconActive: 'text-white',
       iconInactive: 'text-blue-600 group-hover:scale-110'
+    },
+    '/demands': {
+      active: 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/30 border-indigo-600',
+      inactive: 'text-indigo-950 hover:text-indigo-700 hover:bg-indigo-50/90 border-indigo-200/80 hover:border-indigo-400 bg-white/90',
+      iconActive: 'text-white',
+      iconInactive: 'text-indigo-600 group-hover:scale-110'
     },
     '/unit-demand': {
       active: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/30 border-blue-600',
@@ -496,7 +506,8 @@ export default function Layout({ children }) {
                   const isSupplyPoint = item.path === '/approved-demands';
                   const isReviewQueue = item.path === '/review-demands';
                   const isBills = item.path === '/bills';
-                  const rawBadgeCount = isSupplyPoint ? supplyPointCount : (isReviewQueue ? unitReviewCount : (isBills ? billNoticeCount : 0));
+                  const isDemands = item.path === '/demands';
+                  const rawBadgeCount = isSupplyPoint ? supplyPointCount : (isReviewQueue ? unitReviewCount : (isBills ? billNoticeCount : (isDemands ? adminDemandsCount : 0)));
 
                   const clearedInfo = clearedBadges[item.path];
                   let isCleared = false;
@@ -649,7 +660,8 @@ export default function Layout({ children }) {
               const isSupplyPoint = item.path === '/approved-demands';
               const isReviewQueue = item.path === '/review-demands';
               const isBills = item.path === '/bills';
-              const rawBadgeCount = isSupplyPoint ? supplyPointCount : (isReviewQueue ? unitReviewCount : (isBills ? billNoticeCount : 0));
+              const isDemands = item.path === '/demands';
+              const rawBadgeCount = isSupplyPoint ? supplyPointCount : (isReviewQueue ? unitReviewCount : (isBills ? billNoticeCount : (isDemands ? adminDemandsCount : 0)));
               const clearedInfo = clearedBadges[item.path];
               const isCleared = clearedInfo ? (typeof clearedInfo === 'object' && clearedInfo.count !== undefined ? rawBadgeCount <= clearedInfo.count : true) : false;
               const badgeCount = isCleared ? 0 : rawBadgeCount;
