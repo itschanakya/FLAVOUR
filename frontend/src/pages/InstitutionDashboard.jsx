@@ -17,7 +17,8 @@ import {
   Pencil,
   FileEdit,
   Truck,
-  CheckCircle2
+  CheckCircle2,
+  X
 } from 'lucide-react';
 import { IndianRupee } from 'lucide-react';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
@@ -80,7 +81,7 @@ export default function InstitutionDashboard() {
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDemand, setSelectedDemand] = useState(null);
-  const [editDemandId, setEditDemandId] = useState(null);
+  const [editDemandData, setEditDemandData] = useState(null);
   
   // Form State
   const [demandPrefix, setDemandPrefix] = useState('FIRST');
@@ -352,8 +353,8 @@ export default function InstitutionDashboard() {
         items: items
       };
 
-      const res = await fetch(editDemandId ? `/api/demands/${editDemandId}` : '/api/demands', {
-        method: editDemandId ? 'PUT' : 'POST',
+      const res = await fetch('/api/demands', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -363,8 +364,6 @@ export default function InstitutionDashboard() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit demand.');
-
-      if (editDemandId) setEditDemandId(null);
 
       // Broadcast instant local cross-window notification
       try {
@@ -413,16 +412,6 @@ export default function InstitutionDashboard() {
   };
 
   const handleEditClick = (d) => {
-    setEditDemandId(d.id);
-    if (d.purpose && d.purpose.includes('SECOND DEMAND')) {
-      setDemandPrefix('SECOND');
-    } else {
-      setDemandPrefix('FIRST');
-    }
-    setDemandDate(d.demand_date ? d.demand_date.split('T')[0] : '');
-    setDemandTime(d.demand_time || '08:00');
-    setVenue(d.delivery_venue || '');
-    
     let y1 = 0, y2 = 0, y3 = 0;
     if (d.items && d.items.length > 0) {
       d.items.forEach(it => {
@@ -434,11 +423,53 @@ export default function InstitutionDashboard() {
       let total = parseInt(d.total_quantity) || 0;
       y1 = total;
     }
-    setYear1(y1);
-    setYear2(y2);
-    setYear3(y3);
-    setTotalDemanded(y1 + y2 + y3);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    setEditDemandData({
+      id: d.id,
+      demand_date: d.demand_date ? d.demand_date.split('T')[0] : new Date().toISOString().split('T')[0],
+      demand_time: d.demand_time || '08:00',
+      total_quantity: d.total_quantity || 0,
+      y1, y2, y3
+    });
+  };
+
+  const handleUpdateDemand = async (e) => {
+    e.preventDefault();
+    if (!editDemandData) return;
+    
+    const totalQty = (parseInt(editDemandData.y1) || 0) + (parseInt(editDemandData.y2) || 0) + (parseInt(editDemandData.y3) || 0);
+    const items = [
+      { item_name: 'Refreshment Packet', quantity: parseInt(editDemandData.y1) || 0, year_group: '1st Year' },
+      { item_name: 'Refreshment Packet', quantity: parseInt(editDemandData.y2) || 0, year_group: '2nd Year' },
+      { item_name: 'Refreshment Packet', quantity: parseInt(editDemandData.y3) || 0, year_group: '3rd Year' }
+    ].filter(i => i.quantity > 0);
+
+    const payload = {
+      demand_date: editDemandData.demand_date,
+      demand_time: editDemandData.demand_time,
+      total_packets: totalQty,
+      items: items
+    };
+
+    try {
+      const res = await fetch(`/api/demands/${editDemandData.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update demand.');
+
+      setEditDemandData(null);
+      fetchData();
+      alert('Demand updated successfully!');
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const handleDelete = async (id, demandNumber) => {
@@ -779,7 +810,7 @@ export default function InstitutionDashboard() {
                 disabled={submitting}
                 className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-sm transition-all disabled:opacity-70 cursor-pointer"
               >
-                {submitting ? 'Processing...' : (editDemandId ? 'UPDATE DEMAND' : 'PLACE DEMAND')}
+                {submitting ? 'Processing...' : 'PLACE DEMAND'}
               </button>
               <button 
                 type="button"
@@ -938,6 +969,98 @@ export default function InstitutionDashboard() {
         onClose={() => setSelectedDemand(null)} 
         token={token} 
       />
+
+      {/* EDIT DEMAND MODAL */}
+      {editDemandData && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-slate-200" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h3 className="font-black text-slate-800 text-sm flex items-center gap-2 uppercase tracking-wider">
+                <FileEdit className="w-4 h-4 text-indigo-600" />
+                Edit Demand
+              </h3>
+              <button onClick={() => setEditDemandData(null)} className="p-1 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateDemand} className="p-5 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">DATE</label>
+                  <CustomDateInput 
+                    value={editDemandData.demand_date}
+                    onChange={(val) => setEditDemandData({...editDemandData, demand_date: val})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">TIME</label>
+                  <div className="relative group">
+                    <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input 
+                      type="time" 
+                      value={editDemandData.demand_time}
+                      onChange={(e) => setEditDemandData({...editDemandData, demand_time: e.target.value})}
+                      className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">QUANTITY DISTRIBUTION</label>
+                <div className={`grid ${s3 > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    <label className="text-[9px] font-black text-slate-500 block mb-1">1ST YR</label>
+                    <input 
+                      type="number" min="0" max={s1}
+                      value={editDemandData.y1}
+                      onChange={(e) => setEditDemandData({...editDemandData, y1: e.target.value})}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    <label className="text-[9px] font-black text-slate-500 block mb-1">2ND YR</label>
+                    <input 
+                      type="number" min="0" max={s2}
+                      value={editDemandData.y2}
+                      onChange={(e) => setEditDemandData({...editDemandData, y2: e.target.value})}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  {s3 > 0 && (
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                      <label className="text-[9px] font-black text-slate-500 block mb-1">3RD YR</label>
+                      <input 
+                        type="number" min="0" max={s3}
+                        value={editDemandData.y3}
+                        onChange={(e) => setEditDemandData({...editDemandData, y3: e.target.value})}
+                        className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-black text-slate-800 text-center focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button 
+                  type="submit"
+                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black uppercase tracking-wider transition-colors"
+                >
+                  SAVE CHANGES
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setEditDemandData(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-black uppercase tracking-wider transition-colors"
+                >
+                  CANCEL
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
