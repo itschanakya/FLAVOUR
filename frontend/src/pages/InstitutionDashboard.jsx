@@ -15,6 +15,7 @@ import {
   FileCheck,
   Eye,
   Pencil,
+  FileEdit,
   Truck,
   CheckCircle2
 } from 'lucide-react';
@@ -79,6 +80,7 @@ export default function InstitutionDashboard() {
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDemand, setSelectedDemand] = useState(null);
+  const [editDemandId, setEditDemandId] = useState(null);
   
   // Form State
   const [demandPrefix, setDemandPrefix] = useState('FIRST');
@@ -350,8 +352,8 @@ export default function InstitutionDashboard() {
         items: items
       };
 
-      const res = await fetch('/api/demands', {
-        method: 'POST',
+      const res = await fetch(editDemandId ? `/api/demands/${editDemandId}` : '/api/demands', {
+        method: editDemandId ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -361,6 +363,8 @@ export default function InstitutionDashboard() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit demand.');
+
+      if (editDemandId) setEditDemandId(null);
 
       // Broadcast instant local cross-window notification
       try {
@@ -405,6 +409,36 @@ export default function InstitutionDashboard() {
     setDemandTime('08:00');
     setVenue(instDetails?.complete_address || instDetails?.institution_name || '');
     setError('');
+    setEditDemandId(null);
+  };
+
+  const handleEditClick = (d) => {
+    setEditDemandId(d.id);
+    if (d.purpose && d.purpose.includes('SECOND DEMAND')) {
+      setDemandPrefix('SECOND');
+    } else {
+      setDemandPrefix('FIRST');
+    }
+    setDemandDate(d.demand_date ? d.demand_date.split('T')[0] : '');
+    setDemandTime(d.demand_time || '08:00');
+    setVenue(d.delivery_venue || '');
+    
+    let y1 = 0, y2 = 0, y3 = 0;
+    if (d.items && d.items.length > 0) {
+      d.items.forEach(it => {
+        if (it.year_group === '1st Year') y1 = parseInt(it.quantity) || 0;
+        if (it.year_group === '2nd Year') y2 = parseInt(it.quantity) || 0;
+        if (it.year_group === '3rd Year') y3 = parseInt(it.quantity) || 0;
+      });
+    } else {
+      let total = parseInt(d.total_quantity) || 0;
+      y1 = total;
+    }
+    setYear1(y1);
+    setYear2(y2);
+    setYear3(y3);
+    setTotalDemanded(y1 + y2 + y3);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id, demandNumber) => {
@@ -745,7 +779,7 @@ export default function InstitutionDashboard() {
                 disabled={submitting}
                 className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-sm transition-all disabled:opacity-70 cursor-pointer"
               >
-                {submitting ? 'Placing...' : 'PLACE DEMAND'}
+                {submitting ? 'Processing...' : (editDemandId ? 'UPDATE DEMAND' : 'PLACE DEMAND')}
               </button>
               <button 
                 type="button"
@@ -863,13 +897,23 @@ export default function InstitutionDashboard() {
                       </td>
                       <td className="pr-6 pl-2 py-4 text-center rounded-r-2xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">
+                          {(dem.status === 'PENDING' || dem.status === 'SUBMITTED' || dem.status === 'APPROVED') && (
+                            <button
+                              type="button"
+                              onClick={() => handleEditClick(dem)}
+                              className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 border border-indigo-200 shadow-2xs transition-all cursor-pointer"
+                              title="Edit Demand"
+                            >
+                              <FileEdit className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setSelectedDemand(dem)}
                             className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer"
-                            title="Edit / View Details"
+                            title="Live Tracker / View Details"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5" />
                           </button>
 
                           <button

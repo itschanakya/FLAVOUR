@@ -647,7 +647,7 @@ export default function LoginPage() {
       {/* FOOTER: Official Directorate Notice & Helplines */}
       {/* ========================================================================= */}
       <footer className="relative z-20 w-full px-4 sm:px-8 py-3.5 border-t border-white/10 bg-slate-950/50 backdrop-blur-md text-[11px] text-slate-400">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-2 text-center">
           <div>
             <span>© 2026 Flavour Base India LLP. All Rights Reserved.</span>
             <span className="hidden md:inline text-slate-600 mx-2">|</span>
@@ -657,7 +657,7 @@ export default function LoginPage() {
           <div className="flex items-center gap-4 text-slate-400">
             <button
               onClick={() => setShowHelpModal(true)}
-              className="hover:text-white transition-colors cursor-pointer underline underline-offset-2"
+              className="hover:text-white transition-colors cursor-pointer"
             >
               Standard Operating Procedures (SOP)
             </button>
@@ -672,7 +672,7 @@ export default function LoginPage() {
                 setForgotStep(1);
                 setShowForgotModal(true);
               }}
-              className="hover:text-white transition-colors cursor-pointer underline underline-offset-2"
+              className="hover:text-white transition-colors cursor-pointer"
             >
               Reset Credentials
             </button>

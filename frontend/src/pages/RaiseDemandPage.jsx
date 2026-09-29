@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, ShieldAlert, CheckCircle2, AlertCircle, ArrowLeft, ClipboardList, PlusCircle } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Plus, Trash2, ShieldAlert, CheckCircle2, AlertCircle, ArrowLeft, ClipboardList, PlusCircle, Package } from 'lucide-react';
 import StandardPacketViewer from '../components/StandardPacketViewer';
 import CustomDateInput from '../components/CustomDateInput';
 
 export default function RaiseDemandPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const editDemand = location.state?.editDemand || null;
 
   const [institution, setInstitution] = useState(null);
   const [catalog, setCatalog] = useState([]);
-  const [demandDate, setDemandDate] = useState(new Date().toISOString().split('T')[0]);
-  const [purpose, setPurpose] = useState('Institutional Drill Parade Refreshments');
+  const [demandDate, setDemandDate] = useState(editDemand ? editDemand.demand_date.split('T')[0] : new Date().toISOString().split('T')[0]);
+  const [purpose, setPurpose] = useState(editDemand ? editDemand.purpose : 'Institutional Drill Parade Refreshments');
 
   const [selectedItems, setSelectedItems] = useState([
     { item_id: '', year_group: '1st Year', quantity: 10 }
@@ -51,7 +53,15 @@ export default function RaiseDemandPage() {
       const defaultItemId = stdItem ? stdItem.id.toString() : '60001';
 
       const initial = [];
-      if (currentInst) {
+      if (editDemand && editDemand.items && editDemand.items.length > 0) {
+        editDemand.items.forEach(it => {
+          initial.push({
+            item_id: it.item_id.toString(),
+            year_group: it.year_group,
+            quantity: it.quantity
+          });
+        });
+      } else if (currentInst) {
         if ((currentInst.strength_1st_year || 0) > 0) {
           initial.push({ item_id: defaultItemId, year_group: '1st Year', quantity: currentInst.strength_1st_year });
         }
@@ -170,8 +180,11 @@ export default function RaiseDemandPage() {
         }))
       };
 
-      const res = await fetch('/api/demands', {
-        method: 'POST',
+      const url = editDemand ? `/api/demands/${editDemand.id}` : '/api/demands';
+      const method = editDemand ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -184,7 +197,11 @@ export default function RaiseDemandPage() {
         throw new Error(data.error || 'Failed to submit demand.');
       }
 
-      alert(`Demand ${data.demand.demand_number} initiated successfully! Sent to NCC Unit for approval.`);
+      if (editDemand) {
+        alert(`Demand ${editDemand.demand_number} updated successfully!`);
+      } else {
+        alert(`Demand ${data.demand_number || ''} initiated successfully! Sent to NCC Unit for approval.`);
+      }
       navigate('/my-demands');
 
     } catch (err) {
@@ -210,9 +227,9 @@ export default function RaiseDemandPage() {
           <span>Back to Placed Demands</span>
         </button>
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Initiate Refreshment Demand</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">{editDemand ? 'Update Refreshment Demand' : 'Initiate Refreshment Demand'}</h2>
           <p className="text-sm text-slate-500">
-            Submit cadet refreshment requisition to <span className="text-blue-600 font-semibold">{institution?.unit_name}</span>
+            {editDemand ? `Update cadet refreshment requisition for ${editDemand.demand_number}` : `Submit cadet refreshment requisition to `} <span className="text-blue-600 font-semibold">{institution?.unit_name}</span>
           </p>
         </div>
       </div>
@@ -419,7 +436,7 @@ export default function RaiseDemandPage() {
             disabled={submitting || isQuotaExceeded}
             className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50"
           >
-            {submitting ? 'Submitting Demand...' : 'Submit Demand to NCC Unit'}
+            {submitting ? (editDemand ? 'Updating Demand...' : 'Submitting Demand...') : (editDemand ? 'Update Demand' : 'Submit Demand to NCC Unit')}
           </button>
         </div>
       </form>

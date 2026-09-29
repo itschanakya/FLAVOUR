@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, XCircle, Ban, Trash2, Filter, FileText, FileCheck,
   School, Calendar, ArrowRight, IndianRupee, ChevronDown,
   ChevronUp, Users, Package, MessageSquare, ShieldCheck,
   AlertTriangle, Clock3, Inbox, RefreshCw, Eye, Truck, Phone,
-  Layers, TrendingUp, Sparkles, LayoutList, LayoutGrid, MapPin
+  Layers, TrendingUp, Sparkles, LayoutList, LayoutGrid, MapPin, FileEdit
 } from 'lucide-react';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
 import StandardPacketViewer from '../components/StandardPacketViewer';
@@ -220,7 +221,7 @@ function DeliveryStagePill({ demand }) {
 /**
  * Tabular View for Demand Authorization Queue and Historical Records
  */
-function DemandsTableView({ demands, onAction, onDelete, onClick }) {
+function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
   const totalQty = demands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
   const totalVal = demands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
 
@@ -346,6 +347,15 @@ function DemandsTableView({ demands, onAction, onDelete, onClick }) {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+                      {(dem.status === 'PENDING' || dem.status === 'APPROVED' || dem.status === 'SUBMITTED') && (
+                        <button
+                          onClick={() => onEdit(dem)}
+                          title="Edit Demand"
+                          className="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-lg border border-indigo-200 hover:border-indigo-600 transition-all shadow-xs"
+                        >
+                          <FileEdit className="w-4 h-4" />
+                        </button>
+                      )}
                       {dem.delivery_receipt_url && (
                         <a
                           href={dem.delivery_receipt_url}
@@ -393,7 +403,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick }) {
   );
 }
 
-function DemandCard({ dem, onAction, onDelete, onClick }) {
+function DemandCard({ dem, onAction, onDelete, onClick, onEdit }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = dem.status === 'PENDING';
   const canCancel = ['PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH'].includes(dem.status) && dem.delivery_status !== 'DELIVERED';
@@ -736,6 +746,7 @@ function ActionModal({ demand, action, onClose, onConfirm, processing }) {
 
 export default function ReviewDemandsQueue() {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const { events } = useSSE();
   const [demands, setDemands] = useState([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -1145,6 +1156,7 @@ export default function ReviewDemandsQueue() {
             onAction={handleAction}
             onDelete={handleDelete}
             onClick={setViewDemand}
+            onEdit={(d) => navigate('/unit-demand', { state: { editDemand: d } })}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1155,6 +1167,7 @@ export default function ReviewDemandsQueue() {
                 onAction={handleAction}
                 onDelete={handleDelete}
                 onClick={setViewDemand}
+                onEdit={(d) => navigate('/unit-demand', { state: { editDemand: d } })}
               />
             ))}
           </div>

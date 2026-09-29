@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import {
@@ -29,7 +29,8 @@ import {
   History,
   Printer,
   Pencil,
-  Trash2
+  Trash2,
+  FileEdit
 } from 'lucide-react';
 import CustomDateInput from '../components/CustomDateInput';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
@@ -39,6 +40,8 @@ export default function UnitDemandPage() {
   const { user, token } = useAuth();
   const { events } = useSSE();
   const navigate = useNavigate();
+  const location = useLocation();
+  const editDemandState = location.state?.editDemand;
 
   // Strict role check: This Refreshment Demand Console is exclusively for UNIT
   useEffect(() => {
@@ -132,6 +135,7 @@ export default function UnitDemandPage() {
   const [loadingDemands, setLoadingDemands] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedDemand, setSelectedDemand] = useState(null);
+  const [editDemandId, setEditDemandId] = useState(null);
 
   const getNextDate = (dayName) => {
     if (!dayName) return new Date().toISOString().split('T')[0];
@@ -205,6 +209,13 @@ export default function UnitDemandPage() {
   useEffect(() => {
     fetchRecentDemands(true);
   }, [fetchRecentDemands]);
+
+  useEffect(() => {
+    if (editDemandState && institutions.length > 0) {
+      handleEditClick(editDemandState);
+      window.history.replaceState({}, document.title);
+    }
+  }, [editDemandState, institutions]);
 
   // Real-time updates — in-place update + silent background fetch (ZERO flicker)
   useEffect(() => {
@@ -372,6 +383,48 @@ export default function UnitDemandPage() {
     setTotalDemanded(instS1 + instS2 + (instS3 > 0 ? instS3 : 0));
   };
 
+  const handleEditClick = (d) => {
+    setEditDemandId(d.id);
+    setDemandMode(d.demand_type);
+    setDemandDate(d.demand_date ? d.demand_date.split('T')[0] : '');
+    setDemandTime(d.demand_time || '08:00');
+    setVenue(d.delivery_venue || '');
+    setPurpose(d.purpose || '');
+    
+    if (d.demand_type === 'UNIT_DIRECT') {
+      setPacketType(d.packet_type || 'CUSTOMIZED');
+      setCustomRate(d.custom_unit_rate || '60');
+      setTotalPackets(d.total_quantity || '');
+    } else {
+      setSelectedInstId(String(d.institution_id));
+      const foundInst = institutions.find(i => String(i.id) === String(d.institution_id));
+      setSelectedInst(foundInst || null);
+      if (d.purpose && d.purpose.includes('SECOND DEMAND')) {
+        setDemandPrefix('SECOND');
+      } else {
+        setDemandPrefix('FIRST');
+      }
+      let y1 = 0, y2 = 0, y3 = 0;
+      if (d.items && d.items.length > 0) {
+        d.items.forEach(it => {
+          if (it.year_group === '1st Year') y1 = parseInt(it.quantity) || 0;
+          if (it.year_group === '2nd Year') y2 = parseInt(it.quantity) || 0;
+          if (it.year_group === '3rd Year') y3 = parseInt(it.quantity) || 0;
+        });
+      } else {
+        // Fallback to average distribution if items not pre-loaded correctly
+        let total = parseInt(d.total_quantity) || 0;
+        y1 = total; // Just dump in year 1 to avoid complexity if items missing
+      }
+      setYear1(y1 || '');
+      setYear2(y2 || '');
+      setYear3(y3 || '');
+      setTotalDemanded((y1 || 0) + (y2 || 0) + (y3 || 0));
+    }
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleClear = () => {
     if (demandMode === 'INSTITUTION') {
       setYear1('');
@@ -385,6 +438,7 @@ export default function UnitDemandPage() {
     }
     setErrorMsg('');
     setSuccessMsg('');
+    setEditDemandId(null);
   };
 
   // Calculations for Option 2
@@ -422,8 +476,8 @@ export default function UnitDemandPage() {
           delivery_venue: venue.trim()
         };
 
-        const res = await fetch('/api/demands', {
-          method: 'POST',
+        const res = await fetch(editDemandId ? `/api/demands/${editDemandId}` : '/api/demands', {
+          method: editDemandId ? 'PUT' : 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`
@@ -434,7 +488,7 @@ export default function UnitDemandPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to submit unit demand');
 
-        setSuccessMsg(`Demand ${data.demand_number} placed successfully! Packets: ${unitPacketCount} @ ₹${effectiveRate.toFixed(2)} (Total: ₹${unitTotalAmount.toLocaleString('en-IN')}).`);
+        setSuccessMsg(editDemandId ? `Demand ${data.demand?.demand_number || ''} updated successfully!` : `Demand ${data.demand_number} placed successfully! Packets: ${unitPacketCount} @ ₹${effectiveRate.toFixed(2)} (Total: ₹${unitTotalAmount.toLocaleString('en-IN')}).`);
         
         // Optimistically show newly created demand in Demand History immediately
         const newDemandItem = {
@@ -489,8 +543,8 @@ export default function UnitDemandPage() {
           items
         };
 
-        const res = await fetch('/api/demands', {
-          method: 'POST',
+        const res = await fetch(editDemandId ? `/api/demands/${editDemandId}` : '/api/demands', {
+          method: editDemandId ? 'PUT' : 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`
@@ -501,7 +555,7 @@ export default function UnitDemandPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to place demand on behalf of institution');
 
-        setSuccessMsg(`Institutional Demand ${data.demand_number} raised on behalf of ${selectedInst?.institution_name} and approved! Total: ${instTotalQty} Pkts (₹${instTotalAmount.toLocaleString('en-IN')}).`);
+        setSuccessMsg(editDemandId ? `Institutional Demand ${data.demand?.demand_number || ''} updated successfully!` : `Institutional Demand ${data.demand_number} raised on behalf of ${selectedInst?.institution_name} and approved! Total: ${instTotalQty} Pkts (₹${instTotalAmount.toLocaleString('en-IN')}).`);
         
         // Optimistically show newly created institutional demand in Demand History immediately
         const newInstDemandItem = {
@@ -551,6 +605,7 @@ export default function UnitDemandPage() {
               setDemandMode('UNIT_DIRECT');
               setErrorMsg('');
               setSuccessMsg('');
+              setEditDemandId(null);
             }}
             className={`py-1.5 px-4 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${demandMode === 'UNIT_DIRECT'
               ? 'bg-blue-600 text-white shadow-md'
@@ -567,6 +622,7 @@ export default function UnitDemandPage() {
               setDemandMode('INSTITUTION');
               setErrorMsg('');
               setSuccessMsg('');
+              setEditDemandId(null);
             }}
             className={`py-1.5 px-4 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${demandMode === 'INSTITUTION'
               ? 'bg-emerald-600 text-white shadow-md'
@@ -615,14 +671,14 @@ export default function UnitDemandPage() {
             <div className="flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
               <button
                 type="button"
-                onClick={() => { setDemandMode('UNIT_DIRECT'); setErrorMsg(''); setSuccessMsg(''); }}
+                onClick={() => { setDemandMode('UNIT_DIRECT'); setErrorMsg(''); setSuccessMsg(''); setEditDemandId(null); }}
                 className={`py-1.5 px-3 text-xs font-black rounded-lg transition-all cursor-pointer ${demandMode === 'UNIT_DIRECT' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
               >
                 UNIT DIRECT
               </button>
               <button
                 type="button"
-                onClick={() => { setDemandMode('INSTITUTION'); setErrorMsg(''); setSuccessMsg(''); }}
+                onClick={() => { setDemandMode('INSTITUTION'); setErrorMsg(''); setSuccessMsg(''); setEditDemandId(null); }}
                 className={`py-1.5 px-3 text-xs font-black rounded-lg transition-all cursor-pointer ${demandMode === 'INSTITUTION' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
               >
                 FOR INSTITUTE
@@ -1099,12 +1155,24 @@ export default function UnitDemandPage() {
                 ) : (
                   <>
                     <span>
-                      {demandMode === 'UNIT_DIRECT' ? 'PLACE UNIT DIRECT DEMAND' : 'PLACE INSTITUTION DEMAND'}
+                      {editDemandId 
+                        ? 'UPDATE DEMAND' 
+                        : (demandMode === 'UNIT_DIRECT' ? 'PLACE UNIT DIRECT DEMAND' : 'PLACE INSTITUTION DEMAND')}
                     </span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
+              {editDemandId && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="py-3.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs sm:text-sm uppercase tracking-wider transition-all duration-200 cursor-pointer border border-slate-200"
+                  title="Cancel Edit"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
 
               <button
                 type="button"
@@ -1247,13 +1315,24 @@ export default function UnitDemandPage() {
                       </td>
                       <td className="pr-4 pl-2 py-4 text-center rounded-r-xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1.5">
+                          {(d.status === 'PENDING' || d.status === 'APPROVED' || d.status === 'SUBMITTED') && (
+                            <button
+                              type="button"
+                              onClick={() => handleEditClick(d)}
+                              className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border border-emerald-200 shadow-2xs transition-all cursor-pointer"
+                              title="Edit Demand"
+                            >
+                              <FileEdit className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => setSelectedDemand(d)}
                             className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer"
-                            title="Edit / View Details"
+                            title="Live Tracker / View Details"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5" />
                           </button>
 
                           <button

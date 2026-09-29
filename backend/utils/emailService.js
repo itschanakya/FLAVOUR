@@ -303,9 +303,82 @@ async function sendPasswordResetSuccessEmail(email, loginId, newPassword) {
   return false;
 }
 
+/**
+ * Sends an update notification email to the Unit when institution/strength data changes
+ * @param {string} email - Unit recipient email
+ * @param {object} data - { institutionName, updatedBy, changes, timestamp }
+ */
+async function sendUpdateNotificationEmail(email, data) {
+  if (!email || !email.includes('@')) return false;
+
+  const { institutionName, updatedBy, changes, timestamp } = data;
+  const timeStr = timestamp
+    ? new Date(timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+    : new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  const changesHtml = Object.entries(changes || {})
+    .map(([k, v]) => `<tr><td style="padding:6px 0;color:#64748b;font-size:13px;font-weight:600;width:160px;">${k}:</td><td style="padding:6px 0;color:#0f172a;font-size:13px;font-weight:700;">${v}</td></tr>`)
+    .join('');
+
+  const htmlContent = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <h2 style="color:#0f172a;margin:0;font-size:22px;font-weight:800;">FLAVOUR BASE INDIA</h2>
+        <p style="color:#64748b;font-size:13px;margin-top:4px;font-weight:600;">NCC Refreshment Demand &amp; Supply Portal</p>
+      </div>
+      <div style="padding:20px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;margin-bottom:16px;">
+        <div style="display:inline-block;padding:4px 10px;background:#dcfce7;color:#15803d;border-radius:6px;font-size:12px;font-weight:700;margin-bottom:12px;">✓ INSTITUTION DATA UPDATED</div>
+        <p style="color:#334155;font-size:15px;margin:0 0 8px 0;font-weight:700;">${institutionName}</p>
+        <p style="color:#475569;font-size:13px;margin:0 0 16px 0;">Updated by: <strong>${updatedBy}</strong> on ${timeStr} (IST)</p>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;">
+          <table style="width:100%;border-collapse:collapse;">${changesHtml}</table>
+        </div>
+      </div>
+      <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:16px;">This is an automated notification from the NCC Refreshment Portal. Please review the changes in the system.</p>
+    </div>
+  `;
+
+  if (transporter) {
+    try {
+      const info = await transporter.sendMail({
+        from: `"NCC Refreshment Portal" <${smtpUser}>`,
+        to: email,
+        replyTo: smtpUser,
+        subject: `Institution Updated: ${institutionName} - NCC Refreshment Portal`,
+        html: htmlContent,
+        priority: 'high'
+      });
+      console.log(`[UpdateNotif] Email sent to ${email} via SMTP. MessageId: ${info.messageId}`);
+      return true;
+    } catch (smtpErr) {
+      console.error(`[UpdateNotif SMTP Error]:`, smtpErr.message);
+    }
+  }
+
+  if (resend) {
+    try {
+      const { data: d, error } = await resend.emails.send({
+        from: 'NCC Refreshment Portal <onboarding@resend.dev>',
+        to: [email],
+        subject: `Institution Updated: ${institutionName} - NCC Refreshment Portal`,
+        html: htmlContent
+      });
+      if (!error) {
+        console.log(`[UpdateNotif] Sent via Resend. ID: ${d?.id}`);
+        return true;
+      }
+    } catch (resendErr) {
+      console.error('[UpdateNotif Resend Error]:', resendErr.message);
+    }
+  }
+
+  return false;
+}
+
 module.exports = {
   sendOtpEmail,
   sendPasswordResetOtpEmail,
-  sendPasswordResetSuccessEmail
+  sendPasswordResetSuccessEmail,
+  sendUpdateNotificationEmail
 };
 

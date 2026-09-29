@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDB } = require('../database');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
+const { sendUpdateNotificationEmail } = require('../utils/emailService');
 
 // GET /api/institutions - Scoped by role
 router.get('/', authenticateToken, async (req, res) => {
@@ -329,6 +330,33 @@ router.put('/:id', authenticateToken, authorizeRoles('UNIT', 'INSTITUTION', 'ADM
       'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
       ['INSTITUTION', req.params.id, 'UPDATED_PROFILE_AND_STRENGTH', req.user.id, `Updated data and strength to (1st Yr: ${s1}, 2nd Yr: ${s2}, 3rd Yr: ${s3})`]
     );
+
+    // Send email notification to Unit about the update
+    try {
+      const unit = await db.get('SELECT * FROM users WHERE unit_id = ? AND role = "UNIT" LIMIT 1', [inst.unit_id]);
+      const updaterUser = await db.get('SELECT name, email FROM users WHERE id = ?', [req.user.id]);
+      const unitEmail = unit?.email;
+      if (unitEmail) {
+        const changes = {};
+        if (strength_1st_year !== undefined && parseInt(strength_1st_year) !== inst.strength_1st_year) changes['1st Year Strength'] = `${inst.strength_1st_year} → ${s1}`;
+        if (strength_2nd_year !== undefined && parseInt(strength_2nd_year) !== inst.strength_2nd_year) changes['2nd Year Strength'] = `${inst.strength_2nd_year} → ${s2}`;
+        if (strength_3rd_year !== undefined && parseInt(strength_3rd_year) !== inst.strength_3rd_year) changes['3rd Year Strength'] = `${inst.strength_3rd_year} → ${s3}`;
+        if (ano_cto_email && ano_cto_email !== inst.ano_cto_email) changes['Email Address'] = `${inst.ano_cto_email || 'N/A'} → ${ano_cto_email}`;
+        if (ano_cto_name && ano_cto_name !== inst.ano_cto_name) changes['ANO/CTO Name'] = `${inst.ano_cto_name || 'N/A'} → ${ano_cto_name}`;
+        if (ano_cto_contact && ano_cto_contact !== inst.ano_cto_contact) changes['Contact'] = `${inst.ano_cto_contact || 'N/A'} → ${ano_cto_contact}`;
+
+        if (Object.keys(changes).length > 0) {
+          sendUpdateNotificationEmail(unitEmail, {
+            institutionName: inst.institution_name,
+            updatedBy: updaterUser?.name || req.user.role,
+            changes,
+            timestamp: new Date()
+          }).catch(err => console.error('[Email] Update notif failed:', err.message));
+        }
+      }
+    } catch (emailErr) {
+      console.error('[Email] Failed to send update notification:', emailErr.message);
+    }
 
     res.json({ message: 'Institution data and cadet quota updated successfully.' });
   } catch (error) {

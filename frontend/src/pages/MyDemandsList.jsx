@@ -254,6 +254,15 @@ export default function MyDemandsList() {
                     </td>
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                        {(dem.status === 'PENDING' || dem.status === 'SUBMITTED') && (
+                          <button
+                            onClick={() => navigate('/raise-demand', { state: { editDemand: dem } })}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors shadow-2xs"
+                            title="Edit Demand"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-blue-600" /> Edit
+                          </button>
+                        )}
                         {dem.delivery_receipt_url ? (
                           <a
                             href={dem.delivery_receipt_url}

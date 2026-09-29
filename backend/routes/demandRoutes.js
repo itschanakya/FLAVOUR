@@ -1302,4 +1302,110 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// PUT /api/demands/:id - Edit an existing demand
+router.put('/:id', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN'), async (req, res) => {
+  try {
+    const demandId = req.params.id;
+    const { demand_date, purpose, items, delivery_venue, demand_time, custom_unit_rate, packet_type, total_packets } = req.body;
+    const db = await getDB();
+    
+    const demand = await db.get('SELECT * FROM demands WHERE id = ? AND is_deleted = 0', [demandId]);
+    if (!demand) return res.status(404).json({ error: 'Demand not found.' });
+
+    // Role check
+    if (req.user.role === 'INSTITUTION' && demand.institution_id !== req.user.institution_id) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+    if (req.user.role === 'UNIT' && demand.unit_id !== req.user.unit_id) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+
+    if (!['PENDING', 'SUBMITTED', 'APPROVED'].includes(demand.status)) {
+      return res.status(400).json({ error: 'Only pending or approved demands can be edited.' });
+    }
+
+    if (demand.demand_type === 'UNIT_DIRECT') {
+      const rate = parseFloat(custom_unit_rate) || 75.0;
+      const pktCount = parseInt(total_packets) || 1;
+      
+      await db.run(
+        'UPDATE demands SET demand_date = ?, demand_time = ?, purpose = ?, delivery_venue = ?, custom_unit_rate = ?, packet_type = ? WHERE id = ?', 
+        [demand_date, demand_time || '08:00', purpose, delivery_venue, rate, packet_type || 'CUSTOMIZED', demandId]
+      );
+
+      await db.run('DELETE FROM demand_items WHERE demand_id = ?', [demandId]);
+      
+      let packetItem = await db.get("SELECT id FROM refreshment_items WHERE item_name = 'Standard Refreshment Packet'");
+      const itemId = packetItem ? packetItem.id : 1;
+
+      await db.run(
+        `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot)
+         VALUES (?, ?, '1st Year', ?, ?)`,
+        [demandId, itemId, pktCount, rate]
+      );
+    } else {
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'Invalid data provided for update.' });
+      }
+
+      if (demand.institution_id) {
+        const inst = await db.get('SELECT * FROM institutions WHERE id = ?', [demand.institution_id]);
+        if (inst) {
+          const totalByYear = { '1st Year': 0, '2nd Year': 0, '3rd Year': 0 };
+          for (const item of items) {
+            totalByYear[item.year_group] += (parseInt(item.quantity) || 0);
+          }
+          if (totalByYear['1st Year'] > inst.strength_1st_year) return res.status(400).json({ error: `1st Year quantity exceeds limit (${inst.strength_1st_year}).` });
+          if (totalByYear['2nd Year'] > inst.strength_2nd_year) return res.status(400).json({ error: `2nd Year quantity exceeds limit (${inst.strength_2nd_year}).` });
+          if (totalByYear['3rd Year'] > inst.strength_3rd_year) return res.status(400).json({ error: `3rd Year quantity exceeds limit (${inst.strength_3rd_year}).` });
+        }
+      }
+
+      await db.run(
+        'UPDATE demands SET demand_date = ?, demand_time = ?, purpose = ?, delivery_venue = ? WHERE id = ?', 
+        [demand_date, demand_time || '08:00', purpose, delivery_venue, demandId]
+      );
+
+      await db.run('DELETE FROM demand_items WHERE demand_id = ?', [demandId]);
+      
+      const activeTmpl = await db.get('SELECT target_budget FROM packet_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1');
+      const fixedRate = activeTmpl?.target_budget || 75.0;
+
+      let packetItem = await db.get("SELECT id FROM refreshment_items WHERE item_name = 'Standard Refreshment Packet'");
+      const standardPacketItemId = packetItem ? packetItem.id : (items[0]?.item_id || 1);
+
+      for (const item of items) {
+        await db.run(
+          `INSERT INTO demand_items (demand_id, item_id, year_group, quantity, unit_price_snapshot)
+           VALUES (?, ?, ?, ?, ?)`,
+          [demandId, standardPacketItemId, item.year_group, item.quantity, fixedRate]
+        );
+      }
+    }
+
+    try {
+      await db.run(
+        'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
+        [demandId, req.user.id, 'EDITED', demand.status, demand.status, 'Demand updated by user.']
+      );
+    } catch (e) { /* demand_activity optional */ }
+
+    try {
+      await db.run(
+        'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
+        ['DEMAND', demandId, 'UPDATED', req.user.id, `Demand ${demand.demand_number} updated.`]
+      );
+    } catch (e) { /* audit_logs optional */ }
+
+    const updatedDemand = await db.get('SELECT * FROM demands WHERE id = ?', [demandId]);
+    const eventPayload = { ...updatedDemand, timestamp: Date.now() };
+    broadcastToAll('DEMAND_UPDATED', eventPayload);
+
+    res.json({ message: 'Demand updated successfully.', demand: updatedDemand });
+  } catch (err) {
+    console.error('Update demand error:', err);
+    res.status(500).json({ error: 'Failed to update demand.' });
+  }
+});
+
 module.exports = router;
