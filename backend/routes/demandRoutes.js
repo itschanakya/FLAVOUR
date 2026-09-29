@@ -1006,41 +1006,6 @@ router.post('/:id/cancel', authenticateToken, authorizeRoles('UNIT'), async (req
   }
 });
 
-// DELETE /api/demands/:id - NCC UNIT ONLY can soft-delete demand
-router.delete('/:id', authenticateToken, authorizeRoles('UNIT'), async (req, res) => {
-  try {
-    const demandId = req.params.id;
-    const db = await getDB();
-    const demand = await db.get('SELECT * FROM demands WHERE id = ? AND unit_id = ? AND is_deleted = 0', [demandId, req.user.unit_id]);
-
-    if (!demand) {
-      return res.status(404).json({ error: 'Demand not found under your unit jurisdiction.' });
-    }
-
-    await db.run(
-      `UPDATE demands SET is_deleted = 1 WHERE id = ?`,
-      [demandId]
-    );
-
-    // Audit Log
-    await db.run(
-      'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
-      ['DEMAND', demandId, 'DELETED', req.user.id, `Soft-deleted demand ${demand.demand_number}`]
-    );
-
-    const deleteEvent = { id: demandId, is_deleted: true, status: 'DELETED', timestamp: Date.now() };
-    broadcastToAll('DEMAND_UPDATED', deleteEvent);
-    broadcastToUser(demand.raised_by, 'DEMAND_UPDATED', deleteEvent);
-    broadcastToRole('INSTITUTION', 'DEMAND_UPDATED', deleteEvent);
-    broadcastToRole('UNIT', 'DEMAND_UPDATED', deleteEvent);
-    broadcastToRole('ADMIN', 'DEMAND_UPDATED', deleteEvent);
-
-    res.json({ message: 'Demand deleted successfully (soft-delete).' });
-  } catch (error) {
-    console.error('Delete demand error:', error);
-    res.status(500).json({ error: 'Failed to delete demand.' });
-  }
-});
 
 // GET /api/demands/:id/activity - Get activity timeline for a demand
 router.get('/:id/activity', authenticateToken, async (req, res) => {
@@ -1264,7 +1229,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const db = await getDB();
     const demandId = req.params.id;
-    const isNumericId = /^\d+$/.test(demandId);
+    const isNumericId = /^\\d+$/.test(demandId);
 
     let demand = null;
     if (isNumericId) {
@@ -1278,11 +1243,25 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 
     // Role security check
-    if (req.user.role === 'INSTITUTION' && demand.institution_id !== req.user.institution_id) {
-      return res.status(403).json({ error: 'Access denied to this demand.' });
-    }
-    if (req.user.role === 'UNIT' && demand.unit_id !== req.user.unit_id) {
-      return res.status(403).json({ error: 'Access denied to this demand.' });
+    if (req.user.role === 'INSTITUTION') {
+      if (demand.institution_id !== req.user.institution_id) {
+        return res.status(403).json({ error: 'Access denied to this demand.' });
+      }
+      if (demand.status !== 'PENDING') {
+        return res.status(400).json({ error: 'Demand can only be deleted before Unit accepts it.' });
+      }
+    } else if (req.user.role === 'UNIT') {
+      if (demand.unit_id !== req.user.unit_id) {
+        return res.status(403).json({ error: 'Access denied to this demand.' });
+      }
+      const notAllowedStatuses = ['ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED'];
+      if (notAllowedStatuses.includes(demand.status)) {
+        return res.status(400).json({ error: 'Demand can only be deleted before Admin accepts it.' });
+      }
+    } else if (req.user.role === 'ADMIN') {
+      // Admin can delete anytime
+    } else {
+      return res.status(403).json({ error: 'Access denied.' });
     }
 
     if (isNumericId) {
@@ -1290,6 +1269,14 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     } else {
       await db.run('UPDATE demands SET is_deleted = 1 WHERE demand_number = ?', [demandId]);
     }
+    
+    const dbId = demand.id;
+
+    // Audit Log
+    await db.run(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
+      ['DEMAND', dbId, 'DELETED', req.user.id, `Soft-deleted demand ${demand.demand_number || dbId} by ${req.user.role}`]
+    );
 
     // Keep database.sqlite synchronized with data.sqlite
     try {
@@ -1300,8 +1287,14 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         fs.copyFileSync(srcPath, destPath);
       }
     } catch (e) {}
+    
+    const deleteEvent = { id: dbId, is_deleted: true, status: 'DELETED', timestamp: Date.now() };
+    broadcastToAll('DEMAND_UPDATED', deleteEvent);
+    broadcastToUser(demand.raised_by, 'DEMAND_UPDATED', deleteEvent);
+    broadcastToRole('INSTITUTION', 'DEMAND_UPDATED', deleteEvent);
+    broadcastToRole('UNIT', 'DEMAND_UPDATED', deleteEvent);
+    broadcastToRole('ADMIN', 'DEMAND_UPDATED', deleteEvent);
 
-    broadcastToAll('DEMAND_UPDATED', { message: `Demand ${demand.demand_number || demandId} deleted` });
     res.json({ message: 'Demand deleted successfully.' });
   } catch (err) {
     console.error('Delete demand error:', err);
