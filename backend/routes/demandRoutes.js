@@ -1229,7 +1229,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const db = await getDB();
     const demandId = req.params.id;
-    const isNumericId = /^\\d+$/.test(demandId);
+    const isNumericId = /^\d+$/.test(demandId);
 
     let demand = null;
     if (isNumericId) {
