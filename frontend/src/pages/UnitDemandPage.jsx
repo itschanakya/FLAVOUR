@@ -1304,10 +1304,9 @@ export default function UnitDemandPage() {
                   {recentUnitDemands.map((d, idx) => (
                     <tr
                       key={d.id}
-                      onClick={() => setSelectedDemand(d)}
-                      className="group hover:bg-indigo-50/30 transition-colors cursor-pointer bg-slate-50/40 rounded-xl"
+                      className="group hover:bg-indigo-50/30 transition-colors bg-slate-50/40 rounded-xl"
                     >
-                      <td className="pl-4 pr-2 py-4 rounded-l-xl" onClick={e => e.stopPropagation()}>
+                      <td className="pl-4 pr-2 py-4 rounded-l-xl">
                         <input type="checkbox" className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 transition-colors" />
                       </td>
                       <td className="px-3 py-4 font-bold text-slate-500 text-xs">
@@ -1357,7 +1356,7 @@ export default function UnitDemandPage() {
                       <td className="px-3 py-4 text-right font-black text-emerald-600 font-mono text-xs">
                         ₹{Number(d.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="pr-4 pl-2 py-4 text-center rounded-r-xl" onClick={e => e.stopPropagation()}>
+                      <td className="pr-4 pl-2 py-4 text-center rounded-r-xl">
                         <div className="flex items-center justify-center gap-1.5">
                           {(d.status === 'PENDING' || d.status === 'APPROVED' || d.status === 'SUBMITTED') && (
                             <button

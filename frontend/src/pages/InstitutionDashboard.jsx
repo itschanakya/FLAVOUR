@@ -879,10 +879,9 @@ export default function InstitutionDashboard() {
                   recentDemands.map((dem, idx) => (
                     <tr 
                       key={dem.id} 
-                      onClick={() => setSelectedDemand(dem)}
-                      className="group hover:bg-indigo-50/30 transition-colors cursor-pointer"
+                      className="group hover:bg-indigo-50/30 transition-colors"
                     >
-                      <td className="pl-6 pr-2 py-4 rounded-l-2xl" onClick={e => e.stopPropagation()}>
+                      <td className="pl-6 pr-2 py-4 rounded-l-2xl">
                         <input type="checkbox" className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 transition-colors" />
                       </td>
                       <td className="px-3 py-4 font-bold text-slate-500 text-xs">#{idx + 1}</td>
@@ -926,7 +925,7 @@ export default function InstitutionDashboard() {
                       <td className="px-3 py-4 font-black text-emerald-600 text-right">
                         ₹{(dem.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="pr-6 pl-2 py-4 text-center rounded-r-2xl" onClick={e => e.stopPropagation()}>
+                      <td className="pr-6 pl-2 py-4 text-center rounded-r-2xl">
                         <div className="flex items-center justify-center gap-2">
                           {(dem.status === 'PENDING' || dem.status === 'SUBMITTED' || dem.status === 'APPROVED') && (
                             <button
