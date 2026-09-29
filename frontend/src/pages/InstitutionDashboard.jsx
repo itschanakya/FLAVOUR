@@ -900,7 +900,7 @@ export default function InstitutionDashboard() {
                           {(dem.status === 'PENDING' || dem.status === 'SUBMITTED' || dem.status === 'APPROVED') && (
                             <button
                               type="button"
-                              onClick={() => handleEditClick(dem)}
+                              onClick={(e) => { e.stopPropagation(); handleEditClick(dem); }}
                               className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 border border-indigo-200 shadow-2xs transition-all cursor-pointer"
                               title="Edit Demand"
                             >
@@ -909,7 +909,7 @@ export default function InstitutionDashboard() {
                           )}
                           <button
                             type="button"
-                            onClick={() => setSelectedDemand(dem)}
+                            onClick={(e) => { e.stopPropagation(); setSelectedDemand(dem); }}
                             className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer"
                             title="Live Tracker / View Details"
                           >
@@ -918,7 +918,7 @@ export default function InstitutionDashboard() {
 
                           <button
                             type="button"
-                            onClick={() => handleDelete(dem.id, dem.demand_number)}
+                            onClick={(e) => { e.stopPropagation(); handleDelete(dem.id, dem.demand_number); }}
                             className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 border border-rose-200 shadow-2xs transition-all cursor-pointer"
                             title="Delete Demand"
                           >

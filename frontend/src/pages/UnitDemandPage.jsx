@@ -1318,7 +1318,7 @@ export default function UnitDemandPage() {
                           {(d.status === 'PENDING' || d.status === 'APPROVED' || d.status === 'SUBMITTED') && (
                             <button
                               type="button"
-                              onClick={() => handleEditClick(d)}
+                              onClick={(e) => { e.stopPropagation(); handleEditClick(d); }}
                               className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 border border-emerald-200 shadow-2xs transition-all cursor-pointer"
                               title="Edit Demand"
                             >
@@ -1328,7 +1328,7 @@ export default function UnitDemandPage() {
 
                           <button
                             type="button"
-                            onClick={() => setSelectedDemand(d)}
+                            onClick={(e) => { e.stopPropagation(); setSelectedDemand(d); }}
                             className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer"
                             title="Live Tracker / View Details"
                           >
@@ -1337,7 +1337,7 @@ export default function UnitDemandPage() {
 
                           <button
                             type="button"
-                            onClick={() => handleDeleteDemand(d.id, d.demand_number)}
+                            onClick={(e) => { e.stopPropagation(); handleDeleteDemand(d.id, d.demand_number); }}
                             className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 border border-rose-200 shadow-2xs transition-all cursor-pointer"
                             title="Delete Demand"
                           >
