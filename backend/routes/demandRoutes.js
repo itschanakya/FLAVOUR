@@ -1330,7 +1330,7 @@ router.put('/:id', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADM
       
       await db.run(
         'UPDATE demands SET demand_date = ?, demand_time = ?, purpose = ?, delivery_venue = ?, custom_unit_rate = ?, packet_type = ? WHERE id = ?', 
-        [demand_date, demand_time || '08:00', purpose, delivery_venue, rate, packet_type || 'CUSTOMIZED', demandId]
+        [demand_date || demand.demand_date, demand_time || demand.demand_time, purpose !== undefined ? purpose : demand.purpose, delivery_venue !== undefined ? delivery_venue : demand.delivery_venue, rate, packet_type || demand.packet_type, demandId]
       );
 
       await db.run('DELETE FROM demand_items WHERE demand_id = ?', [demandId]);
@@ -1363,7 +1363,7 @@ router.put('/:id', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADM
 
       await db.run(
         'UPDATE demands SET demand_date = ?, demand_time = ?, purpose = ?, delivery_venue = ? WHERE id = ?', 
-        [demand_date, demand_time || '08:00', purpose, delivery_venue, demandId]
+        [demand_date || demand.demand_date, demand_time || demand.demand_time, purpose !== undefined ? purpose : demand.purpose, delivery_venue !== undefined ? delivery_venue : demand.delivery_venue, demandId]
       );
 
       await db.run('DELETE FROM demand_items WHERE demand_id = ?', [demandId]);
