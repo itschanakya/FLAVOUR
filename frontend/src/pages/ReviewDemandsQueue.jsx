@@ -251,7 +251,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
               return (
                 <tr
                   key={dem.id}
-                  className="hover:bg-blue-50/40 transition-colors group"
+                  className="transition-colors group"
                 >
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
