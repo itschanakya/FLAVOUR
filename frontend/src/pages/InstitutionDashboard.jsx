@@ -879,7 +879,7 @@ export default function InstitutionDashboard() {
                   recentDemands.map((dem, idx) => (
                     <tr 
                       key={dem.id} 
-                      className="group transition-colors"
+                      className="group hover:bg-orange-50/60 transition-colors"
                     >
                       <td className="pl-6 pr-2 py-4 rounded-l-2xl">
                         <input type="checkbox" className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 transition-colors" />

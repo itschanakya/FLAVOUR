@@ -231,7 +231,7 @@ export default function MyDemandsList() {
                 </tr>
               ) : (
                 filteredDemands.map((dem) => (
-                  <tr key={dem.id} className="transition-colors">
+                  <tr key={dem.id} className="hover:bg-orange-50/60 transition-colors">
                     <td className="p-4 font-mono font-bold text-blue-600">{dem.demand_number}</td>
                     <td className="p-4 text-slate-700">{formatDMY(dem.demand_date)}</td>
                     <td className="p-4 text-slate-800 font-medium max-w-xs truncate" title={dem.complete_address || dem.purpose}>

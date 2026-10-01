@@ -1305,7 +1305,7 @@ export default function UnitDemandPage() {
                   {recentUnitDemands.map((d, idx) => (
                     <tr
                       key={d.id}
-                      className="group transition-colors bg-slate-50/40 rounded-xl"
+                      className="group hover:bg-orange-50/60 transition-colors bg-slate-50/40 rounded-xl"
                     >
                       <td className="pl-4 pr-2 py-4 rounded-l-xl">
                         <input type="checkbox" className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 transition-colors" />
