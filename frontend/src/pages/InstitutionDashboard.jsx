@@ -493,7 +493,19 @@ export default function InstitutionDashboard() {
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent shadow-lg shadow-indigo-500/20"></div>
+        <div className="relative h-16 w-16 flex items-center justify-center">
+          {/* Outer Orange Clockwise */}
+          <div className="absolute inset-0 rounded-full border-[4px] border-[#FF9933] border-t-transparent animate-spin"></div>
+          
+          {/* Middle White Still */}
+          <div className="absolute inset-2 rounded-full border-[4px] border-white shadow-[0_0_8px_rgba(0,0,0,0.1)]"></div>
+          
+          {/* Inner Green Anti-clockwise */}
+          <div 
+            className="absolute inset-4 rounded-full border-[4px] border-[#138808] border-b-transparent animate-spin"
+            style={{ animationDirection: 'reverse' }}
+          ></div>
+        </div>
       </div>
     );
   }
