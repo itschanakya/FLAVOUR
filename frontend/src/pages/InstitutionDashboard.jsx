@@ -908,7 +908,7 @@ export default function InstitutionDashboard() {
                       </td>
                       <td className="px-3 py-4">
                         <div className="flex flex-col gap-1 items-start">
-                          <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} />
+                          <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} onClick={(e) => { e.stopPropagation(); setSelectedDemand(dem); }} />
                           {dem.delivery_partner_name && dem.delivery_status !== 'DELIVERED' && (
                             <span className="text-[10px] font-bold text-slate-500">
                               Handler: {dem.delivery_partner_name}

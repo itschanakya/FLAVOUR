@@ -136,6 +136,7 @@ export default function UnitDemandPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedDemand, setSelectedDemand] = useState(null);
   const [editDemandData, setEditDemandData] = useState(null);
+  const [editDemandId, setEditDemandId] = useState(null);
 
   const getNextDate = (dayName) => {
     if (!dayName) return new Date().toISOString().split('T')[0];
@@ -462,7 +463,7 @@ export default function UnitDemandPage() {
       if (!res.ok) throw new Error(data.error || 'Failed to update demand.');
 
       setEditDemandData(null);
-      fetchUnitDemands();
+      fetchRecentDemands(false);
       alert('Demand updated successfully!');
     } catch (err) {
       alert(err.message);
@@ -1343,7 +1344,7 @@ export default function UnitDemandPage() {
                         </div>
                       </td>
                       <td className="px-3 py-4">
-                        <StatusBadge status={d.status} deliveryStatus={d.delivery_status} demand={d} />
+                        <StatusBadge status={d.status} deliveryStatus={d.delivery_status} demand={d} onClick={(e) => { e.stopPropagation(); setSelectedDemand(d); }} />
                       </td>
                       <td className="px-3 py-4 text-center">
                         <span className="font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg inline-block text-xs">

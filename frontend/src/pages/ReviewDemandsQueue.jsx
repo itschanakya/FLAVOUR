@@ -305,7 +305,9 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
                     </span>
                   </td>
                   <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                    <StatusPill status={dem.status} deliveryStatus={dem.delivery_status} />
+                    <div onClick={(e) => { e.stopPropagation(); onClick(dem); }} className="cursor-pointer hover:opacity-80 inline-block" title="View Demand Details">
+                      <StatusPill status={dem.status} deliveryStatus={dem.delivery_status} />
+                    </div>
                   </td>
                   <td className="py-3.5 px-4 text-center whitespace-nowrap">
                     <DeliveryStagePill demand={dem} />
