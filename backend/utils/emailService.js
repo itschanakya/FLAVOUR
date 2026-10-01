@@ -10,7 +10,7 @@ if (smtpUser && smtpPass) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
     host: 'smtp.gmail.com',
-    port: 587,
+    port: 587, 
     secure: false,
     auth: {
       user: smtpUser,
@@ -25,294 +25,174 @@ if (smtpUser && smtpPass) {
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 /**
- * Sends an OTP email to the specified user via Nodemailer SMTP or Resend
- * @param {string} email - The recipient email address
- * @param {string} otp - The 6-digit OTP
- * @returns {Promise<boolean>} - True if sent successfully, false otherwise
+ * Universal helper function to send emails safely.
+ * Tries Resend FIRST (for instant production reliability), falls back to Nodemailer (for local testing).
  */
-async function sendOtpEmail(email, otp) {
-  if (!email || !email.includes('@')) {
-    console.warn(`[OTP] Invalid email address: ${email}`);
+async function sendEmailSafely(toEmail, subject, htmlContent, textContent) {
+  if (!toEmail || !toEmail.includes('@')) {
+    console.warn(`[Email System] Invalid email address rejected: ${toEmail}`);
     return false;
   }
 
+  let emailSent = false;
+
+  // STEP 1: Always try Resend API first (Fastest, avoids Render SMTP blocks)
+  if (resend) {
+    try {
+      const { data, error } = await resend.emails.send({
+        from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
+        to: [toEmail],
+        subject: subject,
+        html: htmlContent,
+        text: textContent
+      });
+
+      if (!error) {
+        console.log(`[Email System] 🚀 Sent successfully via Resend to ${toEmail}. ID: ${data?.id}`);
+        return true; // Stop here if successful
+      }
+      console.warn(`[Email System] ⚠️ Resend rejected it. Trying fallback... Error:`, error);
+    } catch (err) {
+      console.warn(`[Email System] ⚠️ Resend exception. Trying fallback... Error:`, err.message);
+    }
+  }
+
+  // STEP 2: Fallback to Nodemailer SMTP (Works well on localhost)
+  if (transporter && !emailSent) {
+    try {
+      const info = await transporter.sendMail({
+        from: `"NCC Refreshment Portal" <${smtpUser}>`,
+        to: toEmail,
+        replyTo: smtpUser,
+        subject: subject,
+        text: textContent,
+        html: htmlContent,
+        priority: 'high'
+      });
+      console.log(`[Email System] 📧 Sent successfully via Gmail SMTP to ${toEmail}. ID: ${info.messageId}`);
+      return true;
+    } catch (smtpErr) {
+      console.error(`[Email System] ❌ Gmail SMTP also failed for ${toEmail}:`, smtpErr.message);
+    }
+  }
+
+  console.error(`[Email System] 🚨 CRITICAL: All email methods failed for ${toEmail}.`);
+  return false;
+}
+
+/**
+ * Sends an OTP email to the specified user
+ */
+async function sendOtpEmail(email, otp) {
+  const subject = `Your Login OTP: ${otp} - NCC Refreshment Portal`;
+  const textContent = `Hello,\n\nYour One-Time Password (OTP) for authenticating into the NCC Refreshment Portal is: ${otp}\n\nThis OTP is valid for 15 minutes. Do not share it with anyone.`;
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
       <div style="text-align: center; margin-bottom: 20px;">
         <h2 style="color: #0f172a; margin: 0; font-size: 22px;">FLAVOUR BASE INDIA</h2>
         <p style="color: #64748b; font-size: 13px; margin-top: 4px; font-weight: 600;">NCC Refreshment Demand & Supply Portal</p>
       </div>
-
       <div style="padding: 20px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
         <p style="color: #334155; font-size: 15px; margin: 0 0 12px 0;">Hello,</p>
         <p style="color: #475569; font-size: 14px; line-height: 1.5; margin: 0 0 20px 0;">
           Your One-Time Password (OTP) for authenticating into the NCC Refreshment Portal is:
         </p>
-
         <div style="text-align: center; margin: 24px 0;">
           <span style="display: inline-block; padding: 14px 28px; background-color: #0f172a; color: #38bdf8; font-size: 32px; font-weight: 800; letter-spacing: 6px; border-radius: 8px; font-family: monospace;">
             ${otp}
           </span>
         </div>
-
         <p style="color: #ef4444; font-size: 13px; text-align: center; font-weight: 600; margin: 12px 0 0 0;">
           ⚠️ This OTP is valid for 15 minutes. Do not share it with anyone.
         </p>
       </div>
-
-      <p style="color: #94a3b8; font-size: 12px; text-align: center; margin-top: 20px;">
-        If you did not request this login attempt, please notify your Unit Admin immediately.
-      </p>
     </div>
   `;
-
-  // 1. Try sending via Gmail SMTP (delivers to any address: gmail, yahoo, custom domain)
-  if (transporter) {
-    try {
-      const textContent = `Hello,\n\nYour One-Time Password (OTP) for authenticating into the NCC Refreshment Portal is: ${otp}\n\nThis OTP is valid for 15 minutes. Do not share it with anyone.\n\nNational Cadet Corps Refreshment Demand & Supply Portal`;
-      const info = await transporter.sendMail({
-        from: `"NCC Refreshment Portal" <${smtpUser}>`,
-        to: email,
-        replyTo: smtpUser,
-        subject: `Your Login OTP: ${otp} - NCC Refreshment Portal`,
-        text: textContent,
-        html: htmlContent,
-        priority: 'high',
-        headers: {
-          'X-Priority': '1',
-          'Importance': 'high'
-        }
-      });
-      console.log(`[OTP] Email delivered to ${email} via SMTP. MessageId: ${info.messageId}`);
-      return true;
-    } catch (smtpErr) {
-      console.error(`[OTP SMTP Error] Failed to send to ${email}:`, smtpErr.message);
-    }
-  }
-
-  // 2. Fallback to Resend if SMTP fails
-  if (resend) {
-    try {
-      const { data, error } = await resend.emails.send({
-        from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
-        to: [email],
-        subject: `Login OTP: ${otp} - NCC Refreshment Portal`,
-        html: htmlContent
-      });
-      if (!error) {
-        console.log(`[OTP] Email sent via Resend fallback. ID: ${data?.id}`);
-        return true;
-      }
-      console.error('[OTP Resend Fallback Error]:', error);
-    } catch (resendErr) {
-      console.error('[OTP Resend Exception]:', resendErr.message);
-    }
-  }
-
-  console.log(`[OTP BACKUP] No email delivered. Emergency Code: 562101 for ${email}`);
-  return false;
+  return sendEmailSafely(email, subject, htmlContent, textContent);
 }
 
 /**
  * Sends a Password Reset OTP email
- * @param {string} email - The recipient email address
- * @param {string} otp - The 6-digit OTP
- * @returns {Promise<boolean>} - True if sent successfully, false otherwise
  */
 async function sendPasswordResetOtpEmail(email, otp) {
-  if (!email || !email.includes('@')) {
-    console.warn(`[Reset OTP] Invalid email address: ${email}`);
-    return false;
-  }
-
+  const subject = `Password Reset OTP: ${otp} - NCC Refreshment Portal`;
+  const textContent = `Hello,\n\nYour Password Reset OTP is: ${otp}\n\nThis code is valid for 15 minutes. Do not share it with anyone.`;
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
       <div style="text-align: center; margin-bottom: 20px;">
         <h2 style="color: #0f172a; margin: 0; font-size: 22px; font-weight: 800;">FLAVOUR BASE INDIA</h2>
         <p style="color: #64748b; font-size: 13px; margin-top: 4px; font-weight: 600;">NCC Refreshment Demand & Supply Portal</p>
       </div>
-
       <div style="padding: 24px; background-color: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
         <div style="display: inline-block; padding: 4px 10px; background-color: #fee2e2; color: #dc2626; border-radius: 6px; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
           PASSWORD RESET REQUEST
         </div>
         <p style="color: #334155; font-size: 15px; margin: 0 0 12px 0;">Hello,</p>
         <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
-          We received a request to reset your password for your NCC Refreshment Portal account. Please use the following 6-digit One-Time Password (OTP) to proceed:
+          We received a request to reset your password. Please use the following 6-digit OTP to proceed:
         </p>
-
         <div style="text-align: center; margin: 24px 0;">
           <span style="display: inline-block; padding: 14px 28px; background-color: #0f172a; color: #38bdf8; font-size: 32px; font-weight: 800; letter-spacing: 6px; border-radius: 8px; font-family: monospace;">
             ${otp}
           </span>
         </div>
-
         <p style="color: #dc2626; font-size: 13px; text-align: center; font-weight: 600; margin: 12px 0 0 0;">
           ⚠️ This OTP is valid for 15 minutes. Never share this code with anyone.
         </p>
       </div>
-
-      <p style="color: #94a3b8; font-size: 12px; text-align: center; margin-top: 20px; line-height: 1.5;">
-        If you did not request a password reset, please ignore this email or notify your Unit Admin immediately. Your existing password remains secure.
-      </p>
     </div>
   `;
-
-  // 1. Try sending via Gmail SMTP
-  if (transporter) {
-    try {
-      const textContent = `Hello,\n\nYour Password Reset OTP is: ${otp}\n\nThis code is valid for 15 minutes. Do not share it with anyone.\n\nNCC Refreshment Portal`;
-      const info = await transporter.sendMail({
-        from: `"NCC Refreshment Security" <${smtpUser}>`,
-        to: email,
-        replyTo: smtpUser,
-        subject: `Password Reset OTP: ${otp} - NCC Refreshment Portal`,
-        text: textContent,
-        html: htmlContent,
-        priority: 'high'
-      });
-      console.log(`[Reset OTP] Email delivered to ${email} via SMTP. MessageId: ${info.messageId}`);
-      return true;
-    } catch (smtpErr) {
-      console.error(`[Reset OTP SMTP Error] Failed to send to ${email}:`, smtpErr.message);
-    }
-  }
-
-  // 2. Fallback to Resend
-  if (resend) {
-    try {
-      const { data, error } = await resend.emails.send({
-        from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
-        to: [email],
-        subject: `Password Reset OTP: ${otp} - NCC Refreshment Portal`,
-        html: htmlContent
-      });
-      if (!error) {
-        console.log(`[Reset OTP] Sent via Resend fallback. ID: ${data?.id}`);
-        return true;
-      }
-      console.error('[Reset OTP Resend Fallback Error]:', error);
-    } catch (resendErr) {
-      console.error('[Reset OTP Resend Exception]:', resendErr.message);
-    }
-  }
-
-  console.log(`[Reset OTP BACKUP] No email delivered. Emergency Code: 562101 for ${email}`);
-  return false;
+  return sendEmailSafely(email, subject, htmlContent, textContent);
 }
 
 /**
  * Sends a confirmation email with the Login ID and newly set password
- * @param {string} email - The recipient email address
- * @param {string} loginId - The user's login ID / username
- * @param {string} newPassword - The new password
- * @returns {Promise<boolean>} - True if sent successfully, false otherwise
  */
 async function sendPasswordResetSuccessEmail(email, loginId, newPassword) {
-  if (!email || !email.includes('@')) {
-    console.warn(`[Reset Success] Invalid email address: ${email}`);
-    return false;
-  }
-
+  const subject = `Your Updated Login Credentials - NCC Refreshment Portal`;
+  const textContent = `Hello,\n\nYour password has been updated.\nLogin ID: ${loginId}\nNew Password: ${newPassword}`;
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
       <div style="text-align: center; margin-bottom: 20px;">
         <h2 style="color: #0f172a; margin: 0; font-size: 22px; font-weight: 800;">FLAVOUR BASE INDIA</h2>
-        <p style="color: #64748b; font-size: 13px; margin-top: 4px; font-weight: 600;">NCC Refreshment Demand & Supply Portal</p>
       </div>
-
       <div style="padding: 24px; background-color: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
         <div style="display: inline-block; padding: 4px 10px; background-color: #dcfce7; color: #15803d; border-radius: 6px; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
           ✓ PASSWORD UPDATED SUCCESSFULLY
         </div>
         <p style="color: #334155; font-size: 15px; margin: 0 0 12px 0;">Hello,</p>
         <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
-          Your password for the <strong>NCC Refreshment Portal</strong> has been successfully updated. Here are your updated login credentials:
+          Your password has been successfully updated.
         </p>
-
         <div style="background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
-              <td style="padding: 6px 0; color: #64748b; font-size: 13px; font-weight: 600; width: 120px;">Login ID / Email:</td>
-              <td style="padding: 6px 0; color: #0f172a; font-size: 14px; font-weight: 700; font-family: monospace;">${loginId}</td>
+              <td style="padding: 6px 0; color: #64748b; font-size: 13px; font-weight: 600; width: 120px;">Login ID:</td>
+              <td style="padding: 6px 0; color: #0f172a; font-size: 14px; font-weight: 700;">${loginId}</td>
             </tr>
             <tr>
               <td style="padding: 6px 0; color: #64748b; font-size: 13px; font-weight: 600;">New Password:</td>
-              <td style="padding: 6px 0; color: #2563eb; font-size: 14px; font-weight: 700; font-family: monospace;">${newPassword}</td>
-            </tr>
-            <tr>
-              <td style="padding: 6px 0; color: #64748b; font-size: 13px; font-weight: 600;">Updated At:</td>
-              <td style="padding: 6px 0; color: #64748b; font-size: 13px;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} (IST)</td>
+              <td style="padding: 6px 0; color: #2563eb; font-size: 14px; font-weight: 700;">${newPassword}</td>
             </tr>
           </table>
         </div>
-
-        <p style="color: #475569; font-size: 13px; line-height: 1.5; margin: 16px 0 0 0;">
-          You can now log in using these credentials at the official portal:
-        </p>
         <div style="text-align: center; margin: 20px 0;">
-          <a href="https://flavourbaseindia.org" style="display: inline-block; padding: 10px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; border-radius: 6px;">
+          <a href="https://flavourbaseindia.org" style="display: inline-block; padding: 10px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 14px; border-radius: 6px;">
             Go to Portal Sign In
           </a>
         </div>
       </div>
-
-      <p style="color: #94a3b8; font-size: 12px; text-align: center; margin-top: 20px; line-height: 1.5;">
-        🔒 Security Note: Please store your credentials securely. If you did not make this change, contact your Unit Admin immediately.
-      </p>
     </div>
   `;
-
-  // 1. Try sending via Gmail SMTP
-  if (transporter) {
-    try {
-      const textContent = `Hello,\n\nYour password for NCC Refreshment Portal has been updated successfully.\n\nLogin ID: ${loginId}\nNew Password: ${newPassword}\n\nSign In: https://flavourbaseindia.org\n\nNCC Refreshment Portal`;
-      const info = await transporter.sendMail({
-        from: `"NCC Refreshment Security" <${smtpUser}>`,
-        to: email,
-        replyTo: smtpUser,
-        subject: `Your Updated Login Credentials - NCC Refreshment Portal`,
-        text: textContent,
-        html: htmlContent,
-        priority: 'high'
-      });
-      console.log(`[Reset Success] Credential confirmation sent to ${email} via SMTP. MessageId: ${info.messageId}`);
-      return true;
-    } catch (smtpErr) {
-      console.error(`[Reset Success SMTP Error] Failed to send to ${email}:`, smtpErr.message);
-    }
-  }
-
-  // 2. Fallback to Resend
-  if (resend) {
-    try {
-      const { data, error } = await resend.emails.send({
-        from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
-        to: [email],
-        subject: `Your Updated Login Credentials - NCC Refreshment Portal`,
-        html: htmlContent
-      });
-      if (!error) {
-        console.log(`[Reset Success] Sent via Resend fallback. ID: ${data?.id}`);
-        return true;
-      }
-    } catch (resendErr) {
-      console.error('[Reset Success Resend Exception]:', resendErr.message);
-    }
-  }
-
-  return false;
+  return sendEmailSafely(email, subject, htmlContent, textContent);
 }
 
 /**
- * Sends an update notification email to the Unit when institution/strength data changes
- * @param {string} email - Unit recipient email
- * @param {object} data - { institutionName, updatedBy, changes, timestamp }
+ * Sends an update notification email
  */
 async function sendUpdateNotificationEmail(email, data) {
-  if (!email || !email.includes('@')) return false;
-
   const { institutionName, updatedBy, changes, timestamp } = data;
+  const subject = `Institution Updated: ${institutionName} - NCC Refreshment Portal`;
   const timeStr = timestamp
     ? new Date(timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
     : new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
@@ -325,7 +205,6 @@ async function sendUpdateNotificationEmail(email, data) {
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
       <div style="text-align:center;margin-bottom:20px;">
         <h2 style="color:#0f172a;margin:0;font-size:22px;font-weight:800;">FLAVOUR BASE INDIA</h2>
-        <p style="color:#64748b;font-size:13px;margin-top:4px;font-weight:600;">NCC Refreshment Demand &amp; Supply Portal</p>
       </div>
       <div style="padding:20px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;margin-bottom:16px;">
         <div style="display:inline-block;padding:4px 10px;background:#dcfce7;color:#15803d;border-radius:6px;font-size:12px;font-weight:700;margin-bottom:12px;">✓ INSTITUTION DATA UPDATED</div>
@@ -335,45 +214,11 @@ async function sendUpdateNotificationEmail(email, data) {
           <table style="width:100%;border-collapse:collapse;">${changesHtml}</table>
         </div>
       </div>
-      <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:16px;">This is an automated notification from the NCC Refreshment Portal. Please review the changes in the system.</p>
     </div>
   `;
-
-  if (transporter) {
-    try {
-      const info = await transporter.sendMail({
-        from: `"NCC Refreshment Portal" <${smtpUser}>`,
-        to: email,
-        replyTo: smtpUser,
-        subject: `Institution Updated: ${institutionName} - NCC Refreshment Portal`,
-        html: htmlContent,
-        priority: 'high'
-      });
-      console.log(`[UpdateNotif] Email sent to ${email} via SMTP. MessageId: ${info.messageId}`);
-      return true;
-    } catch (smtpErr) {
-      console.error(`[UpdateNotif SMTP Error]:`, smtpErr.message);
-    }
-  }
-
-  if (resend) {
-    try {
-      const { data: d, error } = await resend.emails.send({
-        from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
-        to: [email],
-        subject: `Institution Updated: ${institutionName} - NCC Refreshment Portal`,
-        html: htmlContent
-      });
-      if (!error) {
-        console.log(`[UpdateNotif] Sent via Resend. ID: ${d?.id}`);
-        return true;
-      }
-    } catch (resendErr) {
-      console.error('[UpdateNotif Resend Error]:', resendErr.message);
-    }
-  }
-
-  return false;
+  const textContent = `Institution ${institutionName} updated by ${updatedBy} on ${timeStr}.`;
+  
+  return sendEmailSafely(email, subject, htmlContent, textContent);
 }
 
 module.exports = {
@@ -382,4 +227,3 @@ module.exports = {
   sendPasswordResetSuccessEmail,
   sendUpdateNotificationEmail
 };
-
