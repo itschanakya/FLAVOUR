@@ -94,7 +94,7 @@ async function sendOtpEmail(email, otp) {
   if (resend) {
     try {
       const { data, error } = await resend.emails.send({
-        from: 'NCC Refreshment Portal <onboarding@resend.dev>',
+        from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
         to: [email],
         subject: `Login OTP: ${otp} - NCC Refreshment Portal`,
         html: htmlContent
@@ -182,7 +182,7 @@ async function sendPasswordResetOtpEmail(email, otp) {
   if (resend) {
     try {
       const { data, error } = await resend.emails.send({
-        from: 'NCC Refreshment Portal <onboarding@resend.dev>',
+        from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
         to: [email],
         subject: `Password Reset OTP: ${otp} - NCC Refreshment Portal`,
         html: htmlContent
@@ -191,6 +191,7 @@ async function sendPasswordResetOtpEmail(email, otp) {
         console.log(`[Reset OTP] Sent via Resend fallback. ID: ${data?.id}`);
         return true;
       }
+      console.error('[Reset OTP Resend Fallback Error]:', error);
     } catch (resendErr) {
       console.error('[Reset OTP Resend Exception]:', resendErr.message);
     }
@@ -286,7 +287,7 @@ async function sendPasswordResetSuccessEmail(email, loginId, newPassword) {
   if (resend) {
     try {
       const { data, error } = await resend.emails.send({
-        from: 'NCC Refreshment Portal <onboarding@resend.dev>',
+        from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
         to: [email],
         subject: `Your Updated Login Credentials - NCC Refreshment Portal`,
         html: htmlContent
@@ -358,7 +359,7 @@ async function sendUpdateNotificationEmail(email, data) {
   if (resend) {
     try {
       const { data: d, error } = await resend.emails.send({
-        from: 'NCC Refreshment Portal <onboarding@resend.dev>',
+        from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
         to: [email],
         subject: `Institution Updated: ${institutionName} - NCC Refreshment Portal`,
         html: htmlContent
