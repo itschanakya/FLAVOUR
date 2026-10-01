@@ -251,8 +251,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
               return (
                 <tr
                   key={dem.id}
-                  onClick={() => onClick(dem)}
-                  className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
+                  className="hover:bg-blue-50/40 transition-colors group"
                 >
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
@@ -341,7 +340,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
                         </button>
                       )}
                       <button
-                        onClick={() => onClick(dem)}
+                        onClick={(e) => { e.stopPropagation(); onClick(dem); }}
                         title="View Details"
                         className="p-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg border border-blue-200 hover:border-blue-600 transition-all shadow-xs"
                       >
@@ -349,7 +348,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
                       </button>
                       {(dem.status === 'PENDING' || dem.status === 'APPROVED' || dem.status === 'SUBMITTED') && (
                         <button
-                          onClick={() => onEdit(dem)}
+                          onClick={(e) => { e.stopPropagation(); onEdit(dem); }}
                           title="Edit Demand"
                           className="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-lg border border-indigo-200 hover:border-indigo-600 transition-all shadow-xs"
                         >
@@ -361,6 +360,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
                           href={dem.delivery_receipt_url}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
                           title="Delivery Receipt"
                           className="p-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-lg border border-emerald-200 hover:border-emerald-600 transition-all shadow-xs"
                         >
@@ -368,7 +368,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
                         </a>
                       )}
                       <button
-                        onClick={() => onDelete(dem)}
+                        onClick={(e) => { e.stopPropagation(); onDelete(dem); }}
                         title="Delete"
                         className="p-1.5 bg-slate-50 hover:bg-rose-50 text-slate-300 hover:text-rose-500 rounded-lg border border-slate-100 hover:border-rose-200 transition-all shadow-xs"
                       >
