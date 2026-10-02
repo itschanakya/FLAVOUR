@@ -238,21 +238,21 @@ export default function RefreshmentReports() {
                   </button>
                 </div>
                 <div className="overflow-x-auto print:overflow-visible">
-                  <table className="w-full text-left border-collapse min-w-[1300px] table-fixed print:min-w-full">
+                  <table className="w-full text-left border-collapse min-w-[1200px] table-fixed print:min-w-0 print:w-full">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-[11px] font-black uppercase text-slate-600">
-                        <th className="w-[50px] px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black">S.NO</th>
-                        <th className="w-[280px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">INSTITUTION & ANO DETAILS</th>
-                        <th className="w-[240px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">ADDRESS</th>
-                        <th className="w-[100px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">DATE</th>
-                        <th className="w-[80px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">TIME</th>
+                        <th className="w-[4%] px-2 py-3.5 text-center print:text-black border border-slate-200 print:border-black">S.NO</th>
+                        <th className="w-[20%] px-2 py-3.5 print:text-black border border-slate-200 print:border-black">INSTITUTION & ANO DETAILS</th>
+                        <th className="w-[18%] px-2 py-3.5 print:text-black border border-slate-200 print:border-black">ADDRESS</th>
+                        <th className="w-[8%] px-2 py-3.5 print:text-black border border-slate-200 print:border-black">DATE</th>
+                        <th className="w-[8%] px-2 py-3.5 print:text-black border border-slate-200 print:border-black">TIME</th>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-                          <th key={day} className="w-[80px] px-3 py-3 text-center border border-slate-200 print:border-black">
+                          <th key={day} className="w-[5%] px-1 py-3 text-center border border-slate-200 print:border-black">
                             <span className="block text-[11px] font-black text-blue-500 print:text-black uppercase">{day}</span>
                             <span className="block text-[9px] font-bold text-slate-500 print:text-slate-700 whitespace-nowrap mt-0.5 uppercase">{weekDates[i]}</span>
                           </th>
                         ))}
-                        <th className="w-[80px] px-3 py-3.5 text-center print:text-black text-emerald-600 border border-slate-200 print:border-black">TOTAL</th>
+                        <th className="w-[7%] px-2 py-3.5 text-center print:text-black text-emerald-600 border border-slate-200 print:border-black">TOTAL</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 print:divide-black text-xs">
