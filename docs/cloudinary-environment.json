@@ -1,0 +1,24 @@
+{
+  "_comment": "Cloudinary environment and verification details. No secrets are stored here.",
+  "schema_version": 1,
+  "cloud_name": "cayt6dvv",
+  "upload_preset": "ai_powerstart",
+  "preset_source": "admin_api_script",
+  "preview": {
+    "selection_source": "admin_api_list",
+    "public_id": "ncc_refreshment/receipts/receipt-1788678256811-524975770",
+    "original_url": "https://res.cloudinary.com/cayt6dvv/image/upload/v1790935300/ncc_refreshment/receipts/receipt-1788678256811-524975770",
+    "transformed_url": "https://res.cloudinary.com/cayt6dvv/image/upload/b_gen_fill,c_pad,h_1000,w_1000,y_-100/l_text:Arial_72_bold:Adapt%20everywhere,co_white/e_shadow:50/fl_layer_apply,g_south_west,x_80,y_140/l_text:Arial_34:Dynamic%20media%20built%20in%20real%20time,co_rgb:E9D5FF/e_shadow:35/fl_layer_apply,g_south_west,x_84,y_90/f_auto/q_auto/v1790935300/ncc_refreshment/receipts/receipt-1788678256811-524975770"
+  },
+  "measurements": {
+    "original": {
+      "bytes": 13530,
+      "format": "image/jpeg"
+    },
+    "transformed": {
+      "bytes": 48548,
+      "format": "image/webp"
+    },
+    "savings_percent": -258
+  }
+}
