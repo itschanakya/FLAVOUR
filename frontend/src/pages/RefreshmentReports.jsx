@@ -181,19 +181,25 @@ export default function RefreshmentReports() {
       
       if (!acc[mondayKey]) acc[mondayKey] = {};
       const inst = d.institution_name || 'UNKNOWN';
-      if (!acc[mondayKey][inst]) {
-        const instData = institutions.find(i => i.institution_name === inst) || {};
-        const addrStr = d.complete_address || instData.complete_address || d.google_location || instData.google_location || '';
-        
-        acc[mondayKey][inst] = {
+      const instData = institutions.find(i => i.institution_name === inst) || {};
+      const addrStr = d.complete_address || instData.complete_address || d.google_location || instData.google_location || '';
+      const deliveryTime = d.delivery_time || '-';
+      const demandDate = d.demand_date || '-';
+      
+      const rowKey = `${inst}_${demandDate}_${deliveryTime}`;
+
+      if (!acc[mondayKey][rowKey]) {
+        acc[mondayKey][rowKey] = {
           institution: inst,
           address: addrStr,
+          date: demandDate,
+          time: deliveryTime,
           days: [0, 0, 0, 0, 0, 0, 0],
           ano: d.ano_cto_name || '-',
         };
       }
       const dayIdx = day === 0 ? 6 : day - 1;
-      acc[mondayKey][inst].days[dayIdx] += Number(d.total_quantity || 0);
+      acc[mondayKey][rowKey].days[dayIdx] += Number(d.total_quantity || 0);
       return acc;
     }, {});
 
@@ -237,6 +243,9 @@ export default function RefreshmentReports() {
                       <tr className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black print:border-b-2">
                         <th className="w-[40px] px-2 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black">No</th>
                         <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Institution & ANO Details</th>
+                        <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Address</th>
+                        <th className="px-2 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Date</th>
+                        <th className="px-2 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Time</th>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
                           <th key={day} className="w-[80px] px-1 py-4 text-center border-l border-slate-200 print:border-black">
                             <span className="text-xs font-black text-blue-500 block print:text-black">{day}</span>
@@ -253,7 +262,15 @@ export default function RefreshmentReports() {
                           <td className="px-4 py-3 print:border-black">
                             <div className="font-black text-sm text-slate-800 uppercase print:text-black mb-1">{row.institution}</div>
                             <div className="text-[10px] font-bold text-slate-500 uppercase print:text-slate-700 mb-0.5"><span className="text-slate-400">ANO:</span> {row.ano}</div>
-                            {row.address && <div className="text-[9px] font-medium text-slate-400 uppercase print:text-slate-500"><span className="text-slate-300">ADD:</span> {row.address}</div>}
+                          </td>
+                          <td className="px-4 py-3 print:border-black text-[9px] font-medium text-slate-600 uppercase print:text-slate-800 max-w-[200px]">
+                            {row.address || '-'}
+                          </td>
+                          <td className="px-2 py-3 print:border-black text-xs font-bold text-slate-700 print:text-black whitespace-nowrap">
+                            {formatDate(row.date) || '-'}
+                          </td>
+                          <td className="px-2 py-3 print:border-black text-xs font-bold text-slate-700 print:text-black whitespace-nowrap">
+                            {row.time || '-'}
                           </td>
                           {row.days.map((val, i) => (
                             <td key={i} className="px-2 py-3 text-center border-l border-slate-200 print:border-black">
@@ -268,7 +285,7 @@ export default function RefreshmentReports() {
                     </tbody>
                     <tfoot className="bg-slate-50 border-t border-slate-200 print:bg-slate-200 print:border-black print:border-t-2">
                       <tr className="font-black">
-                        <td colSpan={2} className="px-4 py-4 text-right uppercase tracking-widest text-slate-500 text-xs print:text-black">Total Packets</td>
+                        <td colSpan={5} className="px-4 py-4 text-right uppercase tracking-widest text-slate-500 text-xs print:text-black">Total Packets</td>
                         {dayTotals.map((tot, i) => (
                           <td key={i} className="px-2 py-4 text-center text-blue-600 text-sm border-l border-slate-200 print:text-black print:border-black">{tot}</td>
                         ))}
