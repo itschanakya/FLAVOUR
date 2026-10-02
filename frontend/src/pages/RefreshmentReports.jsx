@@ -238,16 +238,16 @@ export default function RefreshmentReports() {
                   </button>
                 </div>
                 <div className="overflow-x-auto print:overflow-visible">
-                  <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-full">
+                  <table className="w-full text-left border-collapse min-w-[1300px] table-fixed print:min-w-full">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-[11px] font-black uppercase text-slate-600">
-                        <th className="w-[40px] px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black">S.NO</th>
-                        <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">INSTITUTION & ANO DETAILS</th>
-                        <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">ADDRESS</th>
-                        <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">DATE</th>
-                        <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">TIME</th>
+                        <th className="w-[50px] px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black">S.NO</th>
+                        <th className="w-[280px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">INSTITUTION & ANO DETAILS</th>
+                        <th className="w-[240px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">ADDRESS</th>
+                        <th className="w-[100px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">DATE</th>
+                        <th className="w-[80px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">TIME</th>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-                          <th key={day} className="px-3 py-3.5 text-center border border-slate-200 print:border-black whitespace-nowrap">
+                          <th key={day} className="w-[80px] px-3 py-3.5 text-center border border-slate-200 print:border-black whitespace-nowrap">
                             {day} {weekDates[i]}
                           </th>
                         ))}
