@@ -252,7 +252,7 @@ export default function AdminDemandsPage() {
       <div className="flex flex-col lg:flex-row gap-5 items-start">
         
         {/* LEFT SIDE: ONBOARDED NCC UNITS SIDEBAR */}
-        <div className="w-full lg:w-72 xl:w-80 shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col sticky top-20">
+        <div className="hidden lg:flex w-full lg:w-72 xl:w-80 shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex-col sticky top-20">
           <div className="p-4 border-b border-slate-100 bg-slate-50/70">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
