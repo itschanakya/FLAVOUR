@@ -590,12 +590,12 @@ export default function DeliveryManagement() {
     } else if (mode === 'PORTER') {
       setAssignPartnerId('');
       setCustomPartnerName('Handled by Porter');
-      setCustomPartnerPhone('Porter Staff');
+      setCustomPartnerPhone(dem.delivery_partner_phone || 'Porter Staff');
       setCustomVehicleNo('Porter Transport');
     } else if (mode === 'SELF_DELIVERY') {
       setAssignPartnerId('');
       setCustomPartnerName('Admin Self Delivery');
-      setCustomPartnerPhone('');
+      setCustomPartnerPhone(dem.delivery_partner_phone || '');
       setCustomVehicleNo('Admin Direct Handover');
     }
     setStartKm(dem.start_km_reading !== null && dem.start_km_reading !== undefined ? String(dem.start_km_reading) : '');
@@ -2281,7 +2281,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                       setDeliveryMode('PORTER');
                       setAssignPartnerId('');
                       setCustomPartnerName('Handled by Porter');
-                      setCustomPartnerPhone('');
+                      setCustomPartnerPhone(selectedDemandForAssign?.delivery_partner_phone || 'Porter Staff');
                       setCustomVehicleNo('Porter Transport');
                     }}
                     className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
@@ -2300,7 +2300,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                       setDeliveryMode('SELF_DELIVERY');
                       setAssignPartnerId('');
                       setCustomPartnerName('Admin Self Delivery');
-                      setCustomPartnerPhone('');
+                      setCustomPartnerPhone(selectedDemandForAssign?.delivery_partner_phone || '');
                       setCustomVehicleNo('Admin Direct Handover');
                     }}
                     className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
