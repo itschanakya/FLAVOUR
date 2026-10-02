@@ -240,56 +240,56 @@ export default function RefreshmentReports() {
                 <div className="overflow-x-auto print:overflow-visible">
                   <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-full">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black print:border-b-2">
-                        <th className="w-[40px] px-2 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black">No</th>
-                        <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Institution & ANO Details</th>
-                        <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Address</th>
-                        <th className="px-2 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black">Date</th>
-                        <th className="px-2 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black">Time</th>
+                      <tr className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-[11px] font-black uppercase text-slate-600">
+                        <th className="w-[40px] px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black">S.NO</th>
+                        <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">INSTITUTION & ANO DETAILS</th>
+                        <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">ADDRESS</th>
+                        <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black">DATE</th>
+                        <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black">TIME</th>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-                          <th key={day} className="w-[80px] px-1 py-4 text-center border-l border-slate-200 print:border-black">
-                            <span className="text-xs font-black text-blue-500 block print:text-black">{day}</span>
-                            <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap print:text-slate-700">{weekDates[i]}</span>
+                          <th key={day} className="w-[60px] px-1 py-3.5 text-center border border-slate-200 print:border-black">
+                            <span className="text-[11px] font-black text-blue-500 block print:text-black">{day}</span>
+                            <span className="text-[9px] font-bold text-slate-500 whitespace-nowrap print:text-slate-700">{weekDates[i]}</span>
                           </th>
                         ))}
-                        <th className="w-[100px] px-1 py-4 text-center text-xs font-black text-emerald-500 uppercase bg-emerald-950/20 border-l border-slate-200 print:bg-slate-200 print:text-black print:border-black">Total</th>
+                        <th className="w-[80px] px-3 py-3.5 text-center print:text-black text-emerald-600 border border-slate-200 print:border-black">TOTAL</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60 print:divide-black">
+                    <tbody className="divide-y divide-slate-100 print:divide-black text-xs">
                       {instData.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-100/50 print:bg-white">
-                          <td className="px-2 py-3 align-middle text-sm font-bold text-slate-500 text-center print:text-black">{idx + 1}</td>
-                          <td className="px-4 py-3 align-middle print:border-black">
-                            <div className="font-black text-sm text-slate-800 uppercase print:text-black mb-1">{row.institution}</div>
-                            <div className="text-[10px] font-bold text-slate-500 uppercase print:text-slate-700 mb-0.5"><span className="text-slate-400">ANO:</span> {row.ano}</div>
+                        <tr key={idx} className="hover:bg-slate-50/80 print:bg-white transition-colors">
+                          <td className="px-3 py-3 align-middle text-slate-500 font-normal text-center print:text-black border border-slate-200 print:border-black">{idx + 1}</td>
+                          <td className="px-3 py-3 align-middle print:text-black border border-slate-200 print:border-black min-w-[200px]">
+                            <div className="font-normal text-slate-800 uppercase">{row.institution}</div>
+                            <div className="text-[10px] font-normal text-slate-500 uppercase leading-tight mt-0.5">ANO: {row.ano}</div>
                           </td>
-                          <td className="px-4 py-3 align-middle print:border-black text-[10px] font-bold text-slate-700 uppercase print:text-slate-800 max-w-[200px]">
+                          <td className="px-3 py-3 align-middle print:border-black font-normal text-slate-700 uppercase print:text-black max-w-[200px] border border-slate-200">
                             {row.address || '-'}
                           </td>
-                          <td className="px-2 py-3 align-middle text-center print:border-black text-[10px] font-bold text-slate-700 uppercase print:text-black whitespace-nowrap">
+                          <td className="px-3 py-3 align-middle text-center print:border-black font-normal text-slate-700 print:text-black whitespace-nowrap border border-slate-200">
                             {formatDate(row.date) || '-'}
                           </td>
-                          <td className="px-2 py-3 align-middle text-center print:border-black text-[10px] font-bold text-slate-700 uppercase print:text-black whitespace-nowrap">
+                          <td className="px-3 py-3 align-middle text-center print:border-black font-normal text-slate-700 print:text-black whitespace-nowrap border border-slate-200">
                             {row.time || '-'}
                           </td>
                           {row.days.map((val, i) => (
-                            <td key={i} className="px-2 py-3 align-middle text-center border-l border-slate-200 print:border-black">
-                              <span className={`text-sm font-black ${val > 0 ? 'text-blue-600' : 'text-slate-700'} print:text-black`}>{val || '-'}</span>
+                            <td key={i} className="px-3 py-3 align-middle text-center font-normal text-slate-900 border border-slate-200 print:border-black">
+                              <span className={`print:text-black ${val > 0 ? 'text-blue-700 font-medium' : 'text-slate-500'}`}>{val || '-'}</span>
                             </td>
                           ))}
-                          <td className="px-4 py-3 align-middle text-center text-sm font-black text-emerald-600 bg-emerald-950/10 border-l border-slate-200 print:bg-slate-100 print:text-black print:border-black">
+                          <td className="px-3 py-3 align-middle text-center font-bold text-emerald-700 border border-slate-200 print:text-black print:border-black bg-emerald-50/30">
                             {row.days.reduce((s, v) => s + v, 0)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-slate-50 border-t border-slate-200 print:bg-slate-200 print:border-black print:border-t-2">
-                      <tr className="font-black">
-                        <td colSpan={5} className="px-4 py-4 text-right uppercase tracking-widest text-slate-500 text-xs print:text-black">Total Packets</td>
+                    <tfoot className="bg-slate-50 border-t border-slate-200 print:bg-slate-100 print:border-black">
+                      <tr className="font-black text-[11px] uppercase text-slate-600">
+                        <td colSpan={5} className="px-3 py-3.5 text-right print:text-black border border-slate-200 print:border-black">TOTAL PACKETS</td>
                         {dayTotals.map((tot, i) => (
-                          <td key={i} className="px-2 py-4 text-center text-blue-600 text-sm border-l border-slate-200 print:text-black print:border-black">{tot}</td>
+                          <td key={i} className="px-3 py-3.5 text-center text-blue-700 border border-slate-200 print:text-black print:border-black">{tot}</td>
                         ))}
-                        <td className="px-4 py-4 text-center text-emerald-600 text-base bg-emerald-950/30 border-l border-slate-200 print:bg-slate-300 print:text-black print:border-black">{grandTotal}</td>
+                        <td className="px-3 py-3.5 text-center text-emerald-700 border border-slate-200 print:text-black print:border-black">{grandTotal}</td>
                       </tr>
                     </tfoot>
                   </table>
