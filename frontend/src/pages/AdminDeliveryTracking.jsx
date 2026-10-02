@@ -12,7 +12,8 @@ import {
   ChevronLeft, 
   ChevronRight, 
   RotateCw,
-  CalendarDays
+  CalendarDays,
+  Phone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -370,8 +371,9 @@ function AdminDeliveryTracking() {
                       </div>
                       <div className="overflow-hidden flex-1">
                         <div className="font-bold text-xs truncate">{driver.name}</div>
-                        <div className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
-                          <Truck className="w-2.5 h-2.5" /> {driver.vehicle_no || 'No Vehicle'}
+                        <div className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-0.5 flex-wrap">
+                          <span className="flex items-center gap-1"><Truck className="w-2.5 h-2.5" /> {driver.vehicle_no || 'No Vehicle'}</span>
+                          {driver.phone && <span className="flex items-center gap-1 ml-1 text-slate-400">| <Phone className="w-2 h-2" /> {driver.phone}</span>}
                         </div>
                       </div>
                       {selectedDriver?.id === driver.id && (

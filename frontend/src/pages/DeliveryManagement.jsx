@@ -2342,7 +2342,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                       setDeliveryMode('PORTER');
                       setAssignPartnerId('');
                       setCustomPartnerName('Handled by Porter');
-                      setCustomPartnerPhone('Porter Staff');
+                      setCustomPartnerPhone('');
                       setCustomVehicleNo('Porter Transport');
                     }}
                     className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
@@ -2415,6 +2415,16 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                   <p className="text-[11px] text-purple-700 font-medium leading-relaxed">
                     Details of porter not required. Order will be marked as <strong>"Porter Assigned"</strong>. Live tracking movement points (In Transit → In at Gate → Delivered / Rejected) are managed directly from the Admin console.
                   </p>
+                  <div className="mt-2.5 pt-2.5 border-t border-purple-200/50">
+                    <label className="block text-xs font-bold text-purple-800 mb-1">Porter Contact No. (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 9876543210 (For ANO to contact)"
+                      value={customPartnerPhone}
+                      onChange={(e) => setCustomPartnerPhone(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-purple-200 rounded-xl text-xs bg-white text-purple-900 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 placeholder-purple-300 shadow-sm"
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 space-y-1.5 text-xs text-emerald-900">
@@ -2425,6 +2435,16 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                   <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
                     Admin direct handover to institution/unit. Order will be marked as <strong>"Self Delivery"</strong>. Live tracking movement points (In Transit → In at Gate → Delivered / Rejected) are managed directly from the Admin console.
                   </p>
+                  <div className="mt-2.5 pt-2.5 border-t border-emerald-200/50">
+                    <label className="block text-xs font-bold text-emerald-800 mb-1">Self Service Rep Contact No. (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 9876543210 (For ANO to contact)"
+                      value={customPartnerPhone}
+                      onChange={(e) => setCustomPartnerPhone(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-emerald-200 rounded-xl text-xs bg-white text-emerald-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder-emerald-300 shadow-sm"
+                    />
+                  </div>
                 </div>
               )}
 

@@ -313,11 +313,11 @@ router.post('/assign', authenticateToken, authorizeRoles('ADMIN'), async (req, r
 
     if (mode === 'PORTER') {
       assignedPartnerName = 'Handled by Porter';
-      assignedPhone = 'Porter Staff';
+      assignedPhone = partnerPhone || 'Porter Staff';
       assignedVehicle = 'Porter Transport';
     } else if (mode === 'SELF_DELIVERY') {
       assignedPartnerName = 'Admin Self Delivery';
-      assignedPhone = '';
+      assignedPhone = partnerPhone || 'Self Service Rep';
       assignedVehicle = 'Admin Direct Handover';
     } else {
       if (!partnerName) {
