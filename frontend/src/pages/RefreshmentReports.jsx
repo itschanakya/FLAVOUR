@@ -207,9 +207,14 @@ export default function RefreshmentReports() {
             return (
               <div key={weekKey} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xl print:shadow-none print:border-none print:bg-white">
                 <PrintHeader title="WEEKLY REFRESHMENT SUMMARY" period={`${weekDates[0]} to ${weekDates[6]}`} />
-                <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-3 print:hidden">
-                  <Calendar size={18} className="text-blue-500" />
-                  <h3 className="font-black text-sm tracking-widest text-slate-800 uppercase">Program: {weekDates[0]} - {weekDates[6]}</h3>
+                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between print:hidden">
+                  <div className="flex items-center gap-3">
+                    <Calendar size={18} className="text-blue-500" />
+                    <h3 className="font-black text-sm tracking-widest text-slate-800 uppercase">Program: {weekDates[0]} - {weekDates[6]}</h3>
+                  </div>
+                  <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-xs rounded-lg transition-all" title="Print Report">
+                    <Printer size={14} /> Print
+                  </button>
                 </div>
                 <div className="overflow-x-auto print:overflow-visible">
                   <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-full">
