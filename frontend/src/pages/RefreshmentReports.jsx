@@ -218,7 +218,7 @@ export default function RefreshmentReports() {
                         <th className="w-[40px] px-2 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black">No</th>
                         <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Institution & ANO Details</th>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-                          <th key={day} className="w-[80px] px-1 py-4 text-left border-l border-slate-200 print:border-black">
+                          <th key={day} className="w-[80px] px-1 py-4 text-center border-l border-slate-200 print:border-black">
                             <span className="text-xs font-black text-blue-500 block print:text-black">{day}</span>
                             <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap print:text-slate-700">{weekDates[i]}</span>
                           </th>
@@ -236,7 +236,7 @@ export default function RefreshmentReports() {
                             {row.address && <div className="text-[9px] font-medium text-slate-400 uppercase print:text-slate-500"><span className="text-slate-300">ADD:</span> {row.address}</div>}
                           </td>
                           {row.days.map((val, i) => (
-                            <td key={i} className="px-2 py-3 text-left border-l border-slate-200 print:border-black">
+                            <td key={i} className="px-2 py-3 text-center border-l border-slate-200 print:border-black">
                               <span className={`text-sm font-black ${val > 0 ? 'text-blue-600' : 'text-slate-700'} print:text-black`}>{val || '-'}</span>
                             </td>
                           ))}
@@ -250,7 +250,7 @@ export default function RefreshmentReports() {
                       <tr className="font-black">
                         <td colSpan={2} className="px-4 py-4 text-right uppercase tracking-widest text-slate-500 text-xs print:text-black">Total Packets</td>
                         {dayTotals.map((tot, i) => (
-                          <td key={i} className="px-2 py-4 text-left text-blue-600 text-sm border-l border-slate-200 print:text-black print:border-black">{tot}</td>
+                          <td key={i} className="px-2 py-4 text-center text-blue-600 text-sm border-l border-slate-200 print:text-black print:border-black">{tot}</td>
                         ))}
                         <td className="px-4 py-4 text-center text-emerald-600 text-base bg-emerald-950/30 border-l border-slate-200 print:bg-slate-300 print:text-black print:border-black">{grandTotal}</td>
                       </tr>
