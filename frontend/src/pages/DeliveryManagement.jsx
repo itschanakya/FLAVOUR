@@ -1258,60 +1258,63 @@ _National Cadet Corps - Supply & Logistics Portal_`;
       </div>
 
       {/* Unified Navigation & Controls Strip */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-2.5 space-y-2">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-          {/* Left: View Switcher */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70 shrink-0">
-            <button
-              type="button"
-              onClick={() => setViewMode('STOPS')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
-                viewMode === 'STOPS'
-                  ? 'bg-white text-blue-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <MapPin className="w-3.5 h-3.5 text-blue-600" />
-              Stops Manifest ({filteredDemands.length})
-            </button>
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 space-y-4">
+        {/* Top Row: View Switcher */}
+        <div className="flex items-center bg-slate-50/80 p-1.5 rounded-2xl w-fit">
+          <button
+            type="button"
+            onClick={() => setViewMode('STOPS')}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+              viewMode === 'STOPS'
+                ? 'bg-white text-blue-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+            Stops Manifest ({filteredDemands.length})
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setViewMode('FLEET_LOADS')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
-                viewMode === 'FLEET_LOADS'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Truck className="w-3.5 h-3.5" />
-              Fleet & Loads ({partnerLoads.length})
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setViewMode('FLEET_LOADS')}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+              viewMode === 'FLEET_LOADS'
+                ? 'bg-white text-blue-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5" />
+            Fleet & Loads ({partnerLoads.length})
+          </button>
+        </div>
 
-          {/* Right: Search + PIN + Driver Filters (when viewing Stops) */}
-          {viewMode === 'STOPS' && (
-            <div className="flex flex-wrap items-center gap-2 flex-1 justify-end">
-              {/* Search Box */}
-              <div className="relative flex-1 min-w-[180px] max-w-xs">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search school, PIN, driver..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                />
-              </div>
+        {/* Middle Row: Search on Left, Filters Stacked on Right */}
+        {viewMode === 'STOPS' && (
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+            {/* Search Input on the Left */}
+            <div className="relative w-full sm:w-[45%] lg:w-[40%] shrink-0">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search school, PIN, driver..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-[14px] text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
+              />
+            </div>
 
+            {/* Right Side Stacked Dropdowns */}
+            <div className="flex flex-col items-end gap-2.5 w-full sm:w-auto min-w-[220px]">
               {/* PIN Code Slicer Dropdown */}
-              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
-                <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
-                <span className="font-extrabold text-slate-400 text-[10px]">PIN:</span>
+              <div className="flex items-center justify-between gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  <span className="font-extrabold text-slate-400 text-[11px]">PIN:</span>
+                </div>
                 <select
                   value={selectedPin}
                   onChange={(e) => setSelectedPin(e.target.value)}
-                  className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer max-w-[120px] truncate"
+                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer text-right w-full"
                 >
                   <option value="ALL">All PINs ({availablePins.length})</option>
                   {availablePins.map(pin => (
@@ -1321,13 +1324,15 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               </div>
 
               {/* Driver Slicer Dropdown */}
-              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
-                <Users className="w-3 h-3 text-indigo-500 shrink-0" />
-                <span className="font-extrabold text-slate-400 text-[10px]">Driver:</span>
+              <div className="flex items-center justify-between gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Users className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                  <span className="font-extrabold text-slate-400 text-[11px]">Driver:</span>
+                </div>
                 <select
                   value={selectedPartner}
                   onChange={(e) => setSelectedPartner(e.target.value)}
-                  className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer max-w-[130px] truncate"
+                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer text-right w-full"
                 >
                   <option value="ALL">All Drivers</option>
                   {partners.map(p => (
@@ -1337,13 +1342,15 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               </div>
 
               {/* Status Slicer Dropdown */}
-              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
-                <Filter className="w-3 h-3 text-blue-500 shrink-0" />
-                <span className="font-extrabold text-slate-400 text-[10px]">Status:</span>
+              <div className="flex items-center justify-between gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Filter className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span className="font-extrabold text-slate-400 text-[11px]">Status:</span>
+                </div>
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer max-w-[145px] truncate"
+                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer text-right w-full"
                 >
                   <option value="ALL">All Demands ({demands.length})</option>
                   <option value="PENDING">Ready for Dispatch ({pendingDispatchCount})</option>
@@ -1361,28 +1368,27 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                     setSelectedPartner('ALL');
                     setSearchTerm('');
                   }}
-                  className="px-2 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1"
-                  title="Clear all filters"
+                  className="w-full text-right py-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 transition-colors"
                 >
-                  <X className="w-3 h-3" /> Reset
+                  Clear filters
                 </button>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Quick PIN Code Pills for Fast 1-Click Cluster Filtering */}
         {viewMode === 'STOPS' && availablePins.length > 0 && (
-          <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 whitespace-nowrap mr-1">
+          <div className="pt-4 border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar text-xs">
+            <span className="text-[11px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap mr-2">
               PIN Clusters:
             </span>
             <button
               onClick={() => setSelectedPin('ALL')}
-              className={`px-2.5 py-0.5 rounded-full text-[11px] font-black transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-full text-[11px] font-black transition-all whitespace-nowrap ${
                 selectedPin === 'ALL'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
               }`}
             >
               All ({demands.length})
@@ -1394,13 +1400,13 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                 <button
                   key={pin}
                   onClick={() => setSelectedPin(pin)}
-                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-black transition-all flex items-center gap-1 whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-black transition-all flex items-center gap-1.5 whitespace-nowrap ${
                     selectedPin === pin
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200'
+                      ? 'bg-rose-50 text-rose-800 border-rose-200'
+                      : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-100'
                   }`}
                 >
-                  <MapPin className="w-2.5 h-2.5" />
+                  <MapPin className={`w-3.5 h-3.5 ${selectedPin === pin ? 'text-rose-600' : 'text-rose-400'}`} />
                   PIN {pin} ({count} • {pkts} Pkts)
                 </button>
               );
@@ -1736,17 +1742,8 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                       </div>
                     </div>
 
-                    {/* DEMAND STOPS LIST FOR THIS UNIT (CLICK ROW OR BUTTON TO POP UP SUMMARY CARD) */}
-                    <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs">
-                      {/* Desktop Table Column Header */}
-                      <div className="hidden lg:grid grid-cols-12 gap-3 px-4 py-2.5 bg-slate-50/90 border-b border-slate-200/80 text-[10px] font-black uppercase tracking-wider text-slate-400 items-center">
-                        <div className="col-span-5">Stop & Institution Venue</div>
-                        <div className="col-span-2 text-center">Packets / Est. Time</div>
-                        <div className="col-span-2 text-center">Delivery Partner</div>
-                        <div className="col-span-2 text-center">Live Status</div>
-                        <div className="col-span-1 text-right">Actions</div>
-                      </div>
-
+                     {/* DEMAND STOPS LIST FOR THIS UNIT (GRID OF CARDS) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
                       {unitGroup.demands.map((dem, idx) => {
                         const isDelivered = dem.delivery_status === 'DELIVERED';
                         const isOut = dem.delivery_status === 'OUT_FOR_DELIVERY';
@@ -1763,216 +1760,154 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                 handleOpenAssign(dem);
                               }
                             }}
-                            className="p-3 sm:p-4 hover:bg-slate-50/90 transition-colors cursor-pointer group flex flex-col lg:grid lg:grid-cols-12 lg:items-center gap-3"
+                            className="p-4 bg-white rounded-[24px] shadow-sm border border-slate-200 relative hover:border-slate-300 transition-all cursor-pointer group flex flex-col"
                           >
-                            {/* Col 1: Stop Index, Demand Ref, Institution Name & Address (col-span-5) */}
-                            <div className="lg:col-span-5 flex items-start gap-3 min-w-0">
-                              <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-blue-50 text-slate-700 group-hover:text-blue-700 font-mono font-black text-xs flex items-center justify-center shrink-0 border border-slate-200 transition-colors">
+                            {/* Top Row: Index, DEM-ID, Date/Time */}
+                            <div className="flex flex-wrap items-center gap-2 mb-3">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-sm text-slate-800 border border-slate-200">
                                 {idx + 1}
                               </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                                  <span className="font-mono font-black text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs">
-                                    {dem.demand_number}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100">
-                                    <Calendar className="w-3 h-3 text-slate-400" /> {formatDDMMYYYY(dem.demand_date)}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100">
-                                    <Clock className="w-3 h-3 text-slate-400" /> {dem.demand_time || '08:00'}
-                                  </span>
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-200 shadow-2xs">
-                                    <MapPin className="w-2.5 h-2.5 text-rose-500" />
-                                    PIN {dem.pin_code || 'N/A'}
-                                  </span>
-                                </div>
-                                <h5 className="font-black text-xs sm:text-sm text-slate-900 uppercase tracking-tight truncate mt-1 group-hover:text-blue-600 transition-colors">
-                                  {dem.institution_name}
-                                </h5>
-                                <p className="text-[11px] text-slate-500 font-medium truncate max-w-md">
-                                  {dem.complete_address || 'Address provided at registry'}
-                                </p>
+                              <div className="px-2 py-1 bg-blue-50 text-blue-700 text-[11px] font-black rounded-md border border-blue-100">
+                                {dem.demand_number}
+                              </div>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-1 font-bold ml-1">
+                                <Calendar className="w-3.5 h-3.5" /> {formatDDMMYYYY(dem.demand_date)}
+                                <Clock className="w-3.5 h-3.5 ml-1" /> {dem.demand_time || '08:00'}
                               </div>
                             </div>
 
-                            {/* Col 2: Quantity & Live Time Remaining (col-span-2) */}
-                            <div className="lg:col-span-2 flex flex-row lg:flex-col items-center justify-between lg:justify-center text-center bg-slate-50 lg:bg-transparent p-2 lg:p-0 rounded-xl lg:rounded-none border border-slate-100 lg:border-transparent">
-                              <span className="inline-block text-xs font-black text-indigo-950 bg-white lg:bg-indigo-50 border border-indigo-200/80 px-2.5 py-1 rounded-xl shadow-2xs">
+                            {/* PIN Code Badge */}
+                            <div className="mb-2">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-rose-50 text-rose-700 text-xs font-black rounded-full border border-rose-100">
+                                <MapPin className="w-3 h-3" /> PIN {dem.pin_code || 'N/A'}
+                              </span>
+                            </div>
+
+                            {/* Institution */}
+                            <div className="mb-1 flex-1">
+                              <h3 className="font-black text-slate-900 text-base group-hover:text-blue-600 transition-colors uppercase leading-tight">
+                                {dem.institution_name}
+                              </h3>
+                              <div className="text-slate-500 text-[13px] font-medium mt-1 truncate">
+                                {dem.complete_address || 'Address provided at registry'}
+                              </div>
+                            </div>
+
+                            {/* Pkts & Due Time */}
+                            <div className="flex items-center justify-between mt-3 mb-4">
+                              <span className="px-3 py-1 bg-indigo-50 text-indigo-900 text-sm font-black rounded-[14px]">
                                 {dem.total_quantity || 0} Pkts
                               </span>
-
-                              {/* Time Remaining / Delivery Status Indicator */}
+                              
                               {timeRemaining.type === 'delivered' ? (
-                                <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 justify-center lg:mt-1">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Done
+                                <div className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Done
                                 </div>
                               ) : timeRemaining.isOverdue ? (
-                                <div className="text-[11px] font-bold text-rose-600 flex items-center gap-1 justify-center lg:mt-1" title="Scheduled delivery time has passed">
-                                  <Clock className="w-3 h-3 text-rose-500" /> {timeRemaining.text}
+                                <div className="text-xs font-black text-rose-600 flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" /> {timeRemaining.text}
                                 </div>
                               ) : timeRemaining.type === 'urgent' ? (
-                                <div className="text-[11px] font-black text-amber-700 flex items-center gap-1 justify-center lg:mt-1">
-                                  <Clock className="w-3 h-3 text-amber-600" /> {timeRemaining.text}
+                                <div className="text-xs font-black text-amber-700 flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" /> {timeRemaining.text}
                                 </div>
                               ) : (
-                                <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1 justify-center lg:mt-1">
-                                  <Clock className="w-3 h-3 text-slate-400" /> {timeRemaining.text}
+                                <div className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" /> {timeRemaining.text}
                                 </div>
                               )}
                             </div>
 
-                            {/* Actions (Col 3, 4, 5) - Grouped on Mobile, Unwrapped on Desktop */}
-                            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-2.5 w-full lg:contents pt-2 lg:pt-0 mt-1 lg:mt-0 border-t border-slate-100 lg:border-t-0">
-                              {/* Col 3: Mode & Handler Assignment (col-span-2) */}
-                              <div className="lg:col-span-2 flex flex-col sm:flex-row items-center justify-center flex-1 lg:flex-none" onClick={e => e.stopPropagation()}>
-                                {dem.delivery_mode === 'PORTER' || dem.delivery_partner_name === 'Handled by Porter' ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenAssign(dem)}
-                                    className="w-full sm:w-auto lg:w-full lg:max-w-[170px] px-2.5 py-2 lg:py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 text-xs font-black border border-purple-200 flex items-center justify-center gap-1.5 truncate transition-all shadow-2xs"
-                                    title="Click to change delivery mode"
-                                  >
-                                    <Package className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                                    <span className="truncate">Porter Assigned</span>
-                                  </button>
-                                ) : dem.delivery_mode === 'SELF_DELIVERY' || dem.delivery_partner_name === 'Admin Self Delivery' ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenAssign(dem)}
-                                    className="w-full sm:w-auto lg:w-full lg:max-w-[170px] px-2.5 py-2 lg:py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-black border border-emerald-200 flex items-center justify-center gap-1.5 truncate transition-all shadow-2xs"
-                                    title="Click to change delivery mode"
-                                  >
-                                    <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                    <span className="truncate">Self Delivery</span>
-                                  </button>
-                                ) : dem.delivery_partner_name ? (
-                                  <div className="w-full sm:w-auto lg:w-full flex flex-col items-center">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenAssign(dem)}
-                                      className="w-full sm:w-auto lg:w-full lg:max-w-[170px] px-2.5 py-2 lg:py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 flex items-center justify-center gap-1.5 truncate transition-all shadow-2xs"
-                                      title="Click to reassign driver or view/update meter reading"
-                                    >
-                                      <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                      <span className="truncate">{dem.delivery_partner_name}</span>
-                                    </button>
-                                    {(dem.total_km !== null && dem.total_km !== undefined) ? (
-                                      <span className="text-[10px] font-mono font-bold text-emerald-700 mt-0.5 flex items-center justify-center gap-1">
-                                        <Gauge className="w-3 h-3 text-emerald-600" />
-                                        {dem.total_km} KM
-                                      </span>
-                                    ) : (dem.start_km_reading !== null && dem.start_km_reading !== undefined) ? (
-                                      <span className="text-[10px] font-mono font-bold text-slate-500 mt-0.5 flex items-center justify-center gap-1">
-                                        <Gauge className="w-3 h-3 text-slate-400" />
-                                        {dem.start_km_reading} KM Start
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenAssign(dem)}
-                                    className="w-full sm:w-auto lg:w-full lg:max-w-[170px] px-2.5 py-2 lg:py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-black border border-dashed border-amber-300 flex items-center justify-center gap-1 transition-all shadow-2xs active:scale-95"
-                                    title="Click to assign driver, porter, or self delivery"
-                                  >
-                                    <Plus className="w-3.5 h-3.5 text-amber-600" />
-                                    <span>Assign Mode</span>
-                                  </button>
-                                )}
-                              </div>
-
-                              {/* Col 4: Live Status & Quick Action Movement Points (col-span-2) */}
-                              <div className="lg:col-span-2 flex flex-col sm:flex-row items-center justify-center gap-1 flex-1 lg:flex-none" onClick={e => e.stopPropagation()}>
-                                {isDelivered ? (
-                                  <span className="w-full sm:w-auto lg:w-full lg:max-w-[160px] py-2 lg:py-1 px-3 lg:px-2 rounded-xl text-[11px] font-black border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center justify-center gap-1 shadow-2xs">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Delivered
-                                  </span>
-                                ) : dem.delivery_status === 'REJECTED' ? (
-                                  <span className="w-full sm:w-auto lg:w-full lg:max-w-[160px] py-2 lg:py-1 px-3 lg:px-2 rounded-xl text-[11px] font-black border bg-rose-50 text-rose-800 border-rose-200 flex items-center justify-center gap-1 shadow-2xs">
-                                    <X className="w-3.5 h-3.5 text-rose-600 shrink-0" /> Rejected
-                                  </span>
-                                ) : dem.delivery_status === 'ARRIVED' ? (
-                                  <div className="flex items-center gap-1.5 w-full sm:w-auto lg:w-full lg:max-w-[170px]">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleUpdateStatus(dem.id, 'DELIVERED')}
-                                      className="flex-1 py-2 lg:py-1 px-2 lg:px-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] lg:text-[10px] font-black shadow-2xs transition-all active:scale-95 flex items-center justify-center gap-1"
-                                      title="Click to mark physically delivered"
-                                    >
-                                      <CheckCircle2 className="w-3.5 h-3.5 lg:w-3 lg:h-3" /> Delivered
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleUpdateStatus(dem.id, 'REJECTED')}
-                                      className="py-2 lg:py-1 px-3 lg:px-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] lg:text-[10px] font-bold border border-rose-200 transition-all flex items-center justify-center shrink-0"
-                                      title="Click to reject delivery"
-                                    >
-                                      <X className="w-3.5 h-3.5 lg:w-3 lg:h-3" />
-                                    </button>
-                                  </div>
-                                ) : isOut ? (
-                                  <div className="flex items-center gap-1.5 w-full sm:w-auto lg:w-full lg:max-w-[170px]">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleUpdateStatus(dem.id, 'ARRIVED')}
-                                      className="flex-1 py-2 lg:py-1 px-2 lg:px-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] lg:text-[10px] font-black shadow-2xs transition-all active:scale-95 flex items-center justify-center gap-1"
-                                      title="Mark arrived at institution gate"
-                                    >
-                                      <MapPin className="w-3.5 h-3.5 lg:w-3 lg:h-3" /> In at Gate
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleUpdateStatus(dem.id, 'DELIVERED')}
-                                      className="py-2 lg:py-1 px-3 lg:px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] lg:text-[10px] font-black shadow-2xs transition-all active:scale-95 flex items-center justify-center shrink-0"
-                                      title="Mark delivered"
-                                    >
-                                      <CheckCircle2 className="w-3.5 h-3.5 lg:w-3 lg:h-3" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span
-                                    className="w-full sm:w-auto lg:w-full lg:max-w-[160px] py-2 lg:py-1 px-3 lg:px-2 rounded-xl text-[11px] lg:text-[10px] font-black border bg-amber-50 text-amber-800 border-amber-200 flex items-center justify-center gap-1 text-center shadow-2xs truncate"
-                                    title="Ready for Dispatch"
-                                  >
-                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" /> Ready for Dispatch
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Col 5: Actions Group (col-span-1) */}
-                              <div className="lg:col-span-1 flex items-center justify-end gap-2 shrink-0 w-full sm:w-auto" onClick={e => e.stopPropagation()}>
-                                <a
-                                  href={mapsUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-2 lg:p-1.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition-colors shadow-2xs flex-1 sm:flex-none flex justify-center"
-                                  title="Open Google Maps Navigation"
+                            {/* Action Buttons Centered */}
+                            <div className="flex flex-col items-center gap-2 mb-10 w-[90%] mx-auto" onClick={e => e.stopPropagation()}>
+                              {/* Assign Mode Button */}
+                              {dem.delivery_mode === 'PORTER' || dem.delivery_partner_name === 'Handled by Porter' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAssign(dem)}
+                                  className="w-full py-2 border-2 border-dashed border-purple-300 text-purple-800 font-bold text-sm rounded-[24px] bg-purple-50 flex items-center justify-center gap-2 transition-all hover:bg-purple-100"
                                 >
-                                  <Navigation className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
-                                </a>
+                                  <Package className="w-4 h-4" /> Porter Assigned
+                                </button>
+                              ) : dem.delivery_mode === 'SELF_DELIVERY' || dem.delivery_partner_name === 'Admin Self Delivery' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAssign(dem)}
+                                  className="w-full py-2 border-2 border-dashed border-emerald-300 text-emerald-800 font-bold text-sm rounded-[24px] bg-emerald-50 flex items-center justify-center gap-2 transition-all hover:bg-emerald-100"
+                                >
+                                  <Building2 className="w-4 h-4" /> Self Delivery
+                                </button>
+                              ) : dem.delivery_partner_name ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAssign(dem)}
+                                  className="w-full py-2 border-2 border-blue-200 text-blue-700 font-bold text-sm rounded-[24px] bg-blue-50 flex items-center justify-center gap-2 transition-all hover:bg-blue-100"
+                                >
+                                  <Truck className="w-4 h-4" /> {dem.delivery_partner_name}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAssign(dem)}
+                                  className="w-full py-2 border-2 border-dashed border-amber-300 text-amber-800 font-bold text-sm rounded-[24px] bg-amber-50/70 flex items-center justify-center gap-2 transition-all hover:bg-amber-100"
+                                >
+                                  <Plus className="w-4 h-4 text-amber-600" /> Assign Mode
+                                </button>
+                              )}
 
+                              {/* Status Action Button */}
+                              {isDelivered ? (
+                                <span className="w-full py-2 border-2 border-emerald-200 text-emerald-700 font-bold text-sm rounded-[24px] bg-emerald-50 flex items-center justify-center gap-2 shadow-sm">
+                                  <CheckCircle2 className="w-4 h-4" /> Delivered
+                                </span>
+                              ) : dem.delivery_status === 'REJECTED' ? (
+                                <span className="w-full py-2 border-2 border-rose-200 text-rose-700 font-bold text-sm rounded-[24px] bg-rose-50 flex items-center justify-center gap-2 shadow-sm">
+                                  <X className="w-4 h-4" /> Rejected
+                                </span>
+                              ) : dem.delivery_status === 'ARRIVED' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateStatus(dem.id, 'DELIVERED')}
+                                  className="w-full py-2 border-2 border-emerald-400 text-white font-black text-sm rounded-[24px] bg-emerald-500 flex items-center justify-center gap-2 shadow-md hover:bg-emerald-600 transition-all active:scale-95"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" /> Mark Delivered
+                                </button>
+                              ) : isOut ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateStatus(dem.id, 'ARRIVED')}
+                                  className="w-full py-2 border-2 border-indigo-400 text-white font-black text-sm rounded-[24px] bg-indigo-500 flex items-center justify-center gap-2 shadow-md hover:bg-indigo-600 transition-all active:scale-95"
+                                >
+                                  <MapPin className="w-4 h-4" /> In at Gate
+                                </button>
+                              ) : (
+                                <span className="w-full py-2 border-2 border-amber-200 text-amber-700 font-black text-sm rounded-[24px] bg-amber-50 flex items-center justify-center gap-2 shadow-sm">
+                                  <AlertTriangle className="w-4 h-4 text-amber-600" /> Ready for Dispatch
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Floating Action Buttons */}
+                            <div className="absolute bottom-4 right-4 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                              <a
+                                href={mapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-10 h-10 rounded-full border border-blue-200 text-blue-600 flex items-center justify-center bg-blue-50 hover:bg-blue-100 transition-colors shadow-sm"
+                                title="Open Google Maps Navigation"
+                              >
+                                <Navigation className="w-4 h-4" />
+                              </a>
                               <button
                                 type="button"
                                 onClick={() => handleSendWhatsAppAlert(dem)}
-                                className="p-2 lg:p-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs flex-1 sm:flex-none flex justify-center"
+                                className="w-10 h-10 rounded-full border border-emerald-200 text-emerald-600 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 transition-colors shadow-sm"
                                 title="Send WhatsApp Alert to ANO"
                               >
-                                <MessageCircle className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
+                                <MessageCircle className="w-4 h-4" />
                               </button>
-
-                              {isDelivered && (
-                                <Link
-                                  to="/documentation"
-                                  className="px-3 lg:px-2.5 py-2 lg:py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[12px] lg:text-[11px] transition-colors shadow-2xs flex items-center justify-center gap-1 shrink-0 flex-1 sm:flex-none"
-                                  title="View in Documentation (Summary Card & Verification)"
-                                >
-                                  <FileCheck className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
-                                  <span>Docs ↗</span>
-
-                                </Link>
-                              )}
                             </div>
-                            </div>
+
                           </div>
                         );
                       })}
