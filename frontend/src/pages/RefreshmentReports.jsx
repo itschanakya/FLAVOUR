@@ -244,8 +244,8 @@ export default function RefreshmentReports() {
                         <th className="w-[40px] px-2 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black">No</th>
                         <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Institution & ANO Details</th>
                         <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Address</th>
-                        <th className="px-2 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Date</th>
-                        <th className="px-2 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Time</th>
+                        <th className="px-2 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black">Date</th>
+                        <th className="px-2 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black">Time</th>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
                           <th key={day} className="w-[80px] px-1 py-4 text-center border-l border-slate-200 print:border-black">
                             <span className="text-xs font-black text-blue-500 block print:text-black">{day}</span>
@@ -258,26 +258,26 @@ export default function RefreshmentReports() {
                     <tbody className="divide-y divide-slate-800/60 print:divide-black">
                       {instData.map((row, idx) => (
                         <tr key={idx} className="hover:bg-slate-100/50 print:bg-white">
-                          <td className="px-2 py-3 text-sm font-bold text-slate-500 text-center print:text-black">{idx + 1}</td>
-                          <td className="px-4 py-3 print:border-black">
+                          <td className="px-2 py-3 align-middle text-sm font-bold text-slate-500 text-center print:text-black">{idx + 1}</td>
+                          <td className="px-4 py-3 align-middle print:border-black">
                             <div className="font-black text-sm text-slate-800 uppercase print:text-black mb-1">{row.institution}</div>
                             <div className="text-[10px] font-bold text-slate-500 uppercase print:text-slate-700 mb-0.5"><span className="text-slate-400">ANO:</span> {row.ano}</div>
                           </td>
-                          <td className="px-4 py-3 print:border-black text-[9px] font-medium text-slate-600 uppercase print:text-slate-800 max-w-[200px]">
+                          <td className="px-4 py-3 align-middle print:border-black text-[10px] font-bold text-slate-700 uppercase print:text-slate-800 max-w-[200px]">
                             {row.address || '-'}
                           </td>
-                          <td className="px-2 py-3 print:border-black text-xs font-bold text-slate-700 print:text-black whitespace-nowrap">
+                          <td className="px-2 py-3 align-middle text-center print:border-black text-[10px] font-bold text-slate-700 uppercase print:text-black whitespace-nowrap">
                             {formatDate(row.date) || '-'}
                           </td>
-                          <td className="px-2 py-3 print:border-black text-xs font-bold text-slate-700 print:text-black whitespace-nowrap">
+                          <td className="px-2 py-3 align-middle text-center print:border-black text-[10px] font-bold text-slate-700 uppercase print:text-black whitespace-nowrap">
                             {row.time || '-'}
                           </td>
                           {row.days.map((val, i) => (
-                            <td key={i} className="px-2 py-3 text-center border-l border-slate-200 print:border-black">
+                            <td key={i} className="px-2 py-3 align-middle text-center border-l border-slate-200 print:border-black">
                               <span className={`text-sm font-black ${val > 0 ? 'text-blue-600' : 'text-slate-700'} print:text-black`}>{val || '-'}</span>
                             </td>
                           ))}
-                          <td className="px-4 py-3 text-center text-sm font-black text-emerald-600 bg-emerald-950/10 border-l border-slate-200 print:bg-slate-100 print:text-black print:border-black">
+                          <td className="px-4 py-3 align-middle text-center text-sm font-black text-emerald-600 bg-emerald-950/10 border-l border-slate-200 print:bg-slate-100 print:text-black print:border-black">
                             {row.days.reduce((s, v) => s + v, 0)}
                           </td>
                         </tr>
