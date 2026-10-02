@@ -226,7 +226,7 @@ export default function RefreshmentReports() {
             const grandTotal = dayTotals.reduce((s, v) => s + v, 0);
 
             return (
-              <div key={weekKey} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xl print:shadow-none print:border-none print:bg-white">
+              <div key={weekKey} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xl print:shadow-none print:border-none print:bg-white print:overflow-visible print:rounded-none">
                 <PrintHeader title="WEEKLY REFRESHMENT SUMMARY" period={`${weekDates[0]} to ${weekDates[6]}`} />
                 <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between print:hidden">
                   <div className="flex items-center gap-3">
@@ -238,7 +238,7 @@ export default function RefreshmentReports() {
                   </button>
                 </div>
                 <div className="overflow-x-auto print:overflow-visible">
-                  <table className="w-full text-left border-collapse min-w-[1200px] table-fixed print:min-w-0 print:w-full">
+                  <table className="w-full text-left border-collapse min-w-[1200px] table-fixed print:min-w-0 print:w-full print:border print:border-black">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-[11px] font-black uppercase text-slate-600">
                         <th className="w-[4%] px-2 py-3.5 text-center print:text-black border border-slate-200 print:border-black">S.NO</th>
@@ -1020,7 +1020,7 @@ export default function RefreshmentReports() {
             return (
               <div 
                 key={sec.key} 
-                className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm print:shadow-none print:border-none print:bg-white print:overflow-visible print:w-full print:mb-0 print:break-after-page page-break-after-always"
+                className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm print:shadow-none print:border-none print:bg-white print:overflow-visible print:w-full print:mb-0 print:break-after-page page-break-after-always print:rounded-none"
                 style={secIdx < groupedSections.length - 1 ? { pageBreakAfter: 'always', breakAfter: 'page' } : {}}
               >
                 {/* Print Page Header */}
