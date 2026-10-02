@@ -244,12 +244,11 @@ export default function RefreshmentReports() {
                         <th className="w-[40px] px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black">S.NO</th>
                         <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">INSTITUTION & ANO DETAILS</th>
                         <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">ADDRESS</th>
-                        <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black">DATE</th>
-                        <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black">TIME</th>
+                        <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">DATE</th>
+                        <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black">TIME</th>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-                          <th key={day} className="w-[60px] px-1 py-3.5 text-center border border-slate-200 print:border-black">
-                            <span className="text-[11px] font-black text-blue-500 block print:text-black">{day}</span>
-                            <span className="text-[9px] font-bold text-slate-500 whitespace-nowrap print:text-slate-700">{weekDates[i]}</span>
+                          <th key={day} className="px-3 py-3.5 text-center border border-slate-200 print:border-black whitespace-nowrap">
+                            {day} {weekDates[i]}
                           </th>
                         ))}
                         <th className="w-[80px] px-3 py-3.5 text-center print:text-black text-emerald-600 border border-slate-200 print:border-black">TOTAL</th>
@@ -263,21 +262,21 @@ export default function RefreshmentReports() {
                             <div className="font-normal text-slate-800 uppercase">{row.institution}</div>
                             <div className="text-[10px] font-normal text-slate-500 uppercase leading-tight mt-0.5">ANO: {row.ano}</div>
                           </td>
-                          <td className="px-3 py-3 align-middle print:border-black font-normal text-slate-700 uppercase print:text-black max-w-[200px] border border-slate-200">
+                          <td className="px-3 py-3 align-middle print:border-black text-[10px] font-normal text-slate-500 leading-tight uppercase print:text-black max-w-[200px] border border-slate-200">
                             {row.address || '-'}
                           </td>
-                          <td className="px-3 py-3 align-middle text-center print:border-black font-normal text-slate-700 print:text-black whitespace-nowrap border border-slate-200">
+                          <td className="px-3 py-3 align-middle print:border-black font-normal text-slate-700 print:text-black whitespace-nowrap border border-slate-200">
                             {formatDate(row.date) || '-'}
                           </td>
-                          <td className="px-3 py-3 align-middle text-center print:border-black font-normal text-slate-700 print:text-black whitespace-nowrap border border-slate-200">
+                          <td className="px-3 py-3 align-middle print:border-black font-normal text-slate-700 print:text-black whitespace-nowrap border border-slate-200">
                             {row.time || '-'}
                           </td>
                           {row.days.map((val, i) => (
                             <td key={i} className="px-3 py-3 align-middle text-center font-normal text-slate-900 border border-slate-200 print:border-black">
-                              <span className={`print:text-black ${val > 0 ? 'text-blue-700 font-medium' : 'text-slate-500'}`}>{val || '-'}</span>
+                              <span className={`print:text-black ${val === 0 ? 'text-slate-400' : ''}`}>{val || '-'}</span>
                             </td>
                           ))}
-                          <td className="px-3 py-3 align-middle text-center font-bold text-emerald-700 border border-slate-200 print:text-black print:border-black bg-emerald-50/30">
+                          <td className="px-3 py-3 align-middle text-center font-normal text-slate-900 border border-slate-200 print:text-black print:border-black bg-emerald-50/10">
                             {row.days.reduce((s, v) => s + v, 0)}
                           </td>
                         </tr>
@@ -287,9 +286,9 @@ export default function RefreshmentReports() {
                       <tr className="font-black text-[11px] uppercase text-slate-600">
                         <td colSpan={5} className="px-3 py-3.5 text-right print:text-black border border-slate-200 print:border-black">TOTAL PACKETS</td>
                         {dayTotals.map((tot, i) => (
-                          <td key={i} className="px-3 py-3.5 text-center text-blue-700 border border-slate-200 print:text-black print:border-black">{tot}</td>
+                          <td key={i} className="px-3 py-3.5 text-center font-normal text-slate-900 border border-slate-200 print:text-black print:border-black">{tot}</td>
                         ))}
-                        <td className="px-3 py-3.5 text-center text-emerald-700 border border-slate-200 print:text-black print:border-black">{grandTotal}</td>
+                        <td className="px-3 py-3.5 text-center font-normal text-slate-900 border border-slate-200 print:text-black print:border-black">{grandTotal}</td>
                       </tr>
                     </tfoot>
                   </table>
