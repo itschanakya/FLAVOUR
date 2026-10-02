@@ -247,8 +247,9 @@ export default function RefreshmentReports() {
                         <th className="w-[100px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">DATE</th>
                         <th className="w-[80px] px-3 py-3.5 print:text-black border border-slate-200 print:border-black">TIME</th>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-                          <th key={day} className="w-[80px] px-3 py-3.5 text-center border border-slate-200 print:border-black whitespace-nowrap">
-                            {day} {weekDates[i]}
+                          <th key={day} className="w-[80px] px-3 py-3 text-center border border-slate-200 print:border-black">
+                            <span className="block text-[11px] font-black text-blue-500 print:text-black uppercase">{day}</span>
+                            <span className="block text-[9px] font-bold text-slate-500 print:text-slate-700 whitespace-nowrap mt-0.5 uppercase">{weekDates[i]}</span>
                           </th>
                         ))}
                         <th className="w-[80px] px-3 py-3.5 text-center print:text-black text-emerald-600 border border-slate-200 print:border-black">TOTAL</th>
