@@ -37,19 +37,7 @@ async function generateDemandNumber(db) {
   }
 }
 
-const multer = require('multer');
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../uploads/receipts/'));
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'receipt-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ storage: storage });
+const { uploadReceipt, uploadBill, getFileUrl } = require('../config/upload');
 
 // GET /api/demands - List demands with role-based scoping and filtering
 router.get('/', authenticateToken, async (req, res) => {
@@ -906,7 +894,7 @@ router.post('/:id/admin-reject', authenticateToken, authorizeRoles('ADMIN'), asy
 });
 
 // POST /api/demands/:id/fulfill - ADMIN marks DELIVERED demand as FULFILLED and uploads files
-router.post('/:id/fulfill', authenticateToken, authorizeRoles('ADMIN'), upload.fields([{ name: 'receipt', maxCount: 1 }, { name: 'invoice', maxCount: 1 }]), async (req, res) => {
+router.post('/:id/fulfill', authenticateToken, authorizeRoles('ADMIN'), uploadReceipt.fields([{ name: 'receipt', maxCount: 1 }, { name: 'invoice', maxCount: 1 }]), async (req, res) => {
   try {
     const demandId = req.params.id;
     const db = await getDB();
@@ -922,10 +910,10 @@ router.post('/:id/fulfill', authenticateToken, authorizeRoles('ADMIN'), upload.f
 
     if (req.files) {
       if (req.files.receipt && req.files.receipt.length > 0) {
-        receiptUrl = `/uploads/receipts/${req.files.receipt[0].filename}`;
+        receiptUrl = getFileUrl(req.files.receipt[0], 'receipts');
       }
       if (req.files.invoice && req.files.invoice.length > 0) {
-        invoiceUrl = `/uploads/receipts/${req.files.invoice[0].filename}`;
+        invoiceUrl = getFileUrl(req.files.invoice[0], 'receipts');
       }
     }
 

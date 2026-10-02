@@ -6,26 +6,7 @@ const multer = require('multer');
 const { getDB, syncStandardPacketPrice } = require('../database');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 
-// Setup Multer Storage for Catalog Photos
-const catalogUploadDir = path.join(__dirname, '../uploads/catalog/');
-if (!fs.existsSync(catalogUploadDir)) {
-  fs.mkdirSync(catalogUploadDir, { recursive: true });
-}
-
-const catalogStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, catalogUploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, 'catalog-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const uploadCatalogPhoto = multer({
-  storage: catalogStorage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
-});
+const { uploadCatalogPhoto, getFileUrl } = require('../config/upload');
 
 // POST /api/catalog/upload-photo - Upload item photo from device
 router.post('/upload-photo', authenticateToken, authorizeRoles('ADMIN'), uploadCatalogPhoto.single('photo'), (req, res) => {
@@ -33,8 +14,8 @@ router.post('/upload-photo', authenticateToken, authorizeRoles('ADMIN'), uploadC
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded.' });
     }
-    const imageUrl = `/uploads/catalog/${req.file.filename}`;
-    res.json({ imageUrl, filename: req.file.filename });
+    const imageUrl = getFileUrl(req.file, 'catalog');
+    res.json({ imageUrl, filename: req.file.filename || imageUrl.split('/').pop() });
   } catch (err) {
     console.error('Catalog photo upload error:', err);
     res.status(500).json({ error: 'Failed to upload photo.' });

@@ -7,20 +7,7 @@ const { getDB } = require('../database');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const { broadcastToAll } = require('../sse');
 
-// Receipt Upload Multer Configuration
-const receiptStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../uploads/receipts/'));
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, 'receipt-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const uploadReceipt = multer({
-  storage: receiptStorage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-});
+const { uploadReceipt, getFileUrl } = require('../config/upload');
 
 // GET /api/delivery/demands - List demands ready/scheduled for physical delivery
 router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
@@ -923,7 +910,7 @@ router.post('/driver/upload-receipt', authenticateToken, authorizeRoles('DELIVER
       return res.status(400).json({ error: 'Receipt photo or document file is required' });
     }
 
-    const receiptUrl = `/uploads/receipts/${req.file.filename}`;
+    const receiptUrl = getFileUrl(req.file, 'receipts');
     const db = await getDB();
 
     await db.run(
