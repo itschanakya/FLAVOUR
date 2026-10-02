@@ -60,6 +60,7 @@ export default function AdminDemandsPage() {
   const [statusFilter, setStatusFilter] = useState('PENDING'); // PENDING, ACCEPTED, REJECTED, ALL
   const [timeFilter, setTimeFilter] = useState('ALL'); // ALL, TODAY, WEEKLY, MONTHLY
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetchDemandsData();
@@ -251,8 +252,22 @@ export default function AdminDemandsPage() {
       {/* 2-Column Layout: ONBOARDED NCC UNITS (Sidebar) on the Left, Demands Console on the Right */}
       <div className="flex flex-col lg:flex-row gap-5 items-start">
         
+        {/* MOBILE TOGGLE FOR SIDEBAR */}
+        <div className="lg:hidden w-full flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-blue-600" />
+            <span className="font-extrabold text-sm text-slate-800">Filter NCC Units</span>
+          </div>
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-200 hover:bg-blue-100 transition-colors"
+          >
+            {isSidebarOpen ? 'Hide' : 'Show'} Filters
+          </button>
+        </div>
+
         {/* LEFT SIDE: ONBOARDED NCC UNITS SIDEBAR */}
-        <div className="hidden lg:flex w-full lg:w-72 xl:w-80 shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex-col sticky top-20">
+        <div className={`${isSidebarOpen ? 'flex' : 'hidden'} lg:flex w-full lg:w-72 xl:w-80 shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex-col sticky top-20`}>
           <div className="p-4 border-b border-slate-100 bg-slate-50/70">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
