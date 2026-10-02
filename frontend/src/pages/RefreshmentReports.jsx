@@ -55,6 +55,7 @@ export default function RefreshmentReports() {
   const [isLandscape, setIsLandscape] = useState(true);
   const [paperSize, setPaperSize] = useState('A4');
   const [selectedGroup, setSelectedGroup] = useState('All');
+  const [printSpecificWeekKey, setPrintSpecificWeekKey] = useState(null);
   
   useEffect(() => {
     fetchData();
@@ -95,6 +96,18 @@ export default function RefreshmentReports() {
       window.removeEventListener('afterprint', handleAfterPrint);
     };
     window.addEventListener('afterprint', handleAfterPrint);
+  };
+
+  const handlePrintWeeklySpecific = (weekKey) => {
+    setPrintSpecificWeekKey(weekKey);
+    setTimeout(() => {
+      const handleRestore = () => {
+        setPrintSpecificWeekKey(null);
+        window.removeEventListener('afterprint', handleRestore);
+      };
+      window.addEventListener('afterprint', handleRestore);
+      handlePrint();
+    }, 10);
   };
   
   const PrintControls = () => (
@@ -188,11 +201,13 @@ export default function RefreshmentReports() {
 
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
-        <PrintControls />
+        {!printSpecificWeekKey && <PrintControls />}
         {sortedWeekKeys.length === 0 ? (
           <div className="p-8 text-center text-slate-500">No demands found.</div>
         ) : (
-          sortedWeekKeys.map(weekKey => {
+          sortedWeekKeys
+            .filter(wk => !printSpecificWeekKey || wk === printSpecificWeekKey)
+            .map(weekKey => {
             const weekStart = new Date(weekKey);
             const weekDates = Array.from({length: 7}).map((_, i) => {
               const d = new Date(weekStart);
@@ -212,7 +227,7 @@ export default function RefreshmentReports() {
                     <Calendar size={18} className="text-blue-500" />
                     <h3 className="font-black text-sm tracking-widest text-slate-800 uppercase">Program: {weekDates[0]} - {weekDates[6]}</h3>
                   </div>
-                  <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-xs rounded-lg transition-all" title="Print Report">
+                  <button onClick={() => handlePrintWeeklySpecific(weekKey)} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-xs rounded-lg transition-all" title="Print Report">
                     <Printer size={14} /> Print
                   </button>
                 </div>
