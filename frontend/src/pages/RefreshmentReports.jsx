@@ -88,7 +88,7 @@ export default function RefreshmentReports() {
     const sizeClass = paperSize === 'Legal' ? 'print-legal' : 'print-a4';
     
     body.classList.add(printClass, sizeClass);
-    setTimeout(() => { window.print(); }, 500);
+    setTimeout(() => { window.print(); }, 100);
     
     const handleAfterPrint = () => {
       body.classList.remove(printClass, sizeClass);
@@ -660,7 +660,7 @@ export default function RefreshmentReports() {
         };
         window.addEventListener('afterprint', handleRestore);
         handlePrint();
-      }, 300);
+      }, 100);
     };
 
     const isFiltered = unitFilter !== 'All' || searchQuery !== '';
