@@ -183,7 +183,7 @@ export default function RefreshmentReports() {
       const inst = d.institution_name || 'UNKNOWN';
       const instData = institutions.find(i => i.institution_name === inst) || {};
       const addrStr = d.complete_address || instData.complete_address || d.google_location || instData.google_location || '';
-      const deliveryTime = d.delivery_time || '-';
+      const deliveryTime = d.demand_time || '-';
       const demandDate = d.demand_date || '-';
       
       const rowKey = `${inst}_${demandDate}_${deliveryTime}`;
