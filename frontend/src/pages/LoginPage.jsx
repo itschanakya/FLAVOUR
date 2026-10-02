@@ -342,7 +342,7 @@ export default function LoginPage() {
             <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-amber-400 to-indigo-500 rounded-3xl blur-lg opacity-40 group-hover:opacity-75 transition duration-700 animate-pulse-border"></div>
 
             {/* Main Card Container */}
-            <div className="relative rounded-3xl bg-slate-900/85 backdrop-blur-2xl border border-white/15 p-4 sm:p-5 shadow-2xl shadow-black/80 space-y-4">
+            <div className="relative rounded-3xl bg-slate-900/85 backdrop-blur-2xl border-2 border-orange-500 p-4 sm:p-5 shadow-2xl shadow-black/80 space-y-4">
                 
                 {/* Portal Header */}
                 <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -639,7 +639,11 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-
+          <div className="mt-4 flex justify-center w-full">
+            <div className="bg-amber-500/20 text-amber-400 px-4 py-1.5 rounded-full font-extrabold tracking-widest text-[10px] shadow-lg shadow-amber-500/10 border border-amber-500/20 backdrop-blur-md">
+              DESIGN AND DEVP BY PRAVEEN KUMAR
+            </div>
+          </div>
 
         </main>
 
@@ -654,14 +658,7 @@ export default function LoginPage() {
             <span className="text-slate-400 hidden md:inline">For Authorized Demand & Supply Operations Only.</span>
           </div>
 
-          <div className="flex items-center gap-4 text-slate-400">
-            <button
-              onClick={() => setShowHelpModal(true)}
-              className="hover:text-white transition-colors cursor-pointer"
-            >
-              Standard Operating Procedures (SOP)
-            </button>
-            <span className="text-slate-600">•</span>
+          <div className="flex items-center gap-4 text-slate-400 mt-2">
             <button
               onClick={() => {
                 setForgotEmail(email || '');
