@@ -590,7 +590,7 @@ export default function DeliveryManagement() {
     } else if (mode === 'PORTER') {
       setAssignPartnerId('');
       setCustomPartnerName('Handled by Porter');
-      setCustomPartnerPhone(dem.delivery_partner_phone || 'Porter Staff');
+      setCustomPartnerPhone(dem.delivery_partner_phone || '');
       setCustomVehicleNo('Porter Transport');
     } else if (mode === 'SELF_DELIVERY') {
       setAssignPartnerId('');
@@ -696,7 +696,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
 
       if (mode === 'PORTER') {
         pName = 'Handled by Porter';
-        pPhone = 'Porter Staff';
+        pPhone = customPartnerPhone || '';
         pVehicle = 'Porter Transport';
       } else if (mode === 'SELF_DELIVERY') {
         pName = 'Admin Self Delivery';
@@ -2281,7 +2281,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                       setDeliveryMode('PORTER');
                       setAssignPartnerId('');
                       setCustomPartnerName('Handled by Porter');
-                      setCustomPartnerPhone(selectedDemandForAssign?.delivery_partner_phone || 'Porter Staff');
+                      setCustomPartnerPhone(selectedDemandForAssign?.delivery_partner_phone || '');
                       setCustomVehicleNo('Porter Transport');
                     }}
                     className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
@@ -2351,9 +2351,6 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                     <Package className="w-4 h-4 text-purple-600" />
                     <span>Porter Mode Active</span>
                   </div>
-                  <p className="text-[11px] text-purple-700 font-medium leading-relaxed">
-                    Details of porter not required. Order will be marked as <strong>"Porter Assigned"</strong>. Live tracking movement points (In Transit → In at Gate → Delivered / Rejected) are managed directly from the Admin console.
-                  </p>
                   <div className="mt-2.5 pt-2.5 border-t border-purple-200/50">
                     <label className="block text-xs font-bold text-purple-800 mb-1">Porter Contact No. (Optional)</label>
                     <input
@@ -2371,9 +2368,6 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                     <Building2 className="w-4 h-4 text-emerald-600" />
                     <span>Self Delivery Mode Active</span>
                   </div>
-                  <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
-                    Admin direct handover to institution/unit. Order will be marked as <strong>"Self Delivery"</strong>. Live tracking movement points (In Transit → In at Gate → Delivered / Rejected) are managed directly from the Admin console.
-                  </p>
                   <div className="mt-2.5 pt-2.5 border-t border-emerald-200/50">
                     <label className="block text-xs font-bold text-emerald-800 mb-1">Self Service Rep Contact No. (Optional)</label>
                     <input
