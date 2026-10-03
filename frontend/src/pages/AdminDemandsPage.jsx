@@ -721,7 +721,7 @@ export default function AdminDemandsPage() {
                           {formatDMY(dem.demand_date)}
                         </td>
                         <td className="p-3.5 font-bold text-slate-800">
-                          {(dem.total_packets || dem.quantity || 0).toLocaleString('en-IN')}
+                          {(dem.total_packets || dem.total_quantity || dem.quantity || 0).toLocaleString('en-IN')}
                         </td>
                         <td className="p-3.5 font-bold text-emerald-700 whitespace-nowrap">
                           ₹{(dem.total_amount || 0).toLocaleString('en-IN')}
