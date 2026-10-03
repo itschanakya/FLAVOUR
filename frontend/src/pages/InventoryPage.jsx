@@ -2105,13 +2105,8 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                       <tr>
                         <th className="p-4">Refreshment Item</th>
                         <th className="p-4">Unit of Measure</th>
-                        <th className="p-4">
-                          Stock Balance
-                          <span className="block text-[10px] text-slate-400 font-normal">
-                            as on {selectedStockDate}
-                          </span>
-                        </th>
-                        <th className="p-4 text-right">Rate</th>
+                        <th className="p-4">Stock Balance</th>
+                        <th className="p-4 text-right">MRP</th>
                         <th className="p-4 text-right">Total Amount</th>
                         <th className="p-4">
                           {selectedStockDate === getTodayDateStr() ? 'Consumed Today' : `Consumed (${selectedStockDate})`}
