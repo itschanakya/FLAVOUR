@@ -725,7 +725,7 @@ export default function UnitDemandPage() {
       {/* Main Grid: Form (Left) & Table (Right) - Full Viewport Vertical Justification Identical to ANO Dashboard */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-stretch flex-1">
         {/* LEFT COLUMN: COMPACT NEW DEMAND ENTRY FORM */}
-        <div className="xl:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 sm:p-5 flex flex-col justify-between h-full min-h-[700px] sticky top-4">
+        <div className="xl:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 sm:p-5 flex flex-col justify-between h-full min-h-[700px]">
           <div className="flex items-center justify-between mb-3 shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
