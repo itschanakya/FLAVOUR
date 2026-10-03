@@ -579,55 +579,7 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
         </div>
       )}
 
-      {/* TABS NAVIGATION */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        {initialView === 'stock' ? (
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
-              <Boxes className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                Stock Management
-                <span className="px-2 py-0.5 rounded-full text-[11px] bg-emerald-100 text-emerald-800 font-bold">
-                  Bal Stock
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500">
-                Track real-time item stock balances, daily refreshment consumption, batch expiry dates, and incoming restock shipments.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
-              <ShoppingBag className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                Catalog Items
-                <span className="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-800 font-bold">
-                  {items.length} Total
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500">
-                Manage your refreshment inventory catalog, approved pricing, and item photos.
-              </p>
-            </div>
-          </div>
-        )}
 
-        {/* Top Action Button */}
-        {(activeTab === 'stock' || initialView === 'stock') && (
-          <button
-            onClick={() => items.length > 0 && handleOpenStockIn(items[0])}
-            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all inline-flex items-center gap-2 self-start sm:self-auto cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Restock / Stock In
-          </button>
-        )}
-      </div>
 
       {/* VIEW 1: REFRESHMENT CATALOG ITEMS (SIDE-BY-SIDE: FORM ALWAYS VISIBLE ON LEFT, TABLE ON RIGHT) */}
       {activeTab === 'catalog' && (
