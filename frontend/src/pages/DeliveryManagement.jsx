@@ -1258,9 +1258,9 @@ _National Cadet Corps - Supply & Logistics Portal_`;
       </div>
 
       {/* Unified Navigation & Controls Strip */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 space-y-4">
-        {/* Top Row: View Switcher */}
-        <div className="flex items-center bg-slate-50/80 p-1.5 rounded-2xl w-fit">
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 flex flex-col xl:flex-row xl:items-center gap-4">
+        {/* View Switcher */}
+        <div className="flex items-center bg-slate-50/80 p-1.5 rounded-2xl shrink-0 w-fit">
           <button
             type="button"
             onClick={() => setViewMode('STOPS')}
@@ -1288,9 +1288,9 @@ _National Cadet Corps - Supply & Logistics Portal_`;
           </button>
         </div>
 
-        {/* Middle Row: Search and Filters in a single row */}
+        {/* Search and Filters */}
         {viewMode === 'STOPS' && (
-          <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-4 w-full">
+          <div className="flex flex-wrap xl:flex-nowrap items-center gap-4 w-full justify-between xl:justify-end">
             {/* Search Input */}
             <div className="relative w-full xl:w-auto flex-1 min-w-[200px]">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
