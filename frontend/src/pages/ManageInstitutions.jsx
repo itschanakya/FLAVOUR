@@ -25,6 +25,17 @@ export default function ManageInstitutions() {
   const [s2, setS2] = useState(35);
   const [s3, setS3] = useState(25);
   const [pinFilter, setPinFilter] = useState('');
+  
+  const [columnFilters, setColumnFilters] = useState({
+    institution_name: '',
+    pin_code: '',
+    ano_cto_name: '',
+    ano_email: '',
+    strength_1st_year: '',
+    strength_2nd_year: '',
+    strength_3rd_year: '',
+    total_vacancy: ''
+  });
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -496,33 +507,90 @@ export default function ManageInstitutions() {
           <table className="w-full text-left text-sm">
             <thead className="bg-white/80 text-xs font-semibold uppercase text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="p-4">Institution Name</th>
-                <th className="p-4">PIN Code</th>
-                <th className="p-4">ANO / CTO Incharge</th>
-                <th className="p-4">ANO Email / Login</th>
-                <th className="p-4 text-center">1st Yr Strength</th>
-                <th className="p-4 text-center">2nd Yr Strength</th>
-                <th className="p-4 text-center">3rd Yr Strength</th>
-                <th className="p-4 text-center">Total Vacancy</th>
+                <th className="p-4">S.No</th>
+                <th className="p-4">
+                  <div className="flex flex-col gap-1">
+                    <span>Institution Name</span>
+                    <input type="text" placeholder="Filter..." className="p-1 text-[10px] font-normal border border-slate-200 rounded w-full bg-slate-50" value={columnFilters.institution_name} onChange={(e) => setColumnFilters({...columnFilters, institution_name: e.target.value})} />
+                  </div>
+                </th>
+                <th className="p-4">
+                  <div className="flex flex-col gap-1">
+                    <span>PIN Code</span>
+                    <input type="text" placeholder="Filter..." className="p-1 text-[10px] font-normal border border-slate-200 rounded w-full bg-slate-50" value={columnFilters.pin_code} onChange={(e) => setColumnFilters({...columnFilters, pin_code: e.target.value})} />
+                  </div>
+                </th>
+                <th className="p-4">
+                  <div className="flex flex-col gap-1">
+                    <span>ANO / CTO Incharge</span>
+                    <input type="text" placeholder="Filter..." className="p-1 text-[10px] font-normal border border-slate-200 rounded w-full bg-slate-50" value={columnFilters.ano_cto_name} onChange={(e) => setColumnFilters({...columnFilters, ano_cto_name: e.target.value})} />
+                  </div>
+                </th>
+                <th className="p-4">
+                  <div className="flex flex-col gap-1">
+                    <span>ANO Email / Login</span>
+                    <input type="text" placeholder="Filter..." className="p-1 text-[10px] font-normal border border-slate-200 rounded w-full bg-slate-50" value={columnFilters.ano_email} onChange={(e) => setColumnFilters({...columnFilters, ano_email: e.target.value})} />
+                  </div>
+                </th>
+                <th className="p-4 text-center">
+                  <div className="flex flex-col gap-1">
+                    <span>1st Yr Strength</span>
+                    <input type="text" placeholder="Filter..." className="p-1 text-[10px] font-normal border border-slate-200 rounded w-full bg-slate-50 text-center" value={columnFilters.strength_1st_year} onChange={(e) => setColumnFilters({...columnFilters, strength_1st_year: e.target.value})} />
+                  </div>
+                </th>
+                <th className="p-4 text-center">
+                  <div className="flex flex-col gap-1">
+                    <span>2nd Yr Strength</span>
+                    <input type="text" placeholder="Filter..." className="p-1 text-[10px] font-normal border border-slate-200 rounded w-full bg-slate-50 text-center" value={columnFilters.strength_2nd_year} onChange={(e) => setColumnFilters({...columnFilters, strength_2nd_year: e.target.value})} />
+                  </div>
+                </th>
+                <th className="p-4 text-center">
+                  <div className="flex flex-col gap-1">
+                    <span>3rd Yr Strength</span>
+                    <input type="text" placeholder="Filter..." className="p-1 text-[10px] font-normal border border-slate-200 rounded w-full bg-slate-50 text-center" value={columnFilters.strength_3rd_year} onChange={(e) => setColumnFilters({...columnFilters, strength_3rd_year: e.target.value})} />
+                  </div>
+                </th>
+                <th className="p-4 text-center">
+                  <div className="flex flex-col gap-1">
+                    <span>Total Vacancy</span>
+                    <input type="text" placeholder="Filter..." className="p-1 text-[10px] font-normal border border-slate-200 rounded w-full bg-slate-50 text-center" value={columnFilters.total_vacancy} onChange={(e) => setColumnFilters({...columnFilters, total_vacancy: e.target.value})} />
+                  </div>
+                </th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {(Array.isArray(institutions) ? institutions : []).filter(inst =>
-                !pinFilter || (inst.pin_code && inst.pin_code.startsWith(pinFilter))
-              ).length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="p-8 text-center text-slate-500 font-medium">
-                    {pinFilter ? `No institutions found with PIN starting with "${pinFilter}".` : 'No institutions onboarded yet under this NCC Unit.'}
-                  </td>
-                </tr>
-              ) : (
-                (Array.isArray(institutions) ? institutions : [])
-                  .filter(inst => !pinFilter || (inst.pin_code && inst.pin_code.startsWith(pinFilter)))
-                  .map((inst) => {
+              {(() => {
+                const filteredInstitutions = (Array.isArray(institutions) ? institutions : []).filter(inst => {
+                  const total = (inst.strength_1st_year || 0) + (inst.strength_2nd_year || 0) + (inst.strength_3rd_year || 0);
+                  const matchGlobalPin = !pinFilter || (inst.pin_code && inst.pin_code.startsWith(pinFilter));
+                  const matchInstName = !columnFilters.institution_name || inst.institution_name?.toLowerCase().includes(columnFilters.institution_name.toLowerCase());
+                  const matchPin = !columnFilters.pin_code || inst.pin_code?.toLowerCase().includes(columnFilters.pin_code.toLowerCase());
+                  const matchAnoName = !columnFilters.ano_cto_name || inst.ano_cto_name?.toLowerCase().includes(columnFilters.ano_cto_name.toLowerCase());
+                  const matchAnoEmail = !columnFilters.ano_email || inst.ano_email?.toLowerCase().includes(columnFilters.ano_email.toLowerCase()) || inst.login_id?.toLowerCase().includes(columnFilters.ano_email.toLowerCase());
+                  const matchS1 = !columnFilters.strength_1st_year || String(inst.strength_1st_year).includes(columnFilters.strength_1st_year);
+                  const matchS2 = !columnFilters.strength_2nd_year || String(inst.strength_2nd_year).includes(columnFilters.strength_2nd_year);
+                  const matchS3 = !columnFilters.strength_3rd_year || String(inst.strength_3rd_year).includes(columnFilters.strength_3rd_year);
+                  const matchTotal = !columnFilters.total_vacancy || String(total).includes(columnFilters.total_vacancy);
+
+                  return matchGlobalPin && matchInstName && matchPin && matchAnoName && matchAnoEmail && matchS1 && matchS2 && matchS3 && matchTotal;
+                });
+
+                if (filteredInstitutions.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan="10" className="p-8 text-center text-slate-500 font-medium">
+                        No institutions found matching the filters.
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return filteredInstitutions.map((inst, index) => {
                   const total = (inst.strength_1st_year || 0) + (inst.strength_2nd_year || 0) + (inst.strength_3rd_year || 0);
                   return (
                     <tr key={inst.id} className="hover:bg-white/50 transition-colors">
+                      <td className="p-4 text-slate-500 font-bold">{index + 1}</td>
                       <td className="p-4 font-bold text-slate-900">
                         <div>{inst.institution_name}</div>
                         {inst.complete_address && <div className="text-xs text-slate-400 font-normal mt-0.5 max-w-[200px] truncate">{inst.complete_address}</div>}
@@ -574,7 +642,7 @@ export default function ManageInstitutions() {
                     </tr>
                   );
                 })
-              )}
+              })()}
             </tbody>
           </table>
         </div>
