@@ -255,6 +255,30 @@ export default function UnitMenuManager() {
     }
   };
 
+  const handleCardClick = (catItem) => {
+    const existingIndex = menuItems.findIndex(i => i.item_id === catItem.id);
+    if (existingIndex >= 0) {
+      handleRemoveItem(catItem.id);
+    } else {
+      const lineCost = (catItem.unit_price || 0) * 1;
+      setMenuItems(prev => [
+        ...prev,
+        {
+          id: 0,
+          unit_id: parseInt(selectedUnitId, 10),
+          item_id: catItem.id,
+          item_name: catItem.item_name,
+          unit_price: catItem.unit_price,
+          unit_of_measure: catItem.unit_of_measure,
+          current_stock: catItem.current_stock,
+          quantity: 1,
+          line_total: lineCost,
+          image_url: catItem.image_url
+        }
+      ]);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 text-center text-slate-500 flex items-center justify-center gap-2">
@@ -266,43 +290,6 @@ export default function UnitMenuManager() {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-white text-xs font-bold mb-2 backdrop-blur-xs border border-white/15">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Admin Internal Console • Restricted Visibility</span>
-            </div>
-            <h2 className="text-xl md:text-2xl font-black tracking-tight">
-              Dedicated Unit Refreshment Menu Charts
-            </h2>
-            <p className="text-xs md:text-sm text-blue-200 mt-1 max-w-2xl leading-relaxed">
-              Configure the exact stock items & ingredients that compose 1 standard refreshment packet for each NCC Unit. 
-              When demands are prepared at Supply Point, these items are automatically charged off from Stock Management.
-            </p>
-          </div>
-
-          <div className="shrink-0 bg-white/10 backdrop-blur-md rounded-xl p-3.5 border border-white/20 text-center">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200 block">Statutory Packet Ceiling</span>
-            <span className="text-2xl font-black text-amber-300">₹75.00</span>
-            <span className="text-[10px] text-blue-200 block mt-0.5">Fixed Cadet Rate</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Info Notice on Privacy & Visibility */}
-      <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 text-xs text-amber-900">
-        <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-        <div>
-          <strong className="font-bold">Strict Operational Visibility Rule:</strong>
-          <span className="ml-1">
-            Cadets, Institutions, and Units only see the aggregate <strong>"Standard Refreshment Packet of ₹75/-"</strong>. 
-            The raw inventory breakdown configured below is strictly confidential to HQ Vendor Admin and the Supply Point preparation team.
-          </span>
-        </div>
-      </div>
-
       {/* Feedback Alerts */}
       {successMsg && (
         <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-2xs">
@@ -324,59 +311,119 @@ export default function UnitMenuManager() {
         </div>
       )}
 
-      {/* Main Grid: Left Unit Selector, Right Menu Editor */}
+      {/* Main Grid: Left Items Selection, Right Menu Editor & Filter */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: NCC Units Selection Sidebar */}
-        <div className="lg:col-span-4 space-y-3">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-slate-900 text-sm flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-blue-600" />
-                <span>Select NCC Unit</span>
+        
+        {/* Left Column: Available Items Shelf */}
+        <div className="lg:col-span-7 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Package className="w-5 h-5 text-amber-500" />
+                Available Refreshment Items ({catalog.length})
               </h3>
-              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                {units.length} Units
-              </span>
+              <p className="text-xs text-slate-500 mt-0.5">
+                1-Click to add item to unit menu. Click again to remove.
+              </p>
             </div>
+            <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+              1-Click Toggle
+            </span>
+          </div>
 
-            <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1">
-              {units.map(u => {
-                const isSelected = String(u.id) === String(selectedUnitId);
-                return (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => handleUnitSelect(String(u.id))}
-                    className={`w-full text-left p-3 rounded-xl transition-all border flex flex-col gap-0.5 ${
-                      isSelected
-                        ? 'bg-blue-600 text-white font-bold border-blue-600 shadow-sm'
-                        : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/80'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className={`font-black text-xs truncate ${isSelected ? 'text-white' : 'text-slate-900'}`}>
-                        {u.unit_code || u.unit_name}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 max-h-[600px] overflow-y-auto pr-2">
+            {catalog.map((item) => {
+              const inMenu = menuItems.find(p => String(p.item_id) === String(item.id));
+              const inMenuQty = inMenu ? inMenu.quantity : 0;
+              const photo = getItemPhoto(item.item_name, item.image_url);
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => handleCardClick(item)}
+                  className={`group relative rounded-2xl border transition-all duration-200 overflow-hidden flex flex-col justify-between select-none ${
+                    inMenuQty > 0
+                      ? 'bg-amber-50/70 border-amber-500 shadow-md ring-2 ring-amber-400/60 hover:shadow-lg cursor-pointer'
+                      : 'bg-white border-slate-200 hover:border-amber-300 hover:shadow-md cursor-pointer active:scale-[0.98]'
+                  }`}
+                >
+                  {/* Photo Header */}
+                  <div className="relative h-28 w-full bg-slate-100 overflow-hidden">
+                    <img
+                      src={photo}
+                      alt={item.item_name}
+                      className={`w-full h-full object-cover transition-transform duration-500 ${
+                        inMenuQty > 0 ? 'scale-110 opacity-90' : 'group-hover:scale-110'
+                      }`}
+                    />
+                    {/* Dark gradient overlay for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent"></div>
+                    
+                    {/* Item Stock Badge */}
+                    <div className="absolute top-2 right-2">
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs border ${
+                        (item.current_stock || 0) > 20
+                          ? 'bg-emerald-500 text-white border-emerald-600'
+                          : 'bg-amber-500 text-white border-amber-600'
+                      }`}>
+                        Stock: {item.current_stock || 0}
                       </span>
-                      {u.ncc_group && (
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-mono ${
-                          isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {u.ncc_group}
+                    </div>
+
+                    {/* Quantity Badge (If in menu) */}
+                    {inMenuQty > 0 && (
+                      <div className="absolute inset-0 bg-amber-500/20 backdrop-blur-[1px] flex flex-col items-center justify-center">
+                        <div className="w-10 h-10 bg-amber-500 text-white rounded-full flex items-center justify-center font-black text-lg shadow-lg border-2 border-white transform scale-110 animate-in zoom-in duration-200">
+                          {inMenuQty}
+                        </div>
+                        <span className="text-[10px] font-bold text-white mt-1 drop-shadow-md bg-black/40 px-2 py-0.5 rounded-md">
+                          In Unit Menu
                         </span>
-                      )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Content Footer */}
+                  <div className="p-3 bg-white">
+                    <h4 className="font-extrabold text-xs text-slate-900 leading-tight truncate" title={item.item_name}>
+                      {item.item_name}
+                    </h4>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-[10px] font-bold text-slate-500">{item.unit_of_measure}</span>
+                      <span className="text-sm font-black text-slate-900">
+                        ₹{(item.unit_price || 0).toFixed(2)}
+                      </span>
                     </div>
-                    <div className={`text-[11px] truncate ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
-                      {u.unit_name}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Right Column: Menu Chart Editor for Selected Unit */}
-        <div className="lg:col-span-8 space-y-4">
+        {/* Right Column: Menu Chart Editor & Filter */}
+        <div className="lg:col-span-5 space-y-4">
+          
+          {/* Unit Filter Box */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+            <label className="font-black text-slate-900 text-sm flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-blue-600" />
+              <span>Select NCC Unit</span>
+            </label>
+            <select
+              value={selectedUnitId}
+              onChange={(e) => handleUnitSelect(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="" disabled>-- Select Unit --</option>
+              {units.map(u => (
+                <option key={u.id} value={u.id}>
+                  {u.unit_code ? `${u.unit_code} - ` : ''}{u.unit_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-5">
             {/* Editor Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
@@ -390,26 +437,12 @@ export default function UnitMenuManager() {
                       ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' 
                       : 'bg-slate-100 text-slate-600'
                   }`}>
-                    {isCustomized ? 'Custom Dedicated Menu' : 'Default Standard Template'}
+                    {isCustomized ? 'Custom Menu' : 'Default Menu'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Items making up 1 cadet refreshment packet for this unit.
-                </p>
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopyToAllUnits}
-                  disabled={copyingAll || menuItems.length === 0}
-                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-all border border-slate-200 disabled:opacity-50"
-                  title="Apply this exact menu configuration to all units"
-                >
-                  {copyingAll ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>Copy to All Units</span>
-                </button>
-
                 <button
                   type="button"
                   onClick={handleSaveMenu}
@@ -417,7 +450,7 @@ export default function UnitMenuManager() {
                   className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black inline-flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-95 disabled:opacity-50"
                 >
                   {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  <span>Save Menu Chart</span>
+                  <span>Save Menu</span>
                 </button>
               </div>
             </div>
@@ -430,19 +463,17 @@ export default function UnitMenuManager() {
               </div>
             ) : menuItems.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-xs">
-                No items in this unit's menu yet. Add items below.
+                No items in this unit's menu yet. Add items from the left.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                      <th className="pb-3 pl-1">Item Details</th>
-                      <th className="pb-3 text-center">In-Stock Balance</th>
-                      <th className="pb-3 text-center">Unit Price</th>
-                      <th className="pb-3 text-center w-28">Qty / Packet</th>
-                      <th className="pb-3 text-right">Line Total</th>
-                      <th className="pb-3 text-center w-12">Action</th>
+                      <th className="pb-3 pl-1">Item</th>
+                      <th className="pb-3 text-center w-24">Qty</th>
+                      <th className="pb-3 text-right">Total</th>
+                      <th className="pb-3 text-center w-8"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -450,70 +481,43 @@ export default function UnitMenuManager() {
                       const photoUrl = getItemPhoto(item.item_name, item.image_url);
                       return (
                         <tr key={item.item_id} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-3 pl-1">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={photoUrl}
-                                alt={item.item_name}
-                                className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
-                              />
-                              <div>
-                                <span className="font-extrabold text-slate-900 block">{item.item_name}</span>
-                                <span className="text-[11px] text-slate-400 font-semibold">
-                                  Per {item.unit_of_measure || 'unit'}
-                                </span>
+                          <td className="py-2 pl-1">
+                            <div className="flex items-center gap-2">
+                              <img src={photoUrl} alt={item.item_name} className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0" />
+                              <div className="w-24 sm:w-32 truncate">
+                                <span className="font-extrabold text-slate-900 block truncate" title={item.item_name}>{item.item_name}</span>
+                                <span className="text-[10px] text-slate-400 font-semibold">₹{(item.unit_price || 0).toFixed(2)}</span>
                               </div>
                             </div>
                           </td>
 
-                          <td className="py-3 text-center">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              (item.current_stock || 0) <= 20 
-                                ? 'bg-amber-100 text-amber-800' 
-                                : 'bg-slate-100 text-slate-700'
-                            }`}>
-                              {item.current_stock ?? 'N/A'} in stock
-                            </span>
-                          </td>
-
-                          <td className="py-3 text-center font-bold text-slate-800">
-                            ₹{(item.unit_price || 0).toFixed(2)}
-                          </td>
-
-                          <td className="py-3 text-center">
-                            <div className="inline-flex items-center justify-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                          <td className="py-2 text-center">
+                            <div className="inline-flex items-center justify-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                               <button
                                 type="button"
                                 onClick={() => handleQuantityChange(item.item_id, Math.max(1, (item.quantity || 1) - 1))}
-                                className="w-6 h-6 rounded-lg bg-white text-slate-700 font-bold hover:bg-slate-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                              >
-                                -
-                              </button>
-                              <span className="w-8 text-center font-black text-slate-900">
-                                {item.quantity || 1}
-                              </span>
+                                className="w-5 h-5 rounded flex items-center justify-center text-slate-700 bg-white hover:bg-slate-200 shadow-xs cursor-pointer"
+                              >-</button>
+                              <span className="w-6 text-center font-black text-slate-900 text-[11px]">{item.quantity || 1}</span>
                               <button
                                 type="button"
                                 onClick={() => handleQuantityChange(item.item_id, (item.quantity || 1) + 1)}
-                                className="w-6 h-6 rounded-lg bg-white text-slate-700 font-bold hover:bg-slate-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                              >
-                                +
-                              </button>
+                                className="w-5 h-5 rounded flex items-center justify-center text-slate-700 bg-white hover:bg-slate-200 shadow-xs cursor-pointer"
+                              >+</button>
                             </div>
                           </td>
 
-                          <td className="py-3 text-right font-black text-slate-900">
+                          <td className="py-2 text-right font-black text-slate-900">
                             ₹{((item.unit_price || 0) * (item.quantity || 1)).toFixed(2)}
                           </td>
 
-                          <td className="py-3 text-center">
+                          <td className="py-2 text-center">
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(item.item_id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                              title="Remove item"
+                              className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
                         </tr>
@@ -525,84 +529,40 @@ export default function UnitMenuManager() {
             )}
 
             {/* Subtotal & Budget Ceiling Summary */}
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="text-left">
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 flex flex-col gap-2">
+              <div className="flex justify-between items-end">
+                <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Packet Unit Price</span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-black text-slate-900">₹{subtotal.toFixed(2)}</span>
-                    <span className="text-xs text-slate-500 font-semibold">/ packet</span>
-                  </div>
+                  <span className="text-lg font-black text-slate-900">₹{subtotal.toFixed(2)}</span>
                 </div>
-
-                <div className="h-8 w-px bg-slate-200 hidden sm:block" />
-
-                <div className="text-left hidden sm:block">
+                <div className="text-right">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Statutory Ceiling</span>
                   <span className="text-sm font-bold text-slate-700">₹75.00</span>
                 </div>
               </div>
 
-              <div>
-                {isBudgetExceeded ? (
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                    Exceeds ₹75.00 limit by ₹{(subtotal - targetBudget).toFixed(2)}
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    Balanced within statutory budget
-                  </span>
-                )}
-              </div>
+              {isBudgetExceeded ? (
+                <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center justify-center gap-1.5">
+                  <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                  Exceeds limit by ₹{(subtotal - targetBudget).toFixed(2)}
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                  Balanced within statutory budget
+                </span>
+              )}
             </div>
 
-            {/* Add New Item to Menu Form */}
-            <form onSubmit={handleAddItem} className="pt-4 border-t border-slate-100">
-              <span className="text-xs font-extrabold text-slate-800 uppercase tracking-tight block mb-2">
-                + Add Item from Inventory Catalog
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                <div className="sm:col-span-7">
-                  <select
-                    value={newItemId}
-                    onChange={(e) => setNewItemId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 font-semibold focus:outline-none focus:border-blue-500"
-                  >
-                    {catalog.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.item_name} (₹{c.unit_price} / {c.unit_of_measure}) — {c.current_stock ?? 0} in stock
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-3">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-slate-500 shrink-0">Qty:</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={newItemQty}
-                      onChange={(e) => setNewItemQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 font-bold focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <button
-                    type="submit"
-                    className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Item</span>
-                  </button>
-                </div>
-              </div>
-            </form>
+            <button
+              type="button"
+              onClick={handleCopyToAllUnits}
+              disabled={copyingAll || menuItems.length === 0}
+              className="w-full px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold inline-flex justify-center items-center gap-1.5 transition-all border border-slate-200 disabled:opacity-50"
+            >
+              {copyingAll ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>Copy Configuration to All Units</span>
+            </button>
           </div>
         </div>
       </div>
