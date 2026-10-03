@@ -60,6 +60,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Global API Error Handler
+app.use('/api', (err, req, res, next) => {
+  console.error('API Error:', err);
+  if (err instanceof require('multer').MulterError) {
+    return res.status(400).json({ error: err.message || 'File upload error.' });
+  }
+  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+});
+
 // Serve React frontend (check frontend/dist then backend/public)
 const fs = require('fs');
 const primaryBuild = path.join(__dirname, '..', 'frontend', 'dist');

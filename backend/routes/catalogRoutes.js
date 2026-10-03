@@ -9,17 +9,23 @@ const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const { uploadCatalogPhoto, getFileUrl } = require('../config/upload');
 
 // POST /api/catalog/upload-photo - Upload item photo from device
-router.post('/upload-photo', authenticateToken, authorizeRoles('ADMIN'), uploadCatalogPhoto.single('photo'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No image file uploaded.' });
+router.post('/upload-photo', authenticateToken, authorizeRoles('ADMIN'), (req, res) => {
+  uploadCatalogPhoto.single('photo')(req, res, (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      return res.status(400).json({ error: err.message || 'File upload failed.' });
     }
-    const imageUrl = getFileUrl(req.file, 'catalog');
-    res.json({ imageUrl, filename: req.file.filename || imageUrl.split('/').pop() });
-  } catch (err) {
-    console.error('Catalog photo upload error:', err);
-    res.status(500).json({ error: 'Failed to upload photo.' });
-  }
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No image file uploaded.' });
+      }
+      const imageUrl = getFileUrl(req.file, 'catalog');
+      res.json({ imageUrl, filename: req.file.filename || imageUrl.split('/').pop() });
+    } catch (innerErr) {
+      console.error('Catalog photo upload error:', innerErr);
+      res.status(500).json({ error: 'Failed to process uploaded photo.' });
+    }
+  });
 });
 
 // GET /api/catalog - List active catalog items with live stock, daywise consumption & stock balance for specified date

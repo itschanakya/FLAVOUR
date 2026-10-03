@@ -85,7 +85,7 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
   }, [initialView]);
 
   // Catalog Item Photo state
-  const [itemImageUrl, setItemImageUrl] = useState('/items/samosa.jpg');
+  const [itemImageUrl, setItemImageUrl] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadPhotoError, setUploadPhotoError] = useState('');
 
@@ -803,15 +803,15 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
                 <div className="flex items-center gap-3">
                   {/* Photo Preview Thumbnail */}
                   <div className="relative w-16 h-16 rounded-xl overflow-hidden border-2 border-amber-300 shadow-2xs bg-white shrink-0 flex items-center justify-center">
-                    <img
-                      src={itemImageUrl || '/items/samosa.jpg'}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = '/items/samosa.jpg';
-                      }}
-                    />
+                    {itemImageUrl ? (
+                      <img
+                        src={itemImageUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-amber-300" />
+                    )}
                   </div>
 
                   {/* Upload From PC Button & URL Input */}
