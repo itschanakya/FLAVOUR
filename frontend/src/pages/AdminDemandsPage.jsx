@@ -664,9 +664,9 @@ export default function AdminDemandsPage() {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+            <div className="overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
+              <table className="w-full text-left text-xs sm:text-sm relative">
+                <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                   <tr>
                     <th className="p-3.5">Demand Ref</th>
                     <th className="p-3.5">NCC Unit</th>
