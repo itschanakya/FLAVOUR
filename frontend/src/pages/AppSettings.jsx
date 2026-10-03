@@ -1037,7 +1037,7 @@ export default function AppSettings() {
               <p className={`text-slate-500 ${activeTab === 'catalog' || activeTab === 'stock' || activeTab === 'inventory' ? 'text-xs mt-0.5' : 'text-sm mt-1'}`}>
                 {activeTab === 'units' && 'Onboard NCC Units, issue Unit logins & manage jurisdiction scopes.'}
                 {activeTab === 'unit-menus' && 'Configure custom items composition for each NCC Unit (Admin only). Supply Point automatically charges off stock when preparing.'}
-                {(activeTab === 'catalog' || activeTab === 'inventory') && 'Configure catalog items, approved pricing, photos, and Standard ₹75 Refreshment Packet builder.'}
+                {(activeTab === 'catalog' || activeTab === 'inventory') && 'Configure catalog items, approved pricing, and item photos.'}
                 {activeTab === 'stock' && 'Live stock balance ledger, batch expiry tracking, consumed today metrics, and incoming restock shipments.'}
                 {activeTab === 'unit-credentials' && 'View, manage, and reset User ID & Passwords for all NCC Units under headquarters.'}
                 {activeTab === 'delivery-partners' && 'Manage Delivery Representatives, Driver Login IDs, Passwords, Vehicle details, and Assigned PIN codes.'}
