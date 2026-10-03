@@ -121,7 +121,7 @@ router.get('/', authenticateToken, async (req, res) => {
       d.total_amount = Number(d.total_amount) || 0;
       d.avg_unit_price = Number(d.avg_unit_price) || 0;
       const items = await db.all(
-        `SELECT di.*, ri.item_name, ri.unit_of_measure 
+        `SELECT di.*, ri.item_name, ri.unit_of_measure, ri.image_url 
          FROM demand_items di
          JOIN refreshment_items ri ON di.item_id = ri.id
          WHERE di.demand_id = ?`,
@@ -131,7 +131,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
       if (req.user.role === 'ADMIN' && d.unit_id) {
         let uMenu = await db.all(`
-          SELECT umi.item_id, umi.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock
+          SELECT umi.item_id, umi.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock, ri.image_url
           FROM unit_menu_items umi
           JOIN refreshment_items ri ON umi.item_id = ri.id
           WHERE umi.unit_id = ?
@@ -142,7 +142,7 @@ router.get('/', authenticateToken, async (req, res) => {
           const defaultTpl = await db.get("SELECT id FROM packet_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
           if (defaultTpl) {
             uMenu = await db.all(`
-              SELECT pti.item_id, pti.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock
+              SELECT pti.item_id, pti.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock, ri.image_url
               FROM packet_template_items pti
               JOIN refreshment_items ri ON pti.item_id = ri.id
               WHERE pti.template_id = ?
@@ -202,7 +202,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 
     const items = await db.all(
-      `SELECT di.*, ri.item_name, ri.unit_of_measure 
+      `SELECT di.*, ri.item_name, ri.unit_of_measure, ri.image_url 
        FROM demand_items di
        JOIN refreshment_items ri ON di.item_id = ri.id
        WHERE di.demand_id = ?`,
@@ -212,7 +212,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     if (req.user.role === 'ADMIN' && demand.unit_id) {
       let uMenu = await db.all(`
-        SELECT umi.item_id, umi.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock
+        SELECT umi.item_id, umi.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock, ri.image_url
         FROM unit_menu_items umi
         JOIN refreshment_items ri ON umi.item_id = ri.id
         WHERE umi.unit_id = ?
@@ -223,7 +223,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
         const defaultTpl = await db.get("SELECT id FROM packet_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
         if (defaultTpl) {
           uMenu = await db.all(`
-            SELECT pti.item_id, pti.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock
+            SELECT pti.item_id, pti.quantity as qty_per_packet, ri.item_name, ri.unit_of_measure, ri.current_stock, ri.image_url
             FROM packet_template_items pti
             JOIN refreshment_items ri ON pti.item_id = ri.id
             WHERE pti.template_id = ?

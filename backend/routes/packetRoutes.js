@@ -18,7 +18,7 @@ router.get('/current', authenticateToken, async (req, res) => {
     const items = await db.all(
       `SELECT pti.id, pti.template_id, pti.item_id, pti.quantity, 
               COALESCE(pti.expiry_date, ri.expiry_date) as expiry_date,
-              ri.item_name, ri.unit_price, ri.unit_of_measure, ri.current_stock, ri.is_active
+              ri.item_name, ri.unit_price, ri.unit_of_measure, ri.current_stock, ri.is_active, ri.image_url
        FROM packet_template_items pti
        JOIN refreshment_items ri ON pti.item_id = ri.id
        WHERE pti.template_id = ?
