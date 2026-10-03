@@ -723,9 +723,9 @@ export default function UnitDemandPage() {
       )}
 
       {/* Main Grid: Form (Left) & Table (Right) - Full Viewport Vertical Justification Identical to ANO Dashboard */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-stretch flex-1">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-start flex-1">
         {/* LEFT COLUMN: COMPACT NEW DEMAND ENTRY FORM */}
-        <div className="xl:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 sm:p-5 flex flex-col justify-between h-full min-h-[700px]">
+        <div className="xl:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 sm:p-5 flex flex-col self-start min-h-[700px] sticky top-4">
           <div className="flex items-center justify-between mb-3 shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
@@ -871,7 +871,7 @@ export default function UnitDemandPage() {
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                      Delivery Date (DD/MM/YYYY)
+                      Delivery Date
                     </label>
                     <CustomDateInput
                       value={demandDate}
@@ -883,7 +883,7 @@ export default function UnitDemandPage() {
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-blue-600" />
-                      Delivery Time (12-Hour)
+                      Delivery Time
                     </label>
                     <input
                       type="time"
@@ -1025,7 +1025,7 @@ export default function UnitDemandPage() {
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                      Delivery Date (DD/MM/YYYY)
+                      Delivery Date
                     </label>
                     <CustomDateInput
                       value={demandDate}
@@ -1037,7 +1037,7 @@ export default function UnitDemandPage() {
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-blue-600" />
-                      Delivery Time (12-Hour)
+                      Delivery Time
                     </label>
                     <input
                       type="time"
@@ -1288,7 +1288,7 @@ export default function UnitDemandPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto p-3">
+          <div className="overflow-x-auto overflow-y-auto max-h-[580px] p-3 custom-scrollbar">
             {loadingDemands && recentUnitDemands.length === 0 ? (
               <div className="py-12 text-center text-xs text-slate-400 font-semibold flex items-center justify-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin text-indigo-500" />
@@ -1303,9 +1303,9 @@ export default function UnitDemandPage() {
               </div>
             ) : (
               <table className="w-full text-left text-sm border-separate border-spacing-y-2">
-                <thead>
+                <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]">
                   <tr>
-                    <th className="pl-4 pr-2 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">
+                    <th className="pl-4 pr-2 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest rounded-l-lg">
                       <input type="checkbox" className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
                     </th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">NO</th>
@@ -1318,7 +1318,7 @@ export default function UnitDemandPage() {
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-center">PKTS</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">RATE</th>
                     <th className="px-3 py-4 font-black text-slate-400 text-[10px] uppercase tracking-widest text-right">COST</th>
-                    <th className="pr-4 pl-2 py-4 text-center font-black text-slate-400 text-[10px] uppercase tracking-widest">ACTION</th>
+                    <th className="pr-4 pl-2 py-4 text-center font-black text-slate-400 text-[10px] uppercase tracking-widest rounded-r-lg">ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
