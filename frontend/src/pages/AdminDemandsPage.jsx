@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import { Link } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
+import TricolorSpinner from '../components/TricolorSpinner';
 import { 
   Building2, 
   IndianRupee, 
@@ -241,8 +242,8 @@ export default function AdminDemandsPage() {
   if (loading) {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-        <div className="text-slate-600 font-bold text-sm">Loading Refreshment Demands Console...</div>
+        <TricolorSpinner size="h-14 w-14" />
+        <div className="text-slate-600 font-bold text-sm mt-4">Loading Refreshment Demands Console...</div>
       </div>
     );
   }
