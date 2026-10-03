@@ -13,7 +13,13 @@ const rateLimit = require('express-rate-limit');
 
 // Security Headers: XSS protection, anti-clickjacking, disable X-Powered-By header
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "img-src": ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https:"]
+    }
+  }
 }));
 
 // Rate limiting disabled as not yet required for local testing/development

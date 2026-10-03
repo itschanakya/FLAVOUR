@@ -896,7 +896,7 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
   const handleOpenCreate = () => {
     setEditingItem(null);
     setItemName('');
-    setItemImageUrl('/items/samosa.jpg');
+    setItemImageUrl('');
     setUploadPhotoError('');
     setUnitPrice('25.0');
     setUnitOfMeasure('Packet');
@@ -912,7 +912,7 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
   const handleOpenEdit = (item) => {
     setEditingItem(item);
     setItemName(item.item_name);
-    setItemImageUrl(item.image_url || getItemPhoto(item.item_name));
+    setItemImageUrl(item.image_url || '');
     setUploadPhotoError('');
     setUnitPrice(item.unit_price.toString());
     setUnitOfMeasure(item.unit_of_measure);
