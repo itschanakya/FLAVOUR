@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import TricolorSpinner from '../components/TricolorSpinner';
 import {
   FileBarChart,
   Building2,

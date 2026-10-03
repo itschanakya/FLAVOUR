@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import TricolorSpinner from '../components/TricolorSpinner';
 import {
   Settings, CalendarClock, Save, CheckCircle2, Key, Building2, School,
   Search, Edit3, ShieldAlert, X, ShoppingBag, Users, MapPin, ExternalLink,
