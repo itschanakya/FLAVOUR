@@ -871,7 +871,7 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
               <div>
                 <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
                   <ShoppingBag className="w-5 h-5 text-amber-500" />
-                  All Added Catalog Items ({items.length})
+                  All Added Catalog Items ({items.filter(i => i.item_name !== 'Standard Refreshment Packet').length})
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Click any item to reflect and edit its details in the left form
@@ -910,7 +910,7 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
                       </td>
                     </tr>
                   ) : (
-                    items.map(item => {
+                    items.filter(i => i.item_name !== 'Standard Refreshment Packet').map(item => {
                       const isExpired = item.is_expired;
                       const isEditingThis = editingItem && editingItem.id === item.id;
                       const photo = getItemPhoto(item.item_name, item.image_url);
