@@ -184,7 +184,7 @@ export default function SchoolAnnualSummary({ hideHeader = false }) {
       {/* Main List of Institutions / Single Institution Detail */}
       {loading ? (
         <div className="bg-white rounded-2xl p-10 text-center text-slate-400 border border-slate-200 shadow-xs">
-          <div className="animate-spin w-7 h-7 border-3 border-purple-600 border-t-transparent rounded-full mx-auto mb-3"></div>
+          <TricolorSpinner size="w-10 h-10" />
           <p className="text-xs font-bold">Generating Annual Summary Report...</p>
         </div>
       ) : filteredData.length === 0 ? (

@@ -219,7 +219,7 @@ export default function SummaryWeeklyMonthly({ hideHeader = false }) {
 
             {loading ? (
               <div className="p-12 text-center text-slate-400">
-                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <TricolorSpinner size="w-10 h-10" />
                 <p className="text-xs font-bold">Loading Monthly Data...</p>
               </div>
             ) : data.monthly.length === 0 ? (
@@ -291,7 +291,7 @@ export default function SummaryWeeklyMonthly({ hideHeader = false }) {
 
             {loading ? (
               <div className="p-12 text-center text-slate-400">
-                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <TricolorSpinner size="w-10 h-10" />
                 <p className="text-xs font-bold">Loading Weekly Data...</p>
               </div>
             ) : data.weekly.length === 0 ? (

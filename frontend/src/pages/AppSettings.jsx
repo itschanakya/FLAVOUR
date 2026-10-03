@@ -1104,7 +1104,7 @@ export default function AppSettings() {
 
             {loading ? (
               <div className="flex justify-center items-center h-48">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <TricolorSpinner size="w-10 h-10" />
               </div>
             ) : (
               <div>
@@ -1549,7 +1549,7 @@ export default function AppSettings() {
                         {/* Inline Stats Section */}
                         {kmStatsModal.loading ? (
                           <div className="flex justify-center p-12">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <TricolorSpinner size="w-10 h-10" />
                           </div>
                         ) : kmStatsModal.stats && (
                           <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-6">

@@ -723,9 +723,9 @@ export default function UnitDemandPage() {
       )}
 
       {/* Main Grid: Form (Left) & Table (Right) - Full Viewport Vertical Justification Identical to ANO Dashboard */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-start flex-1">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 items-stretch flex-1">
         {/* LEFT COLUMN: COMPACT NEW DEMAND ENTRY FORM */}
-        <div className="xl:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 sm:p-5 flex flex-col self-start min-h-[700px] sticky top-4">
+        <div className="xl:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 sm:p-5 flex flex-col justify-between h-full min-h-[700px] sticky top-4">
           <div className="flex items-center justify-between mb-3 shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
@@ -1260,7 +1260,7 @@ export default function UnitDemandPage() {
         </div>
 
         {/* RIGHT COLUMN: DEMAND HISTORY TABLE */}
-        <div className="xl:col-span-9 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
+        <div className="xl:col-span-9 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col h-full">
           <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-2 h-4 bg-gradient-to-b from-indigo-500 to-purple-600 rounded-full"></div>
@@ -1288,7 +1288,7 @@ export default function UnitDemandPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto overflow-y-auto max-h-[660px] p-3 custom-scrollbar">
+          <div className="flex-1 overflow-x-auto overflow-y-auto p-3 custom-scrollbar">
             {loadingDemands && recentUnitDemands.length === 0 ? (
               <div className="py-12 text-center text-xs text-slate-400 font-semibold flex items-center justify-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin text-indigo-500" />

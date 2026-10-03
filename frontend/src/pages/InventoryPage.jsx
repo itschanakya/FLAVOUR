@@ -1301,7 +1301,7 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-48">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+        <TricolorSpinner size="w-10 h-10" />
       </div>
     );
   }
