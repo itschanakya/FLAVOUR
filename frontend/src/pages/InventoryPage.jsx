@@ -1622,7 +1622,7 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
               {/* Price & Unit of Measure */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Approved Price (₹) *</label>
+                  <label className="block text-slate-700 font-semibold mb-1">MRP (₹) *</label>
                   <input
                     type="number"
                     step="any"
@@ -1878,7 +1878,7 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                             </span>
                           </td>
 
-                          {/* Approved Price */}
+                          {/* MRP */}
                           <td className="p-3 font-extrabold text-xs text-slate-900">
                             ₹{item.unit_price?.toFixed(2)}
                           </td>
@@ -2112,7 +2112,6 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                           </span>
                         </th>
                         <th className="p-4 text-right">Rate</th>
-                        <th className="p-4 text-center">GST%</th>
                         <th className="p-4 text-right">Total Amount</th>
                         <th className="p-4">
                           {selectedStockDate === getTodayDateStr() ? 'Consumed Today' : `Consumed (${selectedStockDate})`}
@@ -2207,17 +2206,10 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                                 </span>
                               </td>
 
-                              {/* GST% - Live Statutory Rate */}
-                              <td className="p-4 text-center">
-                                <span className="font-bold text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
-                                  {itemGst}%
-                                </span>
-                              </td>
-
                               {/* Total Amount - True Live Stock Valuation */}
                               <td className="p-4 text-right">
                                 <span className="font-black text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
-                                  ₹{itemTotalAmount.toFixed(2)}
+                                  ₹{(stockQty * itemRate).toFixed(2)}
                                 </span>
                               </td>
 
@@ -2296,16 +2288,14 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                       <td className="p-4 font-black text-slate-900 text-sm">
                         {items.reduce((sum, i) => sum + (i.current_stock || 0), 0)} units
                       </td>
-                      <td colSpan="2" className="p-4 text-right font-black text-slate-600 text-xs">
-                        Total Stock Valuation (inc. GST):
+                      <td colSpan="1" className="p-4 text-right font-black text-slate-600 text-xs">
+                        Total Stock Valuation:
                       </td>
                       <td className="p-4 text-right font-black text-sm text-emerald-800">
                         ₹{items.reduce((sum, i) => {
                           const qty = Number(i.current_stock || 0);
                           const r = Number(i.unit_price || 0);
-                          const g = i.default_gst_rate !== undefined && i.default_gst_rate !== null ? Number(i.default_gst_rate) : 5.0;
-                          const sub = qty * r;
-                          return sum + sub + (sub * (g / 100));
+                          return sum + (qty * r);
                         }, 0).toFixed(2)}
                       </td>
                       <td colSpan="3"></td>

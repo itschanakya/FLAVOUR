@@ -704,7 +704,7 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
               {/* Price & Unit of Measure */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Approved Price (₹) *</label>
+                  <label className="block text-slate-700 font-semibold mb-1">MRP (₹) *</label>
                   <input
                     type="number"
                     step="any"
@@ -960,7 +960,7 @@ export default function ManageCatalog({ embedded = false, initialView = 'catalog
                             </span>
                           </td>
 
-                          {/* Approved Price */}
+                          {/* MRP */}
                           <td className="p-3 font-extrabold text-xs text-slate-900">
                             ₹{item.unit_price?.toFixed(2)}
                           </td>
