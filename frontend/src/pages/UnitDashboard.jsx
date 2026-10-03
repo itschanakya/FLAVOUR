@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
-  ResponsiveContainer, PieChart, Pie, Cell 
+  ResponsiveContainer, PieChart, Pie, Cell, LabelList
 } from 'recharts';
 
 const PIE_COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b'];
@@ -475,12 +475,12 @@ export default function UnitDashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis 
                     dataKey="label" 
-                    tick={{ fill: '#475569', fontSize: 10, fontWeight: 700 }} 
+                    tick={{ fill: '#475569', fontSize: chartView === 'institute' ? 8 : 10, fontWeight: 700 }} 
                     axisLine={{ stroke: '#cbd5e1' }}
                     tickLine={false}
                     interval={0}
-                    angle={chartView === 'institute' ? -15 : 0}
-                    textAnchor={chartView === 'institute' ? 'end' : 'middle'}
+                    angle={0}
+                    textAnchor="middle"
                   />
                   <YAxis 
                     tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
@@ -535,6 +535,7 @@ export default function UnitDashboard() {
                     radius={[6, 6, 0, 0]} 
                     name="Packets Demanded"
                   >
+                    <LabelList dataKey="packets" position="top" fill="#64748b" fontSize={10} fontWeight={800} />
                     {activeChartData.map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
