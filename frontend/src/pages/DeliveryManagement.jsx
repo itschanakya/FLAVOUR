@@ -1288,11 +1288,11 @@ _National Cadet Corps - Supply & Logistics Portal_`;
           </button>
         </div>
 
-        {/* Middle Row: Search on Left, Filters Stacked on Right */}
+        {/* Middle Row: Search and Filters in a single row */}
         {viewMode === 'STOPS' && (
-          <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-            {/* Search Input on the Left */}
-            <div className="relative w-full sm:w-[45%] lg:w-[40%] shrink-0">
+          <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-4 w-full">
+            {/* Search Input */}
+            <div className="relative w-full xl:w-auto flex-1 min-w-[200px]">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -1303,10 +1303,10 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               />
             </div>
 
-            {/* Right Side Stacked Dropdowns */}
-            <div className="flex flex-col items-end gap-2.5 w-full sm:w-auto min-w-[220px]">
+            {/* Right Side Dropdowns */}
+            <div className="flex flex-wrap md:flex-nowrap items-center gap-2.5 w-full xl:w-auto">
               {/* PIN Code Slicer Dropdown */}
-              <div className="flex items-center justify-between gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full">
+              <div className="flex items-center gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full md:w-auto">
                 <div className="flex items-center gap-1.5 shrink-0">
                   <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                   <span className="font-extrabold text-slate-400 text-[11px]">PIN:</span>
@@ -1314,7 +1314,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                 <select
                   value={selectedPin}
                   onChange={(e) => setSelectedPin(e.target.value)}
-                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer text-right w-full"
+                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer w-full md:w-auto"
                 >
                   <option value="ALL">All PINs ({availablePins.length})</option>
                   {availablePins.map(pin => (
@@ -1324,7 +1324,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               </div>
 
               {/* Driver Slicer Dropdown */}
-              <div className="flex items-center justify-between gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full">
+              <div className="flex items-center gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full md:w-auto">
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Users className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                   <span className="font-extrabold text-slate-400 text-[11px]">Driver:</span>
@@ -1332,7 +1332,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                 <select
                   value={selectedPartner}
                   onChange={(e) => setSelectedPartner(e.target.value)}
-                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer text-right w-full"
+                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer w-full md:w-auto"
                 >
                   <option value="ALL">All Drivers</option>
                   {partners.map(p => (
@@ -1342,7 +1342,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               </div>
 
               {/* Status Slicer Dropdown */}
-              <div className="flex items-center justify-between gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full">
+              <div className="flex items-center gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full md:w-auto">
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Filter className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                   <span className="font-extrabold text-slate-400 text-[11px]">Status:</span>
@@ -1350,7 +1350,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer text-right w-full"
+                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer w-full md:w-auto"
                 >
                   <option value="ALL">All Demands ({demands.length})</option>
                   <option value="PENDING">Ready for Dispatch ({pendingDispatchCount})</option>
@@ -1368,7 +1368,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                     setSelectedPartner('ALL');
                     setSearchTerm('');
                   }}
-                  className="w-full text-right py-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 transition-colors"
+                  className="shrink-0 text-right py-1 px-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 transition-colors"
                 >
                   Clear filters
                 </button>
