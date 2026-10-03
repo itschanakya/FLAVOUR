@@ -36,6 +36,26 @@ import CustomDateInput from '../components/CustomDateInput';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
 import StatusBadge from '../components/StatusBadge';
 
+const formatDMY = (dateStr) => {
+  if (!dateStr) return '-';
+  if (typeof dateStr === 'string') {
+    const cleanDate = dateStr.split('T')[0].split(' ')[0];
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+      const year = parts[0];
+      const month = parts[1].padStart(2, '0');
+      const day = parts[2].padStart(2, '0');
+      return `${day}-${month}-${year}`;
+    }
+  }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
 export default function UnitDemandPage() {
   const { user, token } = useAuth();
   const { events } = useSSE();
@@ -1314,7 +1334,7 @@ export default function UnitDemandPage() {
                         #{idx + 1}
                       </td>
                       <td className="px-3 py-4">
-                        <div className="font-black text-slate-800 tracking-tight text-xs">{d.demand_date}</div>
+                        <div className="font-black text-slate-800 tracking-tight text-xs">{formatDMY(d.demand_date)}</div>
                         <div className="text-[10px] font-bold text-slate-400 mt-0.5 tracking-wider">{d.demand_time || '08:00 AM'}</div>
                       </td>
                       <td className="px-3 py-4">
