@@ -174,7 +174,7 @@ export default function UnitDashboard() {
     const sorted = Object.values(instMap).sort((a, b) => b.packets - a.packets);
     return sorted.map(item => ({
       ...item,
-      label: item.name.length > 20 ? item.name.slice(0, 18) + '…' : item.name
+      label: item.name
     }));
   }, [demands]);
 
@@ -475,12 +475,49 @@ export default function UnitDashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis 
                     dataKey="label" 
-                    tick={{ fill: '#475569', fontSize: chartView === 'institute' ? 8 : 10, fontWeight: 700 }} 
+                    tick={({ x, y, payload }) => {
+                      if (chartView !== 'institute') {
+                        return (
+                          <g transform={`translate(${x},${y})`}>
+                            <text x={0} y={0} dy={14} textAnchor="middle" fill="#475569" fontSize={10} fontWeight={700}>
+                              {payload.value}
+                            </text>
+                          </g>
+                        );
+                      }
+                      
+                      const words = payload.value.split(' ');
+                      const lines = [];
+                      let currentLine = '';
+                      words.forEach(word => {
+                        if ((currentLine + word).length > 12) {
+                          if (currentLine) lines.push(currentLine.trim());
+                          currentLine = word + ' ';
+                        } else {
+                          currentLine += word + ' ';
+                        }
+                      });
+                      if (currentLine) lines.push(currentLine.trim());
+                      if (lines.length > 3) {
+                        lines[2] = lines[2].substring(0, 10) + '…';
+                        lines.length = 3;
+                      }
+
+                      return (
+                        <g transform={`translate(${x},${y})`}>
+                          <text x={0} y={0} dy={10} textAnchor="middle" fill="#475569" fontSize={8} fontWeight={700}>
+                            {lines.map((line, index) => (
+                              <tspan x={0} dy={index === 0 ? 0 : 9} key={index}>
+                                {line}
+                              </tspan>
+                            ))}
+                          </text>
+                        </g>
+                      );
+                    }}
                     axisLine={{ stroke: '#cbd5e1' }}
                     tickLine={false}
                     interval={0}
-                    angle={0}
-                    textAnchor="middle"
                   />
                   <YAxis 
                     tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
