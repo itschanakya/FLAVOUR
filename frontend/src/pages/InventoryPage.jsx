@@ -3591,6 +3591,53 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                   </div>
                 );
               })()}
+
+              {/* Wastage & Condemnation History Table */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm mt-4 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+                  <History className="w-4 h-4 text-rose-500" />
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Wastage & Damage History</h3>
+                </div>
+                <div className="overflow-x-auto max-h-64">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 border-b border-slate-200 sticky top-0">
+                      <tr>
+                        <th className="p-2.5">Date & Time</th>
+                        <th className="p-2.5">Item Name</th>
+                        <th className="p-2.5">Reason</th>
+                        <th className="p-2.5">Ref #</th>
+                        <th className="p-2.5 text-center">Qty Out</th>
+                        <th className="p-2.5">Authorized By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(allStockData?.logs || [])
+                        .filter(log => ['WASTAGE', 'DAMAGE', 'CONDEMNED'].includes(log.reason))
+                        .map(log => {
+                          const item = items.find(i => i.id === log.item_id);
+                          return (
+                            <tr key={`wastage-hist-${log.id}`} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="p-2.5 text-slate-600 font-mono text-[10px] whitespace-nowrap">
+                                {new Date(log.created_at).toLocaleString('en-IN', {
+                                  day: '2-digit', month: 'short', year: 'numeric',
+                                  hour: '2-digit', minute: '2-digit'
+                                })}
+                              </td>
+                              <td className="p-2.5 font-bold text-slate-800">{item ? item.item_name : 'Unknown Item'}</td>
+                              <td className="p-2.5"><span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase inline-block bg-amber-100 text-amber-800 border border-amber-300">{log.reason}</span></td>
+                              <td className="p-2.5 font-mono text-[10px] text-slate-500">{log.reference_no || '-'}</td>
+                              <td className="p-2.5 text-center font-black text-rose-600">-{log.quantity}</td>
+                              <td className="p-2.5 text-slate-600">{log.authorized_by || '-'}</td>
+                            </tr>
+                          );
+                        })}
+                      {(allStockData?.logs || []).filter(log => ['WASTAGE', 'DAMAGE', 'CONDEMNED'].includes(log.reason)).length === 0 && (
+                        <tr><td colSpan="6" className="p-8 text-center text-slate-400 text-xs">No wastage history recorded yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 
@@ -4120,6 +4167,53 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                   </div>
                 );
               })()}
+
+              {/* Expired Items Condemnation History Table */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm mt-4 overflow-hidden print:hidden">
+                <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+                  <History className="w-4 h-4 text-purple-500" />
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Expired Items Condemnation History</h3>
+                </div>
+                <div className="overflow-x-auto max-h-64">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 border-b border-slate-200 sticky top-0">
+                      <tr>
+                        <th className="p-2.5">Date & Time</th>
+                        <th className="p-2.5">Item Name</th>
+                        <th className="p-2.5">Reason</th>
+                        <th className="p-2.5">Ref #</th>
+                        <th className="p-2.5 text-center">Qty Out</th>
+                        <th className="p-2.5">Authorized By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(allStockData?.logs || [])
+                        .filter(log => log.reason === 'EXPIRED')
+                        .map(log => {
+                          const item = items.find(i => i.id === log.item_id);
+                          return (
+                            <tr key={`expired-hist-${log.id}`} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="p-2.5 text-slate-600 font-mono text-[10px] whitespace-nowrap">
+                                {new Date(log.created_at).toLocaleString('en-IN', {
+                                  day: '2-digit', month: 'short', year: 'numeric',
+                                  hour: '2-digit', minute: '2-digit'
+                                })}
+                              </td>
+                              <td className="p-2.5 font-bold text-slate-800">{item ? item.item_name : 'Unknown Item'}</td>
+                              <td className="p-2.5"><span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase inline-block bg-purple-100 text-purple-800 border border-purple-300">{log.reason}</span></td>
+                              <td className="p-2.5 font-mono text-[10px] text-slate-500">{log.reference_no || '-'}</td>
+                              <td className="p-2.5 text-center font-black text-rose-600">-{log.quantity}</td>
+                              <td className="p-2.5 text-slate-600">{log.authorized_by || '-'}</td>
+                            </tr>
+                          );
+                        })}
+                      {(allStockData?.logs || []).filter(log => log.reason === 'EXPIRED').length === 0 && (
+                        <tr><td colSpan="6" className="p-8 text-center text-slate-400 text-xs">No expired items history recorded yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
               {/* Printable Official Signatures Block (Visible ONLY during print) */}
               <div className="hidden print:grid grid-cols-3 gap-8 pt-16 pb-8 text-center text-xs">
