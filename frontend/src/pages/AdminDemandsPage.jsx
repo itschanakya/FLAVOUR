@@ -557,7 +557,7 @@ export default function AdminDemandsPage() {
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
             <div className="p-4 md:p-5 border-b border-slate-200 flex flex-col gap-4">
               
-              {/* Row 1: Title & Search Bar */}
+              {/* Row 1: Title & Unit/Inst Dropdowns */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
@@ -570,82 +570,7 @@ export default function AdminDemandsPage() {
                 </div>
 
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Search ref, institute, unit..."
-                      value={demandSearch}
-                      onChange={(e) => setDemandSearch(e.target.value)}
-                      className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all w-52 sm:w-64"
-                    />
-                  </div>
-
-                  {hasActiveFilters && (
-                    <button
-                      onClick={resetAllFilters}
-                      className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
-                      title="Reset all filters"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Row 2: Slicers & Dropdown Filters (Unit & Institution) */}
-              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pt-2 border-t border-slate-100">
-                
-                {/* Status & Time Slicers */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                  {/* Status Slicer */}
-                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar gap-1">
-                    {[
-                      { val: 'ALL', label: `All` },
-                      { val: 'PENDING', label: `Pending (${pendingCount})` },
-                      { val: 'ACCEPTED', label: `Accepted (${acceptedCount})` },
-                      { val: 'REJECTED', label: `Rejected (${rejectedCount})` }
-                    ].map(sf => (
-                      <button
-                        key={sf.val}
-                        onClick={() => setStatusFilter(sf.val)}
-                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                          statusFilter === sf.val 
-                            ? `bg-white shadow-xs text-blue-700 border border-slate-200 font-extrabold` 
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                        }`}
-                      >
-                        {sf.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Time Slicer */}
-                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar gap-1">
-                    {[
-                      { val: 'ALL', label: 'All Time' },
-                      { val: 'TODAY', label: 'Today' },
-                      { val: 'WEEKLY', label: 'This Week' },
-                      { val: 'MONTHLY', label: 'This Month' }
-                    ].map(tf => (
-                      <button
-                        key={tf.val}
-                        onClick={() => setTimeFilter(tf.val)}
-                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                          timeFilter === tf.val 
-                            ? 'bg-white text-blue-700 shadow-xs border border-slate-200 font-extrabold' 
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                        }`}
-                      >
-                        {tf.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* TWO NEW REQUESTED FILTERS: UNIT & INSTITUTION */}
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  {/* 1. UNIT FILTER DROPDOWN */}
+                  {/* UNIT FILTER DROPDOWN */}
                   <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1">
                     <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                     <span className="text-[11px] font-bold text-slate-500">Unit:</span>
@@ -653,7 +578,7 @@ export default function AdminDemandsPage() {
                       value={selectedUnitId}
                       onChange={(e) => {
                         setSelectedUnitId(e.target.value);
-                        setSelectedInstitutionId('ALL'); // Reset institution if unit changes
+                        setSelectedInstitutionId('ALL');
                       }}
                       className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[170px] truncate"
                     >
@@ -666,7 +591,7 @@ export default function AdminDemandsPage() {
                     </select>
                   </div>
 
-                  {/* 2. INSTITUTION FILTER DROPDOWN */}
+                  {/* INSTITUTION FILTER DROPDOWN */}
                   <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1">
                     <School className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                     <span className="text-[11px] font-bold text-slate-500">Institution:</span>
@@ -684,10 +609,9 @@ export default function AdminDemandsPage() {
                     </select>
                   </div>
                 </div>
-
               </div>
 
-              {/* Row 3: Active Filter Tags Display */}
+              {/* Active Filter Tags Display */}
               {(selectedUnitId !== 'ALL' || selectedInstitutionId !== 'ALL') && (
                 <div className="flex items-center gap-2 flex-wrap pt-1">
                   <span className="text-[11px] font-bold text-slate-400">Active Filters:</span>
@@ -723,41 +647,114 @@ export default function AdminDemandsPage() {
                 </div>
               )}
 
-            </div>
-
-            {/* Date quick-filter strip */}
-            {dateChips.length > 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-white">
-                <button onClick={() => stepDate(-1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer" title="Previous date">
-                  <ChevronLeft className="w-4 h-4 text-slate-600" />
-                </button>
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1">
-                  <button
-                    onClick={() => setDateFilter(null)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap border cursor-pointer ${!dateFilter ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                  >
-                    All dates
-                  </button>
-                  {dateChips.map(c => {
-                    const b = dateBadge(c.key);
-                    const active = dateFilter === c.key;
-                    return (
+              {/* Row 2: Status, Time, Date Filters & Search */}
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pt-2 border-t border-slate-100">
+                
+                {/* Left side: Slicers & Dates */}
+                <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+                  {/* Status Slicer */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar gap-1 shrink-0">
+                    {[
+                      { val: 'ALL', label: `All` },
+                      { val: 'PENDING', label: `Pending (${pendingCount})` },
+                      { val: 'ACCEPTED', label: `Accepted (${acceptedCount})` },
+                      { val: 'REJECTED', label: `Rejected (${rejectedCount})` }
+                    ].map(sf => (
                       <button
-                        key={c.key}
-                        onClick={() => setDateFilter(active ? null : c.key)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap border cursor-pointer ${active ? 'bg-blue-600 text-white border-blue-600' : (b && b.label.startsWith('Overdue') ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50')}`}
-                        title={`${formatDMY(c.key)} ${weekdayOf(c.key)}`}
+                        key={sf.val}
+                        onClick={() => setStatusFilter(sf.val)}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                          statusFilter === sf.val 
+                            ? `bg-white shadow-xs text-blue-700 border border-slate-200 font-extrabold` 
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
                       >
-                        {shortDate(c.key)} <span className="opacity-70">({c.count})</span>
+                        {sf.label}
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
+
+                  {/* Time Slicer */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar gap-1 shrink-0">
+                    {[
+                      { val: 'ALL', label: 'All Time' },
+                      { val: 'TODAY', label: 'Today' },
+                      { val: 'WEEKLY', label: 'This Week' },
+                      { val: 'MONTHLY', label: 'This Month' }
+                    ].map(tf => (
+                      <button
+                        key={tf.val}
+                        onClick={() => setTimeFilter(tf.val)}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                          timeFilter === tf.val 
+                            ? 'bg-white text-blue-700 shadow-xs border border-slate-200 font-extrabold' 
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                      >
+                        {tf.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Date Strip */}
+                  {dateChips.length > 0 && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 lg:flex-none">
+                      <button onClick={() => stepDate(-1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer shrink-0" title="Previous date">
+                        <ChevronLeft className="w-4 h-4 text-slate-600" />
+                      </button>
+                      <button
+                        onClick={() => setDateFilter(null)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border cursor-pointer shrink-0 ${!dateFilter ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        All dates
+                      </button>
+                      {dateChips.map(c => {
+                        const b = dateBadge(c.key);
+                        const active = dateFilter === c.key;
+                        return (
+                          <button
+                            key={c.key}
+                            onClick={() => setDateFilter(active ? null : c.key)}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border cursor-pointer shrink-0 ${active ? 'bg-blue-600 text-white border-blue-600' : (b && b.label.startsWith('Overdue') ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50')}`}
+                            title={`${formatDMY(c.key)} ${weekdayOf(c.key)}`}
+                          >
+                            {shortDate(c.key)} <span className="opacity-70">({c.count})</span>
+                          </button>
+                        );
+                      })}
+                      <button onClick={() => stepDate(1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer shrink-0" title="Next date">
+                        <ChevronRight className="w-4 h-4 text-slate-600" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button onClick={() => stepDate(1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer" title="Next date">
-                  <ChevronRight className="w-4 h-4 text-slate-600" />
-                </button>
+
+                {/* Right side: Search & Reset */}
+                <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto mt-2 xl:mt-0">
+                  <div className="relative w-full sm:w-auto">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search ref, institute, unit..."
+                      value={demandSearch}
+                      onChange={(e) => setDemandSearch(e.target.value)}
+                      className="w-full sm:w-64 pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-xs"
+                    />
+                  </div>
+
+                  {hasActiveFilters && (
+                    <button
+                      onClick={resetAllFilters}
+                      className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs shrink-0"
+                      title="Reset all filters"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reset
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
+
+            </div>
 
             {/* Table */}
             <div className="overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
