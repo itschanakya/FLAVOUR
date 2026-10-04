@@ -473,94 +473,83 @@ export default function AdminDemandsPage() {
 
         {/* RIGHT SIDE: MAIN OPERATIONS & REFRESHMENT DEMANDS */}
         <div className="w-full flex-1 min-w-0 space-y-6">
-          {/* Header Banner - Clean Light Design */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-100 text-blue-700">
-                  <ShoppingBag className="w-5 h-5" />
+          {/* Header Banner & Mini Summary - Clean Light Design */}
+          <div className="bg-white rounded-2xl p-4 lg:p-5 border border-slate-200/90 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            
+            {/* Title Section */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className="p-2 rounded-xl bg-blue-100 text-blue-700 hidden sm:block">
+                <ShoppingBag className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg sm:text-xl font-black tracking-tight text-slate-900">
+                  Refreshment Demands Console
+                </h2>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Review & manage official refreshment demands
+                </p>
+              </div>
+            </div>
+
+            {/* Compact Summary Cards - Flex in center */}
+            <div className="flex items-center flex-wrap gap-2 xl:gap-3 flex-1 xl:justify-center">
+              <div className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-200 rounded-xl px-3.5 py-2 min-w-[140px]">
+                <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                  <ClipboardList className="w-4 h-4 text-blue-500" />
                 </div>
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                    Refreshment Demands Console
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Review, accept, or reject official refreshment demands raised by institutions and units
-                  </p>
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Total Demands</div>
+                  <div className="text-sm font-black text-slate-900 leading-none mt-0.5">{safeDemands.length} <span className="text-[10px] text-slate-500 font-medium">{(summary?.financials?.total_packets_demanded || 0).toLocaleString('en-IN')} pkts</span></div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 bg-amber-50 hover:bg-amber-100 transition-colors border border-amber-200 rounded-xl px-3.5 py-2 min-w-[140px]">
+                <div className="bg-white p-1.5 rounded-lg shadow-sm border border-amber-100">
+                  <Clock className="w-4 h-4 text-amber-500" />
+                </div>
+                <div>
+                  <div className="text-[9px] font-bold text-amber-600 uppercase tracking-wider">Pending Action</div>
+                  <div className="text-sm font-black text-amber-700 leading-none mt-0.5">{pendingCount} <span className="text-[10px] font-medium opacity-80">review req</span></div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 bg-emerald-50 hover:bg-emerald-100 transition-colors border border-emerald-200 rounded-xl px-3.5 py-2 min-w-[140px]">
+                <div className="bg-white p-1.5 rounded-lg shadow-sm border border-emerald-100">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div>
+                  <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">In Supply</div>
+                  <div className="text-sm font-black text-emerald-700 leading-none mt-0.5">{acceptedCount} <span className="text-[10px] font-medium opacity-80">active</span></div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-200 rounded-xl px-3.5 py-2 min-w-[140px]">
+                <div className="bg-white p-1.5 rounded-lg shadow-sm border border-slate-100">
+                  <IndianRupee className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Total Value</div>
+                  <div className="text-sm font-black text-slate-900 leading-none mt-0.5">₹{(summary?.financials?.total_amount_delivered || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap">
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2.5 shrink-0">
               <Link
                 to="/approved-demands"
-                className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-xs transition-all flex items-center gap-2"
+                className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-extrabold shadow-sm transition-all flex items-center gap-1.5"
               >
                 <Truck className="w-4 h-4" />
                 Go to Supply Point
               </Link>
               <Link
                 to="/admin/delivery-tracking"
-                className="px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold shadow-xs transition-all flex items-center gap-2"
+                className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-extrabold shadow-sm transition-all flex items-center gap-1.5"
               >
                 <Navigation className="w-4 h-4" />
                 Live Tracking
               </Link>
-            </div>
-          </div>
-
-          {/* Demand Status Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Total Demands</span>
-                <ClipboardList className="w-4 h-4 text-blue-500" />
-              </div>
-              <div className="text-2xl font-extrabold text-slate-900">
-                {safeDemands.length}
-              </div>
-              <div className="text-[11px] text-slate-500 mt-1">
-                {(summary?.financials?.total_packets_demanded || 0).toLocaleString('en-IN')} total packets
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
-              <div className="text-[11px] font-bold text-amber-600 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Pending Vendor Action</span>
-                <Clock className="w-4 h-4 text-amber-500" />
-              </div>
-              <div className="text-2xl font-extrabold text-amber-700">
-                {pendingCount}
-              </div>
-              <div className="text-[11px] text-amber-600 mt-1 font-medium">
-                Requires acceptance / review
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
-              <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Accepted & Supply</span>
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              </div>
-              <div className="text-2xl font-extrabold text-emerald-700">
-                {acceptedCount}
-              </div>
-              <div className="text-[11px] text-slate-500 mt-1">
-                Active in supply & fleet
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Total Amount</span>
-                <IndianRupee className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div className="text-2xl font-extrabold text-slate-900">
-                ₹{(summary?.financials?.total_amount_delivered || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </div>
-              <div className="text-[11px] text-emerald-600 font-semibold mt-1">
-                Fulfilled value delivered
-              </div>
             </div>
           </div>
 
