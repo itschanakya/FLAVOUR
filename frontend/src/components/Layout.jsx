@@ -471,7 +471,7 @@ export default function Layout({ children }) {
   const consoleMeta = getConsoleMeta();
 
   return (
-    <div className={`flex flex-col bg-[#F8FAFC] text-slate-900 font-sans antialiased ${
+    <div className={`flex flex-col print:block print:static print:!h-auto print:!overflow-visible print:!inset-auto bg-[#F8FAFC] text-slate-900 font-sans antialiased ${
       isMobileView
         ? 'fixed inset-0 h-[100dvh] w-full overflow-hidden'
         : 'min-h-screen w-full'
@@ -635,7 +635,7 @@ export default function Layout({ children }) {
       </header>
 
       {/* Main Content Area - Full Width Fluid Canvas */}
-      <main className={`flex-1 w-full bg-[#F8FAFC] ${
+      <main className={`flex-1 w-full bg-[#F8FAFC] print:block print:!overflow-visible print:!h-auto ${
         isMobileView
           ? 'overflow-y-auto overflow-x-hidden pt-3 pb-6 px-3 sm:px-4'
           : 'py-5 px-4 sm:px-6 lg:px-8 xl:px-10'

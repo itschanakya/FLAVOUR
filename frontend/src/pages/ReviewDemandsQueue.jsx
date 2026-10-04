@@ -12,6 +12,11 @@ import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
 import StandardPacketViewer from '../components/StandardPacketViewer';
 import { useSSE } from '../context/SSEContext';
 
+const fmtDMY = (d) => {
+  const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : (d || '');
+};
+
 const STATUS_CONFIG = {
   ALL: { 
     label: 'All History', 
@@ -261,17 +266,17 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
                     </div>
                     <div className="text-[11px] text-slate-500 font-semibold mt-1 flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-slate-400" />
-                      {dem.demand_date}
+                      {fmtDMY(dem.demand_date)}
                       {dem.demand_time && <span className="text-slate-400 font-normal">({dem.demand_time})</span>}
                     </div>
                   </td>
                   <td className="py-3.5 px-4">
-                    <div className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors line-clamp-1 max-w-[220px]" title={dem.institution_name}>
+                    <div className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors max-w-[320px] whitespace-normal break-words leading-snug" title={dem.institution_name}>
                       {dem.demand_type === 'UNIT_DIRECT' || !dem.institution_name || /^\d+$/.test(String(dem.institution_name).trim())
                         ? (dem.unit_code || dem.unit_name || '2 DAB NCC')
                         : dem.institution_name}
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 truncate max-w-[220px]">
+                    <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 max-w-[320px] break-words">
                       <Users className="w-3 h-3 text-slate-400 flex-shrink-0" />
                       <span>
                         {dem.demand_type === 'UNIT_DIRECT' || !dem.ano_cto_name || /^\d+$/.test(String(dem.ano_cto_name).trim())
@@ -446,7 +451,7 @@ function DemandCard({ dem, onAction, onDelete, onClick, onEdit }) {
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
               <Calendar className="w-3 h-3" /> Date
             </div>
-            <div className="text-sm font-bold text-slate-800">{dem.demand_date}</div>
+            <div className="text-sm font-bold text-slate-800">{fmtDMY(dem.demand_date)}</div>
           </div>
           <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
             <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1 flex items-center gap-1">

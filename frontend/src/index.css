@@ -232,8 +232,27 @@
   
   * {
     outline: none !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
+    -webkit-filter: none !important;
+  }
+
+  html, body, #root {
+    height: auto !important;
+    min-height: auto !important;
+    width: auto !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* Disable sticky positioning which hangs print pagination */
+  .sticky, .sticky-top {
+    position: static !important;
   }
   
   body {
@@ -241,6 +260,8 @@
     color: #000000 !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
     -webkit-font-smoothing: antialiased;
+    -webkit-print-color-adjust: economy !important;
+    print-color-adjust: economy !important;
   }
   
   .print-heading {
@@ -252,11 +273,24 @@
   
   table {
     width: 100% !important;
-    border-collapse: collapse !important;
+    border-collapse: separate !important;
     border-spacing: 0 !important;
     font-size: 8pt !important;
     margin: 0 !important;
-    border: 1.5px solid #000000 !important;
+    border: 0 solid #000000 !important;
+    border-top-width: 1px !important;
+    border-left-width: 1px !important;
+  }
+
+  /* Layout wrappers: plain block flow prints much faster */
+  main, main > div, .overflow-x-auto {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  .overflow-hidden {
+    overflow: visible !important;
   }
   
   .table-fixed { table-layout: fixed !important; }
@@ -267,26 +301,26 @@
   }
   
   tbody tr:last-child {
-    page-break-after: avoid !important;
-    break-after: avoid !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   tfoot {
     display: table-row-group !important;
-    page-break-before: avoid !important;
-    break-before: avoid !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+    page-break-before: auto !important;
+    break-before: auto !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
 
   tfoot tr {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
   
   tr {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
   
   th {
@@ -294,7 +328,9 @@
     font-weight: 800 !important;
     background-color: #f1f5f9 !important;
     color: #000000 !important;
-    border: 1px solid #000000 !important;
+    border: 0 solid #000000 !important;
+    border-right-width: 1px !important;
+    border-bottom-width: 1px !important;
     padding: 5px 6px !important;
     text-transform: uppercase !important;
     letter-spacing: 0.03em !important;
@@ -305,7 +341,9 @@
   td {
     font-size: 8pt !important;
     color: #000000 !important;
-    border: 1px solid #000000 !important;
+    border: 0 solid #000000 !important;
+    border-right-width: 1px !important;
+    border-bottom-width: 1px !important;
     padding: 4px 6px !important;
     vertical-align: middle !important;
   }

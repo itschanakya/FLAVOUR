@@ -134,7 +134,7 @@ export default function RefreshmentReports() {
         {/* Company Logo strictly on Far Left Side - Bigger */}
         <div className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center">
           <div className="w-24 h-24 shrink-0 flex items-center justify-center overflow-hidden border-2 border-black rounded-xl bg-[#0d5ea6] p-1.5 shadow-sm">
-            <img src="/logo.png" alt="Flavour Base Logo" className="w-full h-full object-contain" />
+            <img src="/logo-print.png" alt="Flavour Base Logo" width="96" height="96" decoding="async" className="w-full h-full object-contain" />
           </div>
         </div>
 
