@@ -6,7 +6,7 @@ import {
   PackageCheck, IndianRupee, MapPin, RefreshCw,
   School, Package, Users, ChevronDown, ChevronUp,
   ClipboardCheck, AlertCircle, X, Eye, Building2, Layers, Filter,
-  Sparkles, AlertTriangle, Search, History
+  Sparkles, AlertTriangle, Search, History, Printer
 } from 'lucide-react';
 import { useSSE } from '../context/SSEContext';
 
@@ -377,6 +377,80 @@ export default function ApprovedDemandsView() {
     return units.find(u => String(u.id) === String(selectedUnit));
   }, [units, selectedUnit]);
 
+  const handlePrintDate = (dateKey, items) => {
+    const printWindow = window.open('', '_blank');
+    const totalPackets = items.reduce((s, d) => s + (Number(d.total_quantity || d.quantity || d.total_packets || 0)), 0);
+    const dateFormatted = fmtDMY(dateKey);
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Print - Demands for ${dateFormatted}</title>
+          <style>
+            body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 20px; color: #000; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+            th { background-color: #f0f0f0; font-weight: bold; -webkit-print-color-adjust: exact; }
+            .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+            .title { font-size: 20px; font-weight: bold; margin: 0; }
+            .subtitle { font-size: 14px; margin-top: 5px; }
+            @media print {
+              @page { margin: 10mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="title">Refreshment Demands</h1>
+              <div class="subtitle">Date: <strong>${dateFormatted}</strong></div>
+            </div>
+            <div style="text-align: right; font-size: 14px;">
+              Total Demands: <strong>${items.length}</strong><br/>
+              Total Packets: <strong>${totalPackets.toLocaleString('en-IN')}</strong>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 5%">S.No.</th>
+                <th style="width: 15%">Date</th>
+                <th style="width: 15%">Demand No</th>
+                <th style="width: 35%">Institute</th>
+                <th style="width: 20%">NCC Unit</th>
+                <th style="width: 10%">No Packets</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((dem, index) => {
+                const institute = dem.demand_type === 'UNIT_DIRECT' ? (dem.unit_code || dem.unit_name || '—') : (dem.institution_name || '—');
+                const packets = Number(dem.total_quantity || dem.quantity || dem.total_packets || 0).toLocaleString('en-IN');
+                return `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${dateFormatted}</td>
+                    <td>${dem.demand_number || '—'}</td>
+                    <td>${institute}</td>
+                    <td>${dem.unit_name || '—'}</td>
+                    <td>${packets}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="w-full space-y-5">
 
@@ -735,6 +809,14 @@ export default function ApprovedDemandsView() {
                                 <span className="font-extrabold text-slate-800 text-xs">{fmtDMY(g.key)} · {weekdayOf(g.key)}</span>
                                 {badge && <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${badge.cls}`}>{badge.label}</span>}
                                 <span className="text-[11px] font-bold text-slate-500">{g.items.length} demand{g.items.length > 1 ? 's' : ''} · {gPkts.toLocaleString('en-IN')} packets · ₹{gAmt.toLocaleString('en-IN')}</span>
+                                <button
+                                  onClick={() => handlePrintDate(g.key, g.items)}
+                                  className="ml-auto p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-blue-600 transition-colors shadow-2xs flex items-center gap-1.5"
+                                  title="Print demands for this date"
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-bold uppercase tracking-wider">Print List</span>
+                                </button>
                               </div>
                             </td>
                           </tr>
