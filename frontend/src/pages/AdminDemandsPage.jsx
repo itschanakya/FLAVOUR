@@ -22,7 +22,12 @@ import {
   Layers,
   ShoppingBag,
   Truck,
-  RotateCcw
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 
 const formatDMY = (dateStr) => {
@@ -60,6 +65,9 @@ export default function AdminDemandsPage() {
   const [demandSearch, setDemandSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('PENDING'); // PENDING, ACCEPTED, REJECTED, ALL
   const [timeFilter, setTimeFilter] = useState('ALL'); // ALL, TODAY, WEEKLY, MONTHLY
+  const [dateFilter, setDateFilter] = useState(null); // 'YYYY-MM-DD' or null
+  const [sortAsc, setSortAsc] = useState(true); // nearest date first
+  const [collapsedDates, setCollapsedDates] = useState({});
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -156,6 +164,7 @@ export default function AdminDemandsPage() {
     setSelectedInstitutionId('ALL');
     setStatusFilter('ALL');
     setTimeFilter('ALL');
+    setDateFilter(null);
     setDemandSearch('');
   };
 
@@ -183,7 +192,7 @@ export default function AdminDemandsPage() {
 
   // Filter demands by unit, institution, status, time, and keyword search
   const safeDemands = Array.isArray(demands) ? demands : [];
-  const displayedDemands = safeDemands.filter(d => {
+  const baseDemands = safeDemands.filter(d => {
     // 1. Unit filter
     if (selectedUnitId !== 'ALL' && String(d.unit_id) !== String(selectedUnitId)) {
       return false;
@@ -229,6 +238,70 @@ export default function AdminDemandsPage() {
     return true;
   });
 
+  // --- Date-wise priority: sort, chips and groups ---
+  const dateKeyOf = (d) => String(d.demand_date || '').split('T')[0].split(' ')[0];
+  const now0 = new Date();
+  const todayKey = `${now0.getFullYear()}-${String(now0.getMonth() + 1).padStart(2, '0')}-${String(now0.getDate()).padStart(2, '0')}`;
+  const dayNum = (key) => {
+    const m = String(key).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000 : NaN;
+  };
+  const cmpDemand = (a, b) => {
+    const ka = dateKeyOf(a), kb = dateKeyOf(b);
+    if (ka !== kb) return ka < kb ? -1 : 1;
+    const ta = String(a.demand_time || ''), tb = String(b.demand_time || '');
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    return String(a.demand_number || '').localeCompare(String(b.demand_number || ''));
+  };
+
+  // Date chips come from demands before the date chip filter is applied
+  const dateChips = useMemo(() => {
+    const map = {};
+    baseDemands.forEach(d => {
+      const k = dateKeyOf(d);
+      if (k) map[k] = (map[k] || 0) + 1;
+    });
+    return Object.keys(map).sort().map(k => ({ key: k, count: map[k] }));
+  }, [baseDemands]);
+
+  const displayedDemands = baseDemands
+    .filter(d => !dateFilter || dateKeyOf(d) === dateFilter)
+    .sort((a, b) => (sortAsc ? cmpDemand(a, b) : cmpDemand(b, a)));
+
+  const dateGroups = [];
+  displayedDemands.forEach(d => {
+    const k = dateKeyOf(d);
+    const last = dateGroups[dateGroups.length - 1];
+    if (last && last.key === k) last.items.push(d);
+    else dateGroups.push({ key: k, items: [d] });
+  });
+  const pktsOf = (d) => Number(d.total_packets || d.total_quantity || d.quantity || 0);
+
+  const dateBadge = (key) => {
+    const diff = dayNum(key) - dayNum(todayKey);
+    if (isNaN(diff)) return null;
+    if (diff < 0) return { label: `Overdue ${-diff}d`, cls: 'bg-rose-100 text-rose-700 border-rose-200' };
+    if (diff === 0) return { label: 'Today', cls: 'bg-amber-100 text-amber-800 border-amber-200' };
+    if (diff === 1) return { label: 'Tomorrow', cls: 'bg-blue-100 text-blue-700 border-blue-200' };
+    return { label: `In ${diff}d`, cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+  };
+  const weekdayOf = (key) => {
+    const n = dayNum(key);
+    return isNaN(n) ? '' : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(n * 86400000).getUTCDay()];
+  };
+  const shortDate = (key) => {
+    const m = String(key).match(/^\d{4}-(\d{2})-(\d{2})$/);
+    return m ? `${m[2]}-${m[1]}` : key;
+  };
+  const stepDate = (dir) => {
+    if (dateChips.length === 0) return;
+    const idx = dateFilter ? dateChips.findIndex(c => c.key === dateFilter) : -1;
+    let next;
+    if (idx === -1) next = dir > 0 ? 0 : dateChips.length - 1;
+    else next = Math.min(dateChips.length - 1, Math.max(0, idx + dir));
+    setDateFilter(dateChips[next].key);
+  };
+
   const selectedUnit = onboardUnits.find(u => String(u.id) === String(selectedUnitId));
   const selectedInstitution = institutions.find(i => String(i.id) === String(selectedInstitutionId));
 
@@ -237,7 +310,7 @@ export default function AdminDemandsPage() {
   const acceptedCount = safeDemands.filter(d => ['ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED'].includes(d.status)).length;
   const rejectedCount = safeDemands.filter(d => d.status === 'REJECTED').length;
 
-  const hasActiveFilters = selectedUnitId !== 'ALL' || selectedInstitutionId !== 'ALL' || statusFilter !== 'ALL' || timeFilter !== 'ALL' || demandSearch.trim() !== '';
+  const hasActiveFilters = selectedUnitId !== 'ALL' || selectedInstitutionId !== 'ALL' || statusFilter !== 'ALL' || timeFilter !== 'ALL' || !!dateFilter || demandSearch.trim() !== '';
 
   if (loading) {
     return (
@@ -663,6 +736,40 @@ export default function AdminDemandsPage() {
 
             </div>
 
+            {/* Date quick-filter strip */}
+            {dateChips.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-white">
+                <button onClick={() => stepDate(-1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer" title="Previous date">
+                  <ChevronLeft className="w-4 h-4 text-slate-600" />
+                </button>
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1">
+                  <button
+                    onClick={() => setDateFilter(null)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap border cursor-pointer ${!dateFilter ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                  >
+                    All dates
+                  </button>
+                  {dateChips.map(c => {
+                    const b = dateBadge(c.key);
+                    const active = dateFilter === c.key;
+                    return (
+                      <button
+                        key={c.key}
+                        onClick={() => setDateFilter(active ? null : c.key)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap border cursor-pointer ${active ? 'bg-blue-600 text-white border-blue-600' : (b && b.label.startsWith('Overdue') ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50')}`}
+                        title={`${formatDMY(c.key)} ${weekdayOf(c.key)}`}
+                      >
+                        {shortDate(c.key)} <span className="opacity-70">({c.count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button onClick={() => stepDate(1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer" title="Next date">
+                  <ChevronRight className="w-4 h-4 text-slate-600" />
+                </button>
+              </div>
+            )}
+
             {/* Table */}
             <div className="overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
               <table className="w-full text-left text-xs sm:text-sm relative">
@@ -672,7 +779,11 @@ export default function AdminDemandsPage() {
                     <th className="p-3.5">NCC Unit</th>
                     <th className="p-3.5">Type</th>
                     <th className="p-3.5">Institution Name</th>
-                    <th className="p-3.5">Demand Date</th>
+                    <th className="p-3.5">
+                      <button onClick={() => setSortAsc(v => !v)} className="inline-flex items-center gap-1 uppercase font-bold tracking-wider cursor-pointer hover:text-slate-800" title={sortAsc ? 'Nearest date first (click to reverse)' : 'Farthest date first (click to reverse)'}>
+                        Demand Date {sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />}
+                      </button>
+                    </th>
                     <th className="p-3.5">Packets</th>
                     <th className="p-3.5">Total Amount</th>
                     <th className="p-3.5">Status</th>
@@ -697,7 +808,24 @@ export default function AdminDemandsPage() {
                       </td>
                     </tr>
                   ) : (
-                    displayedDemands.map((dem) => (
+                    dateGroups.map((g) => {
+                      const badge = dateBadge(g.key);
+                      const collapsed = !!collapsedDates[g.key];
+                      const gPkts = g.items.reduce((s, d) => s + pktsOf(d), 0);
+                      const gAmt = g.items.reduce((s, d) => s + Number(d.total_amount || 0), 0);
+                      return (
+                    <React.Fragment key={g.key}>
+                      <tr className="bg-slate-100/90 cursor-pointer select-none" onClick={() => setCollapsedDates(p => ({ ...p, [g.key]: !p[g.key] }))}>
+                        <td colSpan="9" className="px-3.5 py-2">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+                            <span className="font-extrabold text-slate-800 text-xs">{formatDMY(g.key)} · {weekdayOf(g.key)}</span>
+                            {badge && <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${badge.cls}`}>{badge.label}</span>}
+                            <span className="text-[11px] font-bold text-slate-500">{g.items.length} demand{g.items.length > 1 ? 's' : ''} · {gPkts.toLocaleString('en-IN')} packets · ₹{gAmt.toLocaleString('en-IN')}</span>
+                          </div>
+                        </td>
+                      </tr>
+                      {!collapsed && g.items.map((dem) => (
                       <tr key={dem.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="p-3.5 font-mono font-bold text-blue-600 whitespace-nowrap">
                           {dem.demand_number}
@@ -759,7 +887,10 @@ export default function AdminDemandsPage() {
                           )}
                         </td>
                       </tr>
-                    ))
+                      ))}
+                    </React.Fragment>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

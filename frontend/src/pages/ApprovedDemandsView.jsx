@@ -63,169 +63,124 @@ function StatusBadge({ status, deliveryStatus, demand }) {
   );
 }
 
-function DemandCard({ dem, onPrepare, onSendToFleet, loadingId }) {
+const fmtDMY = (d) => {
+  const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : (d || '');
+};
+
+const dayNum = (key) => {
+  const m = String(key).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000 : NaN;
+};
+
+const weekdayOf = (key) => {
+  const n = dayNum(key);
+  return isNaN(n) ? '' : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(n * 86400000).getUTCDay()];
+};
+
+const dateBadge = (key) => {
+  const t = new Date();
+  const todayKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  const diff = dayNum(key) - dayNum(todayKey);
+  if (isNaN(diff)) return null;
+  if (diff < 0) return { label: `Overdue ${-diff}d`, cls: 'bg-rose-100 text-rose-700 border-rose-200' };
+  if (diff === 0) return { label: 'Today', cls: 'bg-amber-100 text-amber-800 border-amber-200' };
+  if (diff === 1) return { label: 'Tomorrow', cls: 'bg-blue-100 text-blue-700 border-blue-200' };
+  return { label: `In ${diff}d`, cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+};
+
+function DemandRow({ dem, onPrepare, onSendToFleet, loadingId }) {
   const [expanded, setExpanded] = React.useState(false);
-
-  const cardBorderCls = dem.status === 'ACCEPTED'
-    ? 'border-2 border-amber-200 hover:border-amber-300 shadow-sm'
-    : dem.status === 'PREPARING'
-      ? 'border-2 border-blue-200 hover:border-blue-300 shadow-sm'
-      : 'border-2 border-emerald-200 hover:border-emerald-300 shadow-sm';
-
-  const accentLineCls = dem.status === 'ACCEPTED'
-    ? 'bg-gradient-to-r from-amber-400 to-orange-500'
-    : dem.status === 'PREPARING'
-      ? 'bg-gradient-to-r from-blue-400 to-indigo-500'
-      : 'bg-gradient-to-r from-emerald-400 to-teal-500';
+  const menu = dem.unit_menu && dem.unit_menu.length > 0 ? dem.unit_menu : null;
+  const lines = !menu && dem.items && dem.items.length > 0 ? dem.items : null;
+  const canExpand = !!(menu || lines);
 
   return (
-    <div className={`bg-white rounded-2xl transition-all overflow-hidden flex flex-col justify-between ${cardBorderCls}`}>
-      <div className={`h-2 w-full ${accentLineCls}`} />
-      <div className="p-5 flex-1">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div>
-            <span className="text-xs font-mono font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-              {dem.demand_number}
-            </span>
-            <div className="text-[11px] font-bold text-slate-400 mt-1 flex items-center gap-1">
-              <Calendar className="w-3 h-3" /> {dem.demand_date}
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap justify-end">
-            <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} />
-          </div>
-        </div>
-
-        <h4 className="font-extrabold text-sm text-slate-900 uppercase leading-snug tracking-tight mb-0.5">
-          {dem.institution_name}
-        </h4>
-        <p className="text-xs text-slate-500 font-semibold mb-3">
-          {dem.unit_name} {dem.ncc_group ? `• ${dem.ncc_group}` : ''}
-        </p>
-
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="rounded-xl p-2.5 text-center shadow-2xs border-2 border-slate-100 bg-slate-50">
-            <div className="text-[9px] uppercase tracking-wider text-slate-700 font-bold">Amount</div>
-            <div className="text-xs mt-0.5 text-slate-900 font-black">₹{(dem.total_amount || 0).toLocaleString('en-IN')}</div>
-          </div>
-          <div className="rounded-xl p-2.5 text-center border-2 border-slate-100 bg-slate-50">
-            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Quantity</div>
-            <div className="text-xs font-black text-slate-800 mt-0.5">{dem.total_quantity || 0} Packets</div>
-          </div>
-        </div>
-
-        {dem.purpose && (
-          <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-3 line-clamp-2">
-            <strong className="text-slate-800 font-bold">Purpose:</strong> {dem.purpose}
-          </p>
-        )}
-
-        {/* Dedicated Unit Packing Menu / Raw Inventory BOM */}
-        {dem.unit_menu && dem.unit_menu.length > 0 ? (
-          <div className="mt-3 pt-2.5 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setExpanded(!expanded)}
-              className="w-full flex items-center justify-between text-xs font-bold text-slate-700 hover:text-indigo-600 py-1 transition-colors"
-            >
-              <span className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Unit Packing Menu ({dem.unit_menu.length} Items)</span>
-              </span>
-              <div className="flex items-center gap-1.5">
-                {dem.stock_charged_off ? (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                    Stock Charged Off ✓
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    Charge-Off on Prepare
-                  </span>
-                )}
-                {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-              </div>
-            </button>
-            {expanded && (
-              <div className="mt-2 bg-indigo-50/50 border border-indigo-100/80 rounded-xl overflow-hidden p-2.5 space-y-1.5">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 px-0.5 flex items-center justify-between">
-                  <span>Unit Recipe Checklist</span>
-                  <span className="font-mono text-indigo-600">{dem.total_quantity || 0} Packets</span>
-                </div>
-                {dem.unit_menu.map((menuItem, idx) => (
-                  <div key={menuItem.item_id || idx} className="px-2.5 py-1.5 text-xs bg-white rounded-lg border border-indigo-100 flex items-center justify-between shadow-2xs">
-                    <div>
-                      <span className="font-bold text-slate-800">{menuItem.item_name}</span>
-                      <span className="text-[10px] text-slate-400 ml-1.5 font-medium">({menuItem.qty_per_packet} / pkt)</span>
-                    </div>
-                    <div className="text-right flex items-center gap-2">
-                      <span className="text-[10px] text-slate-400 hidden sm:inline">Stock: {menuItem.current_stock ?? '—'}</span>
-                      <span className="font-black text-indigo-700">{menuItem.total_needed} {menuItem.unit_of_measure || 'units'}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : dem.items && dem.items.length > 0 ? (
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => setExpanded(!expanded)}
-              className="w-full flex items-center justify-between text-xs font-bold text-slate-600 hover:text-slate-900 py-1 transition-colors"
-            >
-              <span className="flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-slate-400" />
-                {dem.items.length} Item Line{dem.items.length > 1 ? 's' : ''}
-              </span>
-              {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-            </button>
-            {expanded && (
-              <div className="mt-2 border border-slate-100 rounded-xl overflow-hidden">
-                {dem.items.map((item, idx) => (
-                  <div key={item.id} className={`px-3 py-2 text-xs flex justify-between ${idx < dem.items.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                    <span className="text-slate-700 font-medium">{item.item_name} <span className="text-slate-400">({item.year_group})</span></span>
-                    <span className="font-bold text-slate-900">{item.quantity}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="p-3 bg-slate-50/90 border-t border-slate-100 flex flex-col gap-1.5">
-        {dem.stock_charged_off ? (
-          <div className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-            <span>Stock charged off from inventory</span>
-          </div>
-        ) : null}
-
-        {dem.status === 'ACCEPTED' ? (
-          <button
-            onClick={() => onPrepare(dem.id)}
-            disabled={loadingId === dem.id}
-            className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-md shadow-indigo-500/20 disabled:opacity-50"
-          >
-            {loadingId === dem.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PackageCheck className="w-3.5 h-3.5" />}
-            Prepare & Charge-Off Stock
-          </button>
-        ) : dem.status === 'PREPARING' ? (
-          <button
-            onClick={() => onSendToFleet(dem.id)}
-            disabled={loadingId === dem.id}
-            className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-md shadow-emerald-500/20 disabled:opacity-50"
-          >
-            {loadingId === dem.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Truck className="w-3.5 h-3.5" />}
-            Send for Fleet Delivery
-          </button>
-        ) : (
-          <span className="w-full py-2.5 px-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl text-center">
-            Sent to Fleet
+    <>
+      <tr className="hover:bg-slate-50/80 transition-colors align-middle">
+        <td className="p-3.5 whitespace-nowrap">
+          <span className="text-xs font-mono font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+            {dem.demand_number}
           </span>
-        )}
-      </div>
-    </div>
+        </td>
+        <td className="p-3.5 font-extrabold text-slate-900 uppercase text-xs min-w-[180px]">{dem.institution_name}</td>
+        <td className="p-3.5 text-slate-600 font-semibold text-xs">
+          {dem.unit_name}{dem.ncc_group ? ` • ${dem.ncc_group}` : ''}
+        </td>
+        <td className="p-3.5 text-slate-600 text-xs max-w-[260px]">
+          <div className="line-clamp-2" title={dem.purpose}>{dem.purpose || '—'}</div>
+          {canExpand && (
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
+            >
+              <Layers className="w-3 h-3" />
+              {menu ? `Packing Menu (${menu.length})` : `${lines.length} Item Line${lines.length > 1 ? 's' : ''}`}
+              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+          )}
+        </td>
+        <td className="p-3.5 text-right font-black text-slate-800 whitespace-nowrap">{(dem.total_quantity || 0).toLocaleString('en-IN')}</td>
+        <td className="p-3.5 text-right font-black text-emerald-700 whitespace-nowrap">₹{(dem.total_amount || 0).toLocaleString('en-IN')}</td>
+        <td className="p-3.5 whitespace-nowrap">
+          <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} />
+          {menu && (dem.stock_charged_off ? (
+            <div className="text-[10px] font-bold text-emerald-600 mt-1">Stock charged off ✓</div>
+          ) : (
+            <div className="text-[10px] font-bold text-amber-700 mt-1">Charge-off on prepare</div>
+          ))}
+        </td>
+        <td className="p-3.5 text-right whitespace-nowrap">
+          {dem.status === 'ACCEPTED' ? (
+            <button
+              onClick={() => onPrepare(dem.id)}
+              disabled={loadingId === dem.id}
+              className="py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl inline-flex items-center gap-1.5 transition-all active:scale-95 shadow-md shadow-indigo-500/20 disabled:opacity-50"
+            >
+              {loadingId === dem.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PackageCheck className="w-3.5 h-3.5" />}
+              Prepare &amp; Charge-Off
+            </button>
+          ) : dem.status === 'PREPARING' ? (
+            <button
+              onClick={() => onSendToFleet(dem.id)}
+              disabled={loadingId === dem.id}
+              className="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl inline-flex items-center gap-1.5 transition-all active:scale-95 shadow-md shadow-emerald-500/20 disabled:opacity-50"
+            >
+              {loadingId === dem.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Truck className="w-3.5 h-3.5" />}
+              Send to Fleet
+            </button>
+          ) : (
+            <span className="py-2 px-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl inline-block">Sent to Fleet</span>
+          )}
+        </td>
+      </tr>
+      {expanded && canExpand && (
+        <tr className="bg-indigo-50/40">
+          <td colSpan="8" className="px-5 py-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5">
+              {menu ? menu.map((m, idx) => (
+                <div key={m.item_id || idx} className="px-2.5 py-1.5 text-xs bg-white rounded-lg border border-indigo-100 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-slate-800">{m.item_name}</span>
+                    <span className="text-[10px] text-slate-400 ml-1.5 font-medium">({m.qty_per_packet} / pkt)</span>
+                  </div>
+                  <div className="text-right flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">Stock: {m.current_stock ?? '—'}</span>
+                    <span className="font-black text-indigo-700">{m.total_needed} {m.unit_of_measure || 'units'}</span>
+                  </div>
+                </div>
+              )) : lines.map((item, idx) => (
+                <div key={item.id || idx} className="px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-100 flex justify-between">
+                  <span className="text-slate-700 font-medium">{item.item_name} <span className="text-slate-400">({item.year_group})</span></span>
+                  <span className="font-bold text-slate-900">{item.quantity}</span>
+                </div>
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -362,6 +317,24 @@ export default function ApprovedDemandsView() {
     if (newDemandFilter === 'HISTORY') return historyList;
     return inSupplyPointList;
   }, [newDemandFilter, inSupplyPointList, acceptedList, preparingList, historyList]);
+
+  // Date-wise grouping: nearest date first
+  const dateKeyOf = (d) => String(d.demand_date || '').split('T')[0].split(' ')[0];
+  const dateGroups = useMemo(() => {
+    const sorted = [...shownList].sort((a, b) => {
+      const ka = dateKeyOf(a), kb = dateKeyOf(b);
+      if (ka !== kb) return ka < kb ? -1 : 1;
+      return String(a.demand_number || '').localeCompare(String(b.demand_number || ''));
+    });
+    const groups = [];
+    sorted.forEach(d => {
+      const k = dateKeyOf(d);
+      const last = groups[groups.length - 1];
+      if (last && last.key === k) last.items.push(d);
+      else groups.push({ key: k, items: [d] });
+    });
+    return groups;
+  }, [shownList]);
 
   // All active demands in Supply Point across all units (for sidebar badges)
   const allSupplyPointDemands = useMemo(() => {
@@ -733,16 +706,53 @@ export default function ApprovedDemandsView() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
-              {shownList.map(dem => (
-                <DemandCard
-                  key={dem.id}
-                  dem={dem}
-                  onPrepare={handlePrepare}
-                  onSendToFleet={handleSendToFleet}
-                  loadingId={loadingId}
-                />
-              ))}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                    <tr>
+                      <th className="p-3.5">Demand Ref</th>
+                      <th className="p-3.5">Institution</th>
+                      <th className="p-3.5">NCC Unit</th>
+                      <th className="p-3.5">Purpose</th>
+                      <th className="p-3.5 text-right">Packets</th>
+                      <th className="p-3.5 text-right">Amount</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {dateGroups.map(g => {
+                      const badge = dateBadge(g.key);
+                      const gPkts = g.items.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+                      const gAmt = g.items.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
+                      return (
+                        <React.Fragment key={g.key}>
+                          <tr className="bg-slate-100/90">
+                            <td colSpan="8" className="px-3.5 py-2">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <Calendar className="w-4 h-4 text-slate-500" />
+                                <span className="font-extrabold text-slate-800 text-xs">{fmtDMY(g.key)} · {weekdayOf(g.key)}</span>
+                                {badge && <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${badge.cls}`}>{badge.label}</span>}
+                                <span className="text-[11px] font-bold text-slate-500">{g.items.length} demand{g.items.length > 1 ? 's' : ''} · {gPkts.toLocaleString('en-IN')} packets · ₹{gAmt.toLocaleString('en-IN')}</span>
+                              </div>
+                            </td>
+                          </tr>
+                          {g.items.map(dem => (
+                            <DemandRow
+                              key={dem.id}
+                              dem={dem}
+                              onPrepare={handlePrepare}
+                              onSendToFleet={handleSendToFleet}
+                              loadingId={loadingId}
+                            />
+                          ))}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </main>
