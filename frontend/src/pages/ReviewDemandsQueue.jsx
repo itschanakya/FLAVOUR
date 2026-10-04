@@ -6,7 +6,7 @@ import {
   School, Calendar, ArrowRight, IndianRupee, ChevronDown,
   ChevronUp, Users, Package, MessageSquare, ShieldCheck,
   AlertTriangle, Clock3, Inbox, RefreshCw, Eye, Truck, Phone,
-  Layers, TrendingUp, Sparkles, LayoutList, LayoutGrid, MapPin, FileEdit
+  Layers, TrendingUp, Sparkles, LayoutList, LayoutGrid, MapPin, FileEdit, Printer
 } from 'lucide-react';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
 import StandardPacketViewer from '../components/StandardPacketViewer';
@@ -15,6 +15,27 @@ import { useSSE } from '../context/SSEContext';
 const fmtDMY = (d) => {
   const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}-${m[2]}-${m[1]}` : (d || '');
+};
+
+const dayNum = (key) => {
+  const m = String(key).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000 : NaN;
+};
+
+const weekdayOf = (key) => {
+  const n = dayNum(key);
+  return isNaN(n) ? '' : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(n * 86400000).getUTCDay()];
+};
+
+const dateBadge = (key) => {
+  const t = new Date();
+  const todayKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  const diff = dayNum(key) - dayNum(todayKey);
+  if (isNaN(diff)) return null;
+  if (diff < 0) return { label: `Overdue ${-diff}d`, cls: 'bg-rose-100 text-rose-700 border-rose-200' };
+  if (diff === 0) return { label: 'Today', cls: 'bg-amber-100 text-amber-800 border-amber-200' };
+  if (diff === 1) return { label: 'Tomorrow', cls: 'bg-blue-100 text-blue-700 border-blue-200' };
+  return { label: `In ${diff}d`, cls: 'bg-slate-100 text-slate-600 border-slate-200' };
 };
 
 const STATUS_CONFIG = {
@@ -230,6 +251,96 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
   const totalQty = demands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
   const totalVal = demands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
 
+  const dateKeyOf = (d) => String(d.demand_date || '').split('T')[0].split(' ')[0];
+  const dateGroups = React.useMemo(() => {
+    const sorted = [...demands].sort((a, b) => {
+      const ka = dateKeyOf(a), kb = dateKeyOf(b);
+      if (ka !== kb) return ka < kb ? -1 : 1;
+      return String(a.demand_number || '').localeCompare(String(b.demand_number || ''));
+    });
+    const groups = [];
+    sorted.forEach(d => {
+      const k = dateKeyOf(d);
+      const last = groups[groups.length - 1];
+      if (last && last.key === k) last.items.push(d);
+      else groups.push({ key: k, items: [d] });
+    });
+    return groups;
+  }, [demands]);
+
+  const handlePrintDate = (dateKey, items) => {
+    const printWindow = window.open('', '_blank');
+    const totalPackets = items.reduce((s, d) => s + (Number(d.total_quantity || d.quantity || d.total_packets || 0)), 0);
+    const dateFormatted = fmtDMY(dateKey);
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Print - Demands for ${dateFormatted}</title>
+          <style>
+            body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 20px; color: #000; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+            th { background-color: #f0f0f0; font-weight: bold; -webkit-print-color-adjust: exact; }
+            .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+            .title { font-size: 20px; font-weight: bold; margin: 0; }
+            .subtitle { font-size: 14px; margin-top: 5px; }
+            @media print {
+              @page { margin: 10mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="title">Refreshment Demands</h1>
+              <div class="subtitle">Date: <strong>${dateFormatted}</strong></div>
+            </div>
+            <div style="text-align: right; font-size: 14px;">
+              Total Demands: <strong>${items.length}</strong><br/>
+              Total Packets: <strong>${totalPackets.toLocaleString('en-IN')}</strong>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 5%">S.No.</th>
+                <th style="width: 15%">Date</th>
+                <th style="width: 15%">Demand No</th>
+                <th style="width: 35%">Institute</th>
+                <th style="width: 20%">NCC Unit</th>
+                <th style="width: 10%">No Packets</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((dem, index) => {
+                const institute = dem.demand_type === 'UNIT_DIRECT' ? (dem.unit_code || dem.unit_name || '—') : (dem.institution_name || '—');
+                const packets = Number(dem.total_quantity || dem.quantity || dem.total_packets || 0).toLocaleString('en-IN');
+                return `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${dateFormatted}</td>
+                    <td>${dem.demand_number || '—'}</td>
+                    <td>${institute}</td>
+                    <td>${dem.unit_name || '—'}</td>
+                    <td>${packets}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
@@ -247,7 +358,31 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
-            {demands.map(dem => {
+            {dateGroups.map(g => {
+              const badge = dateBadge(g.key);
+              const gPkts = g.items.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+              const gAmt = g.items.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
+              return (
+                <React.Fragment key={g.key}>
+                  <tr className="bg-slate-50/80">
+                    <td colSpan="8" className="px-4 py-2 border-b border-slate-200">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Calendar className="w-4 h-4 text-slate-500" />
+                        <span className="font-extrabold text-slate-800 text-xs">{fmtDMY(g.key)} · {weekdayOf(g.key)}</span>
+                        {badge && <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${badge.cls}`}>{badge.label}</span>}
+                        <span className="text-[11px] font-bold text-slate-500">{g.items.length} demand{g.items.length > 1 ? 's' : ''} · {gPkts.toLocaleString('en-IN')} packets · ₹{gAmt.toLocaleString('en-IN')}</span>
+                        <button
+                          onClick={() => handlePrintDate(g.key, g.items)}
+                          className="ml-auto p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-blue-600 transition-colors shadow-2xs flex items-center gap-1.5"
+                          title="Print demands for this date"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Print List</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {g.items.map(dem => {
               const isPending = dem.status === 'PENDING';
               const canCancel = ['PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH'].includes(dem.status) && dem.delivery_status !== 'DELIVERED';
               const qty = Number(dem.total_quantity) || 0;
@@ -386,7 +521,10 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
                 </tr>
               );
             })}
-          </tbody>
+          </React.Fragment>
+        );
+      })}
+    </tbody>
         </table>
       </div>
 
