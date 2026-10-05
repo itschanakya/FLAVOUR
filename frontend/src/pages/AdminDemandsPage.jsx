@@ -70,6 +70,10 @@ export default function AdminDemandsPage() {
   const [collapsedDates, setCollapsedDates] = useState({});
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Bulk Actions State
+  const [selectedDemandIds, setSelectedDemandIds] = useState(new Set());
+  const [isBulkLoading, setIsBulkLoading] = useState(false);
 
   useEffect(() => {
     fetchDemandsData();
@@ -166,6 +170,58 @@ export default function AdminDemandsPage() {
     setTimeFilter('ALL');
     setDateFilter(null);
     setDemandSearch('');
+    setSelectedDemandIds(new Set());
+  };
+
+  const handleBulkAccept = async () => {
+    if (selectedDemandIds.size === 0) return;
+    if (!window.confirm(`Accept ${selectedDemandIds.size} demands for fulfillment?`)) return;
+    
+    setIsBulkLoading(true);
+    try {
+      const promises = Array.from(selectedDemandIds).map(id =>
+        fetch(`/api/demands/${id}/accept`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
+      );
+      await Promise.all(promises);
+      fetchDemandsData();
+      setSelectedDemandIds(new Set());
+      window.dispatchEvent(new Event('demand-status-changed'));
+    } catch (err) {
+      alert(`Bulk accept failed: ${err.message}`);
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
+  const handleBulkReject = async () => {
+    if (selectedDemandIds.size === 0) return;
+    const reason = window.prompt(`Reason for rejecting ${selectedDemandIds.size} demands:`);
+    if (reason === null) return;
+    
+    setIsBulkLoading(true);
+    try {
+      const promises = Array.from(selectedDemandIds).map(id =>
+        fetch(`/api/demands/${id}/admin-reject`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}` 
+          },
+          body: JSON.stringify({ reason: reason || 'Rejected by Vendor/Admin.' })
+        }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
+      );
+      await Promise.all(promises);
+      fetchDemandsData();
+      setSelectedDemandIds(new Set());
+      window.dispatchEvent(new Event('demand-status-changed'));
+    } catch (err) {
+      alert(`Bulk reject failed: ${err.message}`);
+    } finally {
+      setIsBulkLoading(false);
+    }
   };
 
   // Filter institutions available based on selected Unit
@@ -237,6 +293,33 @@ export default function AdminDemandsPage() {
 
     return true;
   });
+
+  const eligibleForBulk = (d) => d.status === 'APPROVED';
+
+  const toggleSelection = (demandId) => {
+    const next = new Set(selectedDemandIds);
+    if (next.has(demandId)) {
+      next.delete(demandId);
+    } else {
+      next.add(demandId);
+    }
+    setSelectedDemandIds(next);
+  };
+
+  const toggleSelectAll = () => {
+    const eligibleDemands = displayedDemands.filter(eligibleForBulk);
+    if (eligibleDemands.length === 0) return;
+    
+    // If all currently displayed eligible demands are selected, unselect them
+    const allSelected = eligibleDemands.every(d => selectedDemandIds.has(d.id));
+    const next = new Set(selectedDemandIds);
+    if (allSelected) {
+      eligibleDemands.forEach(d => next.delete(d.id));
+    } else {
+      eligibleDemands.forEach(d => next.add(d.id));
+    }
+    setSelectedDemandIds(next);
+  };
 
   // --- Date-wise priority: sort, chips and groups ---
   const dateKeyOf = (d) => String(d.demand_date || '').split('T')[0].split(' ')[0];
@@ -757,10 +840,43 @@ export default function AdminDemandsPage() {
             </div>
 
             {/* Table */}
+            {selectedDemandIds.size > 0 && (
+              <div className="bg-indigo-50 border-b border-indigo-100 p-3 flex items-center justify-between">
+                <div className="text-sm font-bold text-indigo-800">
+                  {selectedDemandIds.size} demand(s) selected
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleBulkReject}
+                    disabled={isBulkLoading}
+                    className="px-3 py-1.5 bg-white border border-rose-200 text-rose-600 rounded-lg text-xs font-bold hover:bg-rose-50 hover:border-rose-300 transition-colors disabled:opacity-50"
+                  >
+                    Reject Selected
+                  </button>
+                  <button
+                    onClick={handleBulkAccept}
+                    disabled={isBulkLoading}
+                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                  >
+                    Accept Selected
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
               <table className="w-full text-left text-xs sm:text-sm relative">
                 <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                   <tr>
+                    <th className="p-3.5 w-10 text-center">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
+                        onChange={toggleSelectAll}
+                        checked={displayedDemands.filter(eligibleForBulk).length > 0 && displayedDemands.filter(eligibleForBulk).every(d => selectedDemandIds.has(d.id))}
+                        disabled={displayedDemands.filter(eligibleForBulk).length === 0}
+                        title="Select/Deselect all pending demands in view"
+                      />
+                    </th>
                     <th className="p-3.5">Demand Ref</th>
                     <th className="p-3.5">NCC Unit</th>
                     <th className="p-3.5">Type</th>
@@ -779,7 +895,7 @@ export default function AdminDemandsPage() {
                 <tbody className="divide-y divide-slate-100">
                   {displayedDemands.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="p-8 text-center text-slate-500 font-medium">
+                      <td colSpan="10" className="p-8 text-center text-slate-500 font-medium">
                         No demands matching the selected criteria.
                         {hasActiveFilters && (
                           <div className="mt-2">
@@ -802,7 +918,7 @@ export default function AdminDemandsPage() {
                       return (
                     <React.Fragment key={g.key}>
                       <tr className="bg-slate-100/90 cursor-pointer select-none" onClick={() => setCollapsedDates(p => ({ ...p, [g.key]: !p[g.key] }))}>
-                        <td colSpan="9" className="px-3.5 py-2">
+                        <td colSpan="10" className="px-3.5 py-2">
                           <div className="flex items-center gap-3 flex-wrap">
                             <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
                             <span className="font-extrabold text-slate-800 text-xs">{formatDMY(g.key)} · {weekdayOf(g.key)}</span>
@@ -813,6 +929,16 @@ export default function AdminDemandsPage() {
                       </tr>
                       {!collapsed && g.items.map((dem) => (
                       <tr key={dem.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-3.5 text-center">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-30"
+                            checked={selectedDemandIds.has(dem.id)}
+                            onChange={() => toggleSelection(dem.id)}
+                            disabled={!eligibleForBulk(dem)}
+                            title={eligibleForBulk(dem) ? "Select demand" : "Only pending demands can be selected"}
+                          />
+                        </td>
                         <td className="p-3.5 font-mono font-bold text-blue-600 whitespace-nowrap">
                           {dem.demand_number}
                         </td>

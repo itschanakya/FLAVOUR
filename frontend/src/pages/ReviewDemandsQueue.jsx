@@ -247,7 +247,7 @@ function DeliveryStagePill({ demand }) {
 /**
  * Tabular View for Demand Authorization Queue and Historical Records
  */
-function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
+function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, selectedDemandIds, isBulkLoading, toggleSelection, toggleSelectAll, handleBulkAction, eligibleForBulk }) {
   const totalQty = demands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
   const totalVal = demands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
 
@@ -343,10 +343,43 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {selectedDemandIds && selectedDemandIds.size > 0 && (
+        <div className="bg-indigo-50 border-b border-indigo-100 p-3 flex items-center justify-between">
+          <div className="text-sm font-bold text-indigo-800">
+            {selectedDemandIds.size} demand(s) selected
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleBulkAction('APPROVE')}
+              disabled={isBulkLoading}
+              className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            >
+              Approve Selected
+            </button>
+            <button
+              onClick={() => handleBulkAction('REJECT')}
+              disabled={isBulkLoading}
+              className="px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700 transition-colors disabled:opacity-50"
+            >
+              Reject Selected
+            </button>
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-slate-50 via-slate-100 to-slate-50 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-600">
+              <th className="py-3.5 px-4 w-10 text-center">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
+                  onChange={() => toggleSelectAll(demands)}
+                  checked={demands.filter(eligibleForBulk).length > 0 && demands.filter(eligibleForBulk).every(d => selectedDemandIds.has(d.id))}
+                  disabled={demands.filter(eligibleForBulk).length === 0}
+                  title="Select/Deselect all eligible demands in view"
+                />
+              </th>
               <th className="py-3.5 px-4">Demand Ref & Date</th>
               <th className="py-3.5 px-4">Institution & In-charge</th>
               <th className="py-3.5 px-4">Event / Purpose</th>
@@ -365,7 +398,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
               return (
                 <React.Fragment key={g.key}>
                   <tr className="bg-slate-50/80">
-                    <td colSpan="8" className="px-4 py-2 border-b border-slate-200">
+                    <td colSpan="9" className="px-4 py-2 border-b border-slate-200">
                       <div className="flex items-center gap-3 flex-wrap">
                         <Calendar className="w-4 h-4 text-slate-500" />
                         <span className="font-extrabold text-slate-800 text-xs">{fmtDMY(g.key)} · {weekdayOf(g.key)}</span>
@@ -393,6 +426,16 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit }) {
                   key={dem.id}
                   className="hover:bg-orange-50/60 transition-colors group"
                 >
+                  <td className="py-3.5 px-4 text-center">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-30"
+                      checked={selectedDemandIds?.has(dem.id) || false}
+                      onChange={() => toggleSelection(dem.id)}
+                      disabled={!eligibleForBulk(dem)}
+                      title={eligibleForBulk(dem) ? "Select demand" : "Only PENDING demands can be selected"}
+                    />
+                  </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
@@ -904,6 +947,66 @@ export default function ReviewDemandsQueue() {
 
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Bulk Actions State
+  const [selectedDemandIds, setSelectedDemandIds] = useState(new Set());
+  const [isBulkLoading, setIsBulkLoading] = useState(false);
+
+  const eligibleForBulk = (d) => d.status === 'PENDING';
+
+  const toggleSelection = (demandId) => {
+    const next = new Set(selectedDemandIds);
+    if (next.has(demandId)) {
+      next.delete(demandId);
+    } else {
+      next.add(demandId);
+    }
+    setSelectedDemandIds(next);
+  };
+
+  const toggleSelectAll = (filteredDemands) => {
+    const eligibleDemands = filteredDemands.filter(eligibleForBulk);
+    if (eligibleDemands.length === 0) return;
+    
+    const allSelected = eligibleDemands.every(d => selectedDemandIds.has(d.id));
+    const next = new Set(selectedDemandIds);
+    if (allSelected) {
+      eligibleDemands.forEach(d => next.delete(d.id));
+    } else {
+      eligibleDemands.forEach(d => next.add(d.id));
+    }
+    setSelectedDemandIds(next);
+  };
+
+  const handleBulkAction = async (action) => {
+    // Only process 'PENDING' selected demands
+    const actionIds = Array.from(selectedDemandIds).filter(id => demands.find(d => d.id === id)?.status === 'PENDING');
+    if (actionIds.length === 0) return;
+    
+    if (!window.confirm(`Are you sure you want to ${action.toLowerCase()} ${actionIds.length} demand(s)?`)) return;
+    
+    setIsBulkLoading(true);
+    try {
+      const promises = actionIds.map(id =>
+        fetch(`/api/demands/${id}/review`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: action, remarks: `Bulk ${action.toLowerCase()}` })
+        }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
+      );
+      await Promise.all(promises);
+      fetchDemands();
+      // Keep other selections, just remove the processed ones so they don't get selected again if we refresh state
+      const next = new Set(selectedDemandIds);
+      actionIds.forEach(id => next.delete(id));
+      setSelectedDemandIds(next);
+      window.dispatchEvent(new Event('demand-status-changed'));
+    } catch (err) {
+      alert(`Bulk ${action.toLowerCase()} failed: ${err.message}`);
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
   const fetchDemands = useCallback(async () => {
     setLoading(true);
     try {
@@ -1302,6 +1405,12 @@ export default function ReviewDemandsQueue() {
             onDelete={handleDelete}
             onClick={setViewDemand}
             onEdit={(d) => navigate('/unit-demand', { state: { editDemand: d } })}
+            selectedDemandIds={selectedDemandIds}
+            isBulkLoading={isBulkLoading}
+            toggleSelection={toggleSelection}
+            toggleSelectAll={toggleSelectAll}
+            handleBulkAction={handleBulkAction}
+            eligibleForBulk={eligibleForBulk}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

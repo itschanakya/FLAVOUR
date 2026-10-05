@@ -89,7 +89,7 @@ const dateBadge = (key) => {
   return { label: `In ${diff}d`, cls: 'bg-slate-100 text-slate-600 border-slate-200' };
 };
 
-function DemandRow({ dem, onPrepare, onSendToFleet, loadingId }) {
+function DemandRow({ dem, onPrepare, onSendToFleet, loadingId, isSelected, onToggle, eligibleForBulk }) {
   const [expanded, setExpanded] = React.useState(false);
   const menu = dem.unit_menu && dem.unit_menu.length > 0 ? dem.unit_menu : null;
   const lines = !menu && dem.items && dem.items.length > 0 ? dem.items : null;
@@ -98,6 +98,16 @@ function DemandRow({ dem, onPrepare, onSendToFleet, loadingId }) {
   return (
     <>
       <tr className="hover:bg-slate-50/80 transition-colors align-middle">
+        <td className="p-3.5 text-center">
+          <input 
+            type="checkbox" 
+            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-30"
+            checked={isSelected}
+            onChange={() => onToggle(dem.id)}
+            disabled={!eligibleForBulk}
+            title={eligibleForBulk ? "Select demand" : "Only ACCEPTED or PREPARING demands can be selected"}
+          />
+        </td>
         <td className="p-3.5 whitespace-nowrap">
           <span className="text-xs font-mono font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
             {dem.demand_number}
@@ -157,7 +167,7 @@ function DemandRow({ dem, onPrepare, onSendToFleet, loadingId }) {
       </tr>
       {expanded && canExpand && (
         <tr className="bg-indigo-50/40">
-          <td colSpan="8" className="px-5 py-3">
+          <td colSpan="9" className="px-5 py-3">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5">
               {menu ? menu.map((m, idx) => (
                 <div key={m.item_id || idx} className="px-2.5 py-1.5 text-xs bg-white rounded-lg border border-indigo-100 flex items-center justify-between">
@@ -196,6 +206,10 @@ export default function ApprovedDemandsView() {
   const [newDemandFilter, setNewDemandFilter] = useState('ALL'); // 'ALL' | 'ACCEPTED' | 'APPROVED'
   const [unitSearch, setUnitSearch] = useState('');
   const [timeFilter, setTimeFilter] = useState('ALL'); // ALL, WEEKLY, MONTHLY, ANNUALLY
+
+  // Bulk Actions State
+  const [selectedDemandIds, setSelectedDemandIds] = useState(new Set());
+  const [isBulkLoading, setIsBulkLoading] = useState(false);
 
   const fetchDemands = useCallback(async () => {
     setLoading(true);
@@ -301,6 +315,92 @@ export default function ApprovedDemandsView() {
       return true;
     });
   }, [demands, units, selectedGroup, selectedUnit, timeFilter, passesTimeFilter]);
+
+  const eligibleForBulk = (d) => d.status === 'ACCEPTED' || d.status === 'PREPARING';
+  
+  const toggleSelection = (demandId) => {
+    const next = new Set(selectedDemandIds);
+    if (next.has(demandId)) {
+      next.delete(demandId);
+    } else {
+      next.add(demandId);
+    }
+    setSelectedDemandIds(next);
+  };
+
+  const toggleSelectAll = () => {
+    const activeGroupKey = Object.keys(groupedDemands).find(k => k.startsWith(timeFilter + '-' + selectedGroup + '-' + selectedUnit));
+    // Actually, we just need to get the flat list of displayed demands to select them
+    // To make it simple, we just select from filteredDemands
+    const eligibleDemands = filteredDemands.filter(eligibleForBulk);
+    if (eligibleDemands.length === 0) return;
+    
+    const allSelected = eligibleDemands.every(d => selectedDemandIds.has(d.id));
+    const next = new Set(selectedDemandIds);
+    if (allSelected) {
+      eligibleDemands.forEach(d => next.delete(d.id));
+    } else {
+      eligibleDemands.forEach(d => next.add(d.id));
+    }
+    setSelectedDemandIds(next);
+  };
+
+  const handleBulkPrepare = async () => {
+    // Only process 'ACCEPTED' selected demands
+    const prepareIds = Array.from(selectedDemandIds).filter(id => demands.find(d => d.id === id)?.status === 'ACCEPTED');
+    if (prepareIds.length === 0) return;
+    
+    if (!window.confirm(`Prepare & Charge-off ${prepareIds.length} demands?`)) return;
+    
+    setIsBulkLoading(true);
+    try {
+      const promises = prepareIds.map(id =>
+        fetch(`/api/demands/${id}/prepare`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
+      );
+      await Promise.all(promises);
+      fetchDemands();
+      // Keep other selections, just remove the prepared ones so they don't get selected again if we refresh state
+      const next = new Set(selectedDemandIds);
+      prepareIds.forEach(id => next.delete(id));
+      setSelectedDemandIds(next);
+      window.dispatchEvent(new Event('demand-status-changed'));
+    } catch (err) {
+      alert(`Bulk prepare failed: ${err.message}`);
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
+  const handleBulkSendToFleet = async () => {
+    // Only process 'PREPARING' selected demands
+    const sendIds = Array.from(selectedDemandIds).filter(id => demands.find(d => d.id === id)?.status === 'PREPARING');
+    if (sendIds.length === 0) return;
+    
+    if (!window.confirm(`Send ${sendIds.length} demands to Fleet?`)) return;
+    
+    setIsBulkLoading(true);
+    try {
+      const promises = sendIds.map(id =>
+        fetch(`/api/demands/${id}/ready-for-dispatch`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
+      );
+      await Promise.all(promises);
+      fetchDemands();
+      const next = new Set(selectedDemandIds);
+      sendIds.forEach(id => next.delete(id));
+      setSelectedDemandIds(next);
+      window.dispatchEvent(new Event('demand-status-changed'));
+    } catch (err) {
+      alert(`Bulk send to fleet failed: ${err.message}`);
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
 
   const handlePrepare = async (demandId) => {
     setLoadingId(demandId);
@@ -862,10 +962,43 @@ export default function ApprovedDemandsView() {
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+              {selectedDemandIds.size > 0 && (
+                <div className="bg-indigo-50 border-b border-indigo-100 p-3 flex items-center justify-between">
+                  <div className="text-sm font-bold text-indigo-800">
+                    {selectedDemandIds.size} demand(s) selected
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleBulkPrepare}
+                      disabled={isBulkLoading || !Array.from(selectedDemandIds).some(id => demands.find(d => d.id === id)?.status === 'ACCEPTED')}
+                      className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    >
+                      Prepare Selected
+                    </button>
+                    <button
+                      onClick={handleBulkSendToFleet}
+                      disabled={isBulkLoading || !Array.from(selectedDemandIds).some(id => demands.find(d => d.id === id)?.status === 'PREPARING')}
+                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                    >
+                      Send Selected to Fleet
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                     <tr>
+                      <th className="p-3.5 w-10 text-center">
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
+                          onChange={toggleSelectAll}
+                          checked={filteredDemands.filter(eligibleForBulk).length > 0 && filteredDemands.filter(eligibleForBulk).every(d => selectedDemandIds.has(d.id))}
+                          disabled={filteredDemands.filter(eligibleForBulk).length === 0}
+                          title="Select/Deselect all eligible demands in view"
+                        />
+                      </th>
                       <th className="p-3.5">Demand Ref</th>
                       <th className="p-3.5">Institution</th>
                       <th className="p-3.5">NCC Unit</th>
@@ -884,7 +1017,7 @@ export default function ApprovedDemandsView() {
                       return (
                         <React.Fragment key={g.key}>
                           <tr className="bg-slate-100/90">
-                            <td colSpan="8" className="px-3.5 py-2">
+                            <td colSpan="9" className="px-3.5 py-2">
                               <div className="flex items-center gap-3 flex-wrap">
                                 <Calendar className="w-4 h-4 text-slate-500" />
                                 <span className="font-extrabold text-slate-800 text-xs">{fmtDMY(g.key)} · {weekdayOf(g.key)}</span>
@@ -908,6 +1041,9 @@ export default function ApprovedDemandsView() {
                               onPrepare={handlePrepare}
                               onSendToFleet={handleSendToFleet}
                               loadingId={loadingId}
+                              isSelected={selectedDemandIds.has(dem.id)}
+                              onToggle={toggleSelection}
+                              eligibleForBulk={eligibleForBulk(dem)}
                             />
                           ))}
                         </React.Fragment>
