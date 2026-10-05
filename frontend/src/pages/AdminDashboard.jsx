@@ -253,7 +253,7 @@ export default function AdminDashboard() {
     }
 
     // Grand Total Row
-    const activeList = analyticsData[periodTab] || [];
+    const activeList = [...(analyticsData[periodTab] || [])].reverse();
     const totalDemands = activeList.reduce((acc, r) => acc + Number(r.demand_count || 0), 0);
     const totalPackets = activeList.reduce((acc, r) => acc + Number(r.total_packets || 0), 0);
     const totalDeliveredPkts = activeList.reduce((acc, r) => acc + Number(r.delivered_packets || 0), 0);
@@ -374,7 +374,7 @@ export default function AdminDashboard() {
   }, [analyticsData, periodTab]);
 
   // Calculate Active Table Totals
-  const activeList = analyticsData[periodTab] || [];
+  const activeList = [...(analyticsData[periodTab] || [])].reverse();
   const grandTotalDemands = activeList.reduce((acc, r) => acc + Number(r.demand_count || 0), 0);
   const grandTotalPackets = activeList.reduce((acc, r) => acc + Number(r.total_packets || 0), 0);
   const grandTotalDeliveredPkts = activeList.reduce((acc, r) => acc + Number(r.delivered_packets || 0), 0);

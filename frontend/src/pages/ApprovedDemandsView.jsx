@@ -239,6 +239,37 @@ export default function ApprovedDemandsView() {
     return Array.from(groupsSet).sort();
   }, [units, demands]);
 
+  const passesTimeFilter = useCallback((d, filter) => {
+    if (filter === 'ALL') return true;
+    if (!d.demand_date) return true;
+    const dDate = new Date(d.demand_date);
+    if (isNaN(dDate.getTime())) return true;
+    
+    const now = new Date();
+    
+    if (filter === 'WEEKLY') {
+      // Current week (Sunday to Saturday)
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+      
+      return dDate >= startOfWeek && dDate <= endOfWeek;
+    } 
+    if (filter === 'MONTHLY') {
+      // Current month
+      return dDate.getMonth() === now.getMonth() && dDate.getFullYear() === now.getFullYear();
+    }
+    if (filter === 'ANNUALLY') {
+      // Current year
+      return dDate.getFullYear() === now.getFullYear();
+    }
+    return true;
+  }, []);
+
   // Units filtered by selectedGroup
   const filteredUnitsList = useMemo(() => {
     if (selectedGroup === 'ALL') return units;
@@ -265,26 +296,11 @@ export default function ApprovedDemandsView() {
       if (selectedUnit !== 'ALL') {
         if (String(d.unit_id) !== String(selectedUnit)) return false;
       }
-      if (timeFilter !== 'ALL') {
-        const dDate = new Date(d.demand_date);
-        const now = new Date();
-        if (timeFilter === 'WEEKLY') {
-          const diffTime = Math.abs(now - dDate);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          if (diffDays > 7) return false;
-        } else if (timeFilter === 'MONTHLY') {
-          const diffTime = Math.abs(now - dDate);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          if (diffDays > 30) return false;
-        } else if (timeFilter === 'ANNUALLY') {
-          const diffTime = Math.abs(now - dDate);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          if (diffDays > 365) return false;
-        }
-      }
+      if (!passesTimeFilter(d, timeFilter)) return false;
+      
       return true;
     });
-  }, [demands, units, selectedGroup, selectedUnit, timeFilter]);
+  }, [demands, units, selectedGroup, selectedUnit, timeFilter, passesTimeFilter]);
 
   const handlePrepare = async (demandId) => {
     setLoadingId(demandId);
@@ -356,8 +372,12 @@ export default function ApprovedDemandsView() {
 
   // All active demands in Supply Point across all units (for sidebar badges)
   const allSupplyPointDemands = useMemo(() => {
-    return demands.filter(d => d.status === 'ACCEPTED' || d.status === 'PREPARING');
-  }, [demands]);
+    return demands.filter(d => {
+      if (d.status !== 'ACCEPTED' && d.status !== 'PREPARING') return false;
+      if (!passesTimeFilter(d, timeFilter)) return false;
+      return true;
+    });
+  }, [demands, timeFilter, passesTimeFilter]);
 
   // Precompute demand counts per unit in Supply Point
   const unitStatsMap = useMemo(() => {
