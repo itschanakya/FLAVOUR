@@ -375,20 +375,39 @@ export default function ApprovedDemandsView() {
   };
 
   const handleBulkSendToFleet = async () => {
-    // Only process 'PREPARING' selected demands
-    const sendIds = Array.from(selectedDemandIds).filter(id => demands.find(d => d.id === id)?.status === 'PREPARING');
+    // Process both 'PREPARING' and 'ACCEPTED' selected demands
+    const sendIds = Array.from(selectedDemandIds).filter(id => {
+      const status = demands.find(d => d.id === id)?.status;
+      return status === 'PREPARING' || status === 'ACCEPTED';
+    });
     if (sendIds.length === 0) return;
     
     if (!window.confirm(`Send ${sendIds.length} demands to Fleet?`)) return;
     
     setIsBulkLoading(true);
     try {
-      const promises = sendIds.map(id =>
-        fetch(`/api/demands/${id}/ready-for-dispatch`, {
+      const promises = sendIds.map(async id => {
+        const demand = demands.find(d => d.id === id);
+        if (demand.status === 'ACCEPTED') {
+          // First prepare it
+          const prepRes = await fetch(`/api/demands/${id}/prepare`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (!prepRes.ok) {
+            const data = await prepRes.json();
+            throw new Error(data.error || 'Failed to prepare');
+          }
+        }
+        // Then send to fleet
+        const sendRes = await fetch(`/api/demands/${id}/ready-for-dispatch`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` }
-        }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
-      );
+        });
+        const sendData = await sendRes.json();
+        if (!sendRes.ok) throw new Error(sendData.error);
+        return sendData;
+      });
       await Promise.all(promises);
       fetchDemands();
       const next = new Set(selectedDemandIds);
@@ -977,7 +996,10 @@ export default function ApprovedDemandsView() {
                     </button>
                     <button
                       onClick={handleBulkSendToFleet}
-                      disabled={isBulkLoading || !Array.from(selectedDemandIds).some(id => demands.find(d => d.id === id)?.status === 'PREPARING')}
+                      disabled={isBulkLoading || !Array.from(selectedDemandIds).some(id => {
+                        const status = demands.find(d => d.id === id)?.status;
+                        return status === 'PREPARING' || status === 'ACCEPTED';
+                      })}
                       className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
                     >
                       Send Selected to Fleet
