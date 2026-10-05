@@ -193,8 +193,9 @@ export default function ApprovedDemandsView() {
   const [selectedUnit, setSelectedUnit] = useState('ALL');
     const [loading, setLoading] = useState(true);
   const [loadingId, setLoadingId] = useState(null);
-    const [newDemandFilter, setNewDemandFilter] = useState('ALL'); // 'ALL' | 'ACCEPTED' | 'APPROVED'
-    const [unitSearch, setUnitSearch] = useState('');
+  const [newDemandFilter, setNewDemandFilter] = useState('ALL'); // 'ALL' | 'ACCEPTED' | 'APPROVED'
+  const [unitSearch, setUnitSearch] = useState('');
+  const [timeFilter, setTimeFilter] = useState('ALL'); // ALL, WEEKLY, MONTHLY, ANNUALLY
 
   const fetchDemands = useCallback(async () => {
     setLoading(true);
@@ -254,7 +255,7 @@ export default function ApprovedDemandsView() {
     }
   };
 
-  // Filter demands by Group (GP) and Unit
+  // Filter demands by Group (GP) and Unit and Time
   const filteredDemands = useMemo(() => {
     return demands.filter(d => {
       if (selectedGroup !== 'ALL') {
@@ -264,9 +265,26 @@ export default function ApprovedDemandsView() {
       if (selectedUnit !== 'ALL') {
         if (String(d.unit_id) !== String(selectedUnit)) return false;
       }
+      if (timeFilter !== 'ALL') {
+        const dDate = new Date(d.demand_date);
+        const now = new Date();
+        if (timeFilter === 'WEEKLY') {
+          const diffTime = Math.abs(now - dDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays > 7) return false;
+        } else if (timeFilter === 'MONTHLY') {
+          const diffTime = Math.abs(now - dDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays > 30) return false;
+        } else if (timeFilter === 'ANNUALLY') {
+          const diffTime = Math.abs(now - dDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays > 365) return false;
+        }
+      }
       return true;
     });
-  }, [demands, units, selectedGroup, selectedUnit]);
+  }, [demands, units, selectedGroup, selectedUnit, timeFilter]);
 
   const handlePrepare = async (demandId) => {
     setLoadingId(demandId);
@@ -569,6 +587,50 @@ export default function ApprovedDemandsView() {
             <FileCheck className="w-3.5 h-3.5" />
             <span>Documentation Portal ↗</span>
           </Link>
+        </div>
+      </div>
+
+      {/* New Filter Bar for Time Slicer & NCC Unit Dropdown */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Time Slicer */}
+        <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar gap-1 shrink-0">
+          {[
+            { val: 'ALL', label: 'All Time' },
+            { val: 'WEEKLY', label: 'Weekly' },
+            { val: 'MONTHLY', label: 'Monthly' },
+            { val: 'ANNUALLY', label: 'Annually' }
+          ].map(tf => (
+            <button
+              key={tf.val}
+              type="button"
+              onClick={() => setTimeFilter(tf.val)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                timeFilter === tf.val 
+                  ? 'bg-white text-blue-700 shadow-xs border border-slate-200 font-extrabold' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              {tf.label}
+            </button>
+          ))}
+        </div>
+
+        {/* NCC Unit Dropdown */}
+        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+          <Building2 className="w-4 h-4 text-slate-500 shrink-0" />
+          <span className="text-xs font-bold text-slate-500">NCC Unit:</span>
+          <select
+            value={selectedUnit}
+            onChange={(e) => setSelectedUnit(e.target.value)}
+            className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer w-full md:w-64 truncate"
+          >
+            <option value="ALL">All Units</option>
+            {units.map(u => (
+              <option key={u.id} value={u.id}>
+                {u.unit_code ? `[${u.unit_code}] ` : ''}{u.unit_name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
