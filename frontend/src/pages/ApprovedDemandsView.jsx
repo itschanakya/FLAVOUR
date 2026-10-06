@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   Truck, CheckCircle2, Calendar, Upload, FileText, FileCheck,
   PackageCheck, IndianRupee, MapPin, RefreshCw,
-  School, Package, Users, ChevronDown, ChevronUp,
+  School, Package, Users, ChevronDown, ChevronUp, ChevronRight,
   ClipboardCheck, AlertCircle, X, Eye, Building2, Layers, Filter,
   Sparkles, AlertTriangle, Search, History, Printer
 } from 'lucide-react';
@@ -210,6 +210,8 @@ export default function ApprovedDemandsView() {
   // Bulk Actions State
   const [selectedDemandIds, setSelectedDemandIds] = useState(new Set());
   const [isBulkLoading, setIsBulkLoading] = useState(false);
+  
+  const [expandedDates, setExpandedDates] = useState({});
 
   const fetchDemands = useCallback(async () => {
     setLoading(true);
@@ -469,6 +471,19 @@ export default function ApprovedDemandsView() {
     });
     return groups;
   }, [shownList]);
+
+  useEffect(() => {
+    const initial = {};
+    const todayStr = new Date().toISOString().split('T')[0];
+    dateGroups.forEach(g => {
+      initial[g.key] = g.key >= todayStr;
+    });
+    setExpandedDates(initial);
+  }, [dateGroups]);
+
+  const toggleDate = (dateKey) => {
+    setExpandedDates(prev => ({ ...prev, [dateKey]: !prev[dateKey] }));
+  };
 
   // All active demands in Supply Point across all units (for sidebar badges)
   const allSupplyPointDemands = useMemo(() => {
@@ -1016,15 +1031,16 @@ export default function ApprovedDemandsView() {
                       const gAmt = g.items.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
                       return (
                         <React.Fragment key={g.key}>
-                          <tr className="bg-slate-100/90">
+                          <tr className="bg-slate-100/90 cursor-pointer" onClick={() => toggleDate(g.key)}>
                             <td colSpan="9" className="px-3.5 py-2">
                               <div className="flex items-center gap-3 flex-wrap">
+                                {expandedDates[g.key] ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
                                 <Calendar className="w-4 h-4 text-slate-500" />
                                 <span className="font-extrabold text-slate-800 text-xs">{fmtDMY(g.key)} · {weekdayOf(g.key)}</span>
                                 {badge && <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${badge.cls}`}>{badge.label}</span>}
                                 <span className="text-[11px] font-bold text-slate-500">{g.items.length} demand{g.items.length > 1 ? 's' : ''} · {gPkts.toLocaleString('en-IN')} packets · ₹{gAmt.toLocaleString('en-IN')}</span>
                                 <button
-                                  onClick={() => handlePrintDate(g.key, g.items)}
+                                  onClick={(e) => { e.stopPropagation(); handlePrintDate(g.key, g.items); }}
                                   className="ml-auto p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-blue-600 transition-colors shadow-2xs flex items-center gap-1.5"
                                   title="Print demands for this date"
                                 >
@@ -1034,7 +1050,7 @@ export default function ApprovedDemandsView() {
                               </div>
                             </td>
                           </tr>
-                          {g.items.map(dem => (
+                          {expandedDates[g.key] && g.items.map(dem => (
                             <DemandRow
                               key={dem.id}
                               dem={dem}

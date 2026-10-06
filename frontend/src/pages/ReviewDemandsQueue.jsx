@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, XCircle, Ban, Trash2, Filter, FileText, FileCheck,
   School, Calendar, ArrowRight, IndianRupee, ChevronDown,
-  ChevronUp, Users, Package, MessageSquare, ShieldCheck,
+  ChevronUp, Users, Package, MessageSquare, ShieldCheck, ChevronRight,
   AlertTriangle, Clock3, Inbox, RefreshCw, Eye, Truck, Phone,
   Layers, TrendingUp, Sparkles, LayoutList, LayoutGrid, MapPin, FileEdit, Printer
 } from 'lucide-react';
@@ -56,7 +56,7 @@ const STATUS_CONFIG = {
     active: 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/30' 
   },
   APPROVED: { 
-    label: 'Authorized', 
+    label: 'Approved', 
     color: 'text-blue-700', 
     bg: 'bg-blue-50', 
     border: 'border-blue-300',
@@ -145,7 +145,7 @@ function StatusPill({ status, deliveryStatus }) {
   if (['APPROVED', 'ACCEPTED', 'PREPARING'].includes(status)) {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-blue-100 text-blue-800 border-blue-200">
-        <ShieldCheck className="w-3 h-3" /> Authorized
+        <ShieldCheck className="w-3 h-3" /> Approved
       </span>
     );
   }
@@ -251,6 +251,8 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
   const totalQty = demands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
   const totalVal = demands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
 
+  const [expandedDates, setExpandedDates] = useState({});
+
   const dateKeyOf = (d) => String(d.demand_date || '').split('T')[0].split(' ')[0];
   const dateGroups = React.useMemo(() => {
     const sorted = [...demands].sort((a, b) => {
@@ -267,6 +269,20 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
     });
     return groups;
   }, [demands]);
+
+  useEffect(() => {
+    const initial = {};
+    const todayStr = new Date().toISOString().split('T')[0];
+    dateGroups.forEach(g => {
+      // expand today and future dates by default
+      initial[g.key] = g.key >= todayStr;
+    });
+    setExpandedDates(initial);
+  }, [dateGroups]);
+
+  const toggleDate = (dateKey) => {
+    setExpandedDates(prev => ({ ...prev, [dateKey]: !prev[dateKey] }));
+  };
 
   const handlePrintDate = (dateKey, items) => {
     const printWindow = window.open('', '_blank');
@@ -397,15 +413,16 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
               const gAmt = g.items.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
               return (
                 <React.Fragment key={g.key}>
-                  <tr className="bg-slate-50/80">
+                  <tr className="bg-slate-50/80 cursor-pointer" onClick={() => toggleDate(g.key)}>
                     <td colSpan="9" className="px-4 py-2 border-b border-slate-200">
                       <div className="flex items-center gap-3 flex-wrap">
+                        {expandedDates[g.key] ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
                         <Calendar className="w-4 h-4 text-slate-500" />
                         <span className="font-extrabold text-slate-800 text-xs">{fmtDMY(g.key)} · {weekdayOf(g.key)}</span>
                         {badge && <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${badge.cls}`}>{badge.label}</span>}
                         <span className="text-[11px] font-bold text-slate-500">{g.items.length} demand{g.items.length > 1 ? 's' : ''} · {gPkts.toLocaleString('en-IN')} packets · ₹{gAmt.toLocaleString('en-IN')}</span>
                         <button
-                          onClick={() => handlePrintDate(g.key, g.items)}
+                          onClick={(e) => { e.stopPropagation(); handlePrintDate(g.key, g.items); }}
                           className="ml-auto p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-blue-600 transition-colors shadow-2xs flex items-center gap-1.5"
                           title="Print demands for this date"
                         >
@@ -415,7 +432,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
                       </div>
                     </td>
                   </tr>
-                  {g.items.map(dem => {
+                  {expandedDates[g.key] && g.items.map(dem => {
               const isPending = dem.status === 'PENDING';
               const canCancel = ['PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH'].includes(dem.status) && dem.delivery_status !== 'DELIVERED';
               const qty = Number(dem.total_quantity) || 0;
@@ -501,7 +518,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
                         <>
                           <button
                             onClick={() => onAction(dem, 'APPROVE')}
-                            title="Authorize Demand"
+                            title="Approve Demand"
                             className="p-1.5 bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white rounded-lg border border-emerald-200 hover:border-emerald-500 transition-all shadow-xs"
                           >
                             <CheckCircle2 className="w-4 h-4" />
@@ -819,7 +836,7 @@ function ActionModal({ demand, action, onClose, onConfirm, processing }) {
 
   const config = {
     APPROVE: {
-      title: 'Authorize Demand',
+      title: 'Approve Demand',
       subtitle: 'This will forward the demand to the Admin Vendor for supply.',
       headerBg: 'bg-gradient-to-r from-emerald-500 to-teal-500',
       btnCls: 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/25',
@@ -1168,10 +1185,10 @@ export default function ReviewDemandsQueue() {
               <School className="w-3.5 h-3.5 text-blue-600" /> Unit Command Portal
             </div>
             <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-              Demand Authorization & History
+              Demand Approval & History
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Review, authorize, and track refreshment requisitions from institutions under your jurisdiction.
+              Review, approve, and track refreshment requisitions from institutions under your jurisdiction.
             </p>
           </div>
           <div className="flex items-center gap-2 self-stretch sm:self-auto">
