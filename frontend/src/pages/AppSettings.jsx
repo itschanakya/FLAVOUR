@@ -176,6 +176,12 @@ export default function AppSettings() {
   });
 
   // 4. Unit: Institutions List & Edit Modal State
+  const [unitQuotaForm, setUnitQuotaForm] = useState({
+    auth_classes_1: 40,
+    auth_classes_2: 35,
+    auth_classes_3: 35
+  });
+
   const [instsList, setInstsList] = useState([]);
   const [editingInst, setEditingInst] = useState(null);
   const [instForm, setInstForm] = useState({
@@ -264,6 +270,8 @@ export default function AppSettings() {
       await fetchKmLogs(kmLogDate);
     } else if (activeTab === 'my-account' && role !== 'INSTITUTION') {
       await fetchMyCredentials();
+    } else if (activeTab === 'auth-classes-quota' && role === 'UNIT') {
+      await fetchUnits();
     }
   };
 
@@ -378,7 +386,16 @@ export default function AppSettings() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (res.ok) setUnitsList(data);
+      if (res.ok) {
+        setUnitsList(data);
+        if (role === 'UNIT' && data.length > 0) {
+          setUnitQuotaForm({
+            auth_classes_1: data[0].auth_classes_1 ?? 40,
+            auth_classes_2: data[0].auth_classes_2 ?? 35,
+            auth_classes_3: data[0].auth_classes_3 ?? 35
+          });
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -581,6 +598,34 @@ export default function AppSettings() {
       password: ''
     });
     setError('');
+  };
+
+  const handleSaveUnitQuota = async (e) => {
+    if (e) e.preventDefault();
+    if (unitsList.length === 0) return;
+    const unitId = unitsList[0].id;
+    try {
+      setSaving(true);
+      setError('');
+      const res = await fetch(`/api/units/${unitId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(unitQuotaForm)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update quota');
+      
+      setSaveSuccess(true);
+      fetchUnits();
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Admin: Save Unit Credentials
@@ -960,6 +1005,13 @@ export default function AppSettings() {
             {role === 'UNIT' && (
               <>
                 <button
+                  onClick={() => setActiveTab('auth-classes-quota')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'auth-classes-quota' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <CalendarClock className="w-4 h-4 text-indigo-600" />
+                  Auth Classes Quota
+                </button>
+                <button
                   onClick={() => setActiveTab('inst-credentials')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'inst-credentials' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
@@ -1026,6 +1078,7 @@ export default function AppSettings() {
                 {activeTab === 'stock' && 'Stock Management'}
                 {activeTab === 'unit-credentials' && 'Units Login Credentials & Access Control'}
                 {activeTab === 'delivery-partners' && 'Delivery Partners & Delivery Reps (Logins & Vehicle Fleets)'}
+                {activeTab === 'auth-classes-quota' && 'Auth Classes Quota Distribution'}
                 {activeTab === 'inst-credentials' && 'Institutions Login Credentials & ANO Passwords'}
                 {activeTab === 'institution-details' && 'Institution Details & Delivery Address'}
                 {activeTab === 'schedule' && 'Schedule of Refreshment'}
@@ -1041,6 +1094,7 @@ export default function AppSettings() {
                 {activeTab === 'stock' && 'Live stock balance ledger, batch expiry tracking, consumed today metrics, and incoming restock shipments.'}
                 {activeTab === 'unit-credentials' && 'View, manage, and reset User ID & Passwords for all NCC Units under headquarters.'}
                 {activeTab === 'delivery-partners' && 'Manage Delivery Representatives, Driver Login IDs, Passwords, Vehicle details, and Assigned PIN codes.'}
+                {activeTab === 'auth-classes-quota' && 'Configure the year-wise maximum authorized classes for the institutions under this unit.'}
                 {activeTab === 'inst-credentials' && 'Manage User ID, Login Emails & Passwords for ANOs/Schools under this NCC Unit.'}
                 {activeTab === 'institution-details' && 'Update your official institution name, ANO/CTO incharge, contact phone, delivery PIN code, Google Maps GPS link, and complete address.'}
                 {activeTab === 'schedule' && 'Configure your weekly default days and times for automatic demand placements.'}
@@ -1673,6 +1727,62 @@ export default function AppSettings() {
                 {/* ═══ DATA BACKUP TAB ═══ */}
                 {activeTab === 'data-backup' && role === 'ADMIN' && (
                   <DataBackupPanel token={token} />
+                )}
+
+                {activeTab === 'auth-classes-quota' && role === 'UNIT' && (
+                  <div className="p-6">
+                    <div className="max-w-2xl bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
+                        <h3 className="font-bold text-slate-800">Auth Classes Year-wise Quota</h3>
+                        <p className="text-sm text-slate-500">Configure the maximum number of classes allowed per cadet year group. This updates the report logic instantly.</p>
+                      </div>
+                      <div className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">1st Year Auth Classes</label>
+                            <input
+                              type="number"
+                              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              value={unitQuotaForm.auth_classes_1}
+                              onChange={(e) => setUnitQuotaForm({ ...unitQuotaForm, auth_classes_1: Number(e.target.value) })}
+                              min="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">2nd Year Auth Classes</label>
+                            <input
+                              type="number"
+                              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              value={unitQuotaForm.auth_classes_2}
+                              onChange={(e) => setUnitQuotaForm({ ...unitQuotaForm, auth_classes_2: Number(e.target.value) })}
+                              min="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">3rd Year Auth Classes</label>
+                            <input
+                              type="number"
+                              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              value={unitQuotaForm.auth_classes_3}
+                              onChange={(e) => setUnitQuotaForm({ ...unitQuotaForm, auth_classes_3: Number(e.target.value) })}
+                              min="0"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-end pt-4 border-t border-slate-100">
+                          <button
+                            onClick={handleSaveUnitQuota}
+                            disabled={saving}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                            Save Quota Distribution
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* 2. UNIT: INSTITUTIONS CREDENTIALS TABLE */}

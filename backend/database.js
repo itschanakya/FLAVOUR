@@ -168,6 +168,9 @@ async function initializeSchema(db) {
       unit_code VARCHAR(255) UNIQUE NOT NULL,
       location TEXT,
       ncc_group VARCHAR(255) DEFAULT 'Group B',
+      auth_classes_1 INT DEFAULT 40,
+      auth_classes_2 INT DEFAULT 35,
+      auth_classes_3 INT DEFAULT 35,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 

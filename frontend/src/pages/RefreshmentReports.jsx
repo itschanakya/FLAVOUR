@@ -50,6 +50,7 @@ export default function RefreshmentReports() {
   const [activeTab, setActiveTab] = useState('weekly'); // weekly | audit | annual | bill
   const [demands, setDemands] = useState([]);
   const [institutions, setInstitutions] = useState([]);
+  const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   
   const [isLandscape, setIsLandscape] = useState(true);
@@ -66,15 +67,18 @@ export default function RefreshmentReports() {
       setLoading(true);
       const headers = { Authorization: `Bearer ${token}` };
       
-      const [demandsRes, instRes] = await Promise.all([
+      const [demandsRes, instRes, unitsRes] = await Promise.all([
         fetch('/api/demands', { headers }),
-        fetch('/api/institutions', { headers })
+        fetch('/api/institutions', { headers }),
+        fetch('/api/units', { headers })
       ]);
       
       const dJson = await demandsRes.json();
       const iJson = await instRes.json();
+      const uJson = await unitsRes.json();
       setDemands(Array.isArray(dJson) ? dJson : []);
       setInstitutions(Array.isArray(iJson) ? iJson : []);
+      setUnits(Array.isArray(uJson) ? uJson : []);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load data');
@@ -1255,10 +1259,10 @@ export default function RefreshmentReports() {
       const filteredInstitutions = safeInstitutions.filter(i => selectedGroup === 'All' || i.ncc_group === selectedGroup);
       
       return filteredInstitutions.map(inst => {
-        const cadetStr = (inst.strength_1st_year || 0) + (inst.strength_2nd_year || 0) + (inst.strength_3rd_year || 0);
-        const vacancy = cadetStr; // Actual vacancy is total sanctioned strength
-        const authClasses = 35;
-        const authPackets = vacancy * authClasses;
+        const s1 = inst.strength_1st_year || 0;
+        const s2 = inst.strength_2nd_year || 0;
+        const s3 = inst.strength_3rd_year || 0;
+        const vacancy = s1 + s2 + s3;
         
         const instDemands = safeDemands.filter(d => {
           if (d.institution_id !== inst.id) return false;
@@ -1267,17 +1271,51 @@ export default function RefreshmentReports() {
           return dYear === yearFilter;
         });
 
-        const classesHeld = instDemands.length;
-        const packetsDemanded = instDemands.reduce((sum, d) => sum + (Number(d.total_quantity) || 0), 0);
-        const totalAmount = instDemands.reduce((sum, d) => sum + (Number(d.total_amount) || 0), 0);
-        const balanceClasses = Math.max(0, authClasses - classesHeld);
-        const balancePackets = authPackets - packetsDemanded;
+        const unitObj = units.find(u => u.id === inst.unit_id) || (units.length > 0 ? units[0] : {});
+        const authClasses1 = unitObj.auth_classes_1 ?? 40;
+        const authClasses2 = unitObj.auth_classes_2 ?? 35;
+        const authClasses3 = unitObj.auth_classes_3 ?? 35;
+
+        const authPackets1 = s1 * authClasses1;
+        const authPackets2 = s2 * authClasses2;
+        const authPackets3 = s3 * authClasses3;
+        const authPackets = authPackets1 + authPackets2 + authPackets3;
+
+        const packetsDemanded1 = instDemands.reduce((sum, d) => sum + (Number(d.y1_quantity) || 0), 0);
+        const packetsDemanded2 = instDemands.reduce((sum, d) => sum + (Number(d.y2_quantity) || 0), 0);
+        const packetsDemanded3 = instDemands.reduce((sum, d) => sum + (Number(d.y3_quantity) || 0), 0);
+        const packetsDemanded = packetsDemanded1 + packetsDemanded2 + packetsDemanded3;
+
+        const classesHeld1 = instDemands.filter(d => (Number(d.y1_quantity) || 0) > 0).length;
+        const classesHeld2 = instDemands.filter(d => (Number(d.y2_quantity) || 0) > 0).length;
+        const classesHeld3 = instDemands.filter(d => (Number(d.y3_quantity) || 0) > 0).length;
+        const classesHeld = classesHeld1 + classesHeld2 + classesHeld3;
+        
+        const balanceClasses1 = Math.max(0, authClasses1 - classesHeld1);
+        const balanceClasses2 = Math.max(0, authClasses2 - classesHeld2);
+        const balanceClasses3 = Math.max(0, authClasses3 - classesHeld3);
+        
+        const balancePackets1 = authPackets1 - packetsDemanded1;
+        const balancePackets2 = authPackets2 - packetsDemanded2;
+        const balancePackets3 = authPackets3 - packetsDemanded3;
+        const balancePackets = balancePackets1 + balancePackets2 + balancePackets3;
+
         const utilizationPct = authPackets > 0 ? Math.round((packetsDemanded / authPackets) * 100) : 0;
         const isOverQuota = packetsDemanded > authPackets;
+        
+        const totalAmount = instDemands.reduce((sum, d) => sum + (Number(d.total_amount) || 0), 0);
 
         return {
           ...inst,
-          vacancy, authClasses, authPackets, classesHeld, packetsDemanded, totalAmount, balanceClasses, balancePackets, utilizationPct, isOverQuota
+          vacancy, 
+          s1, s2, s3,
+          authClasses1, authClasses2, authClasses3,
+          authPackets1, authPackets2, authPackets3, authPackets,
+          classesHeld1, classesHeld2, classesHeld3, classesHeld,
+          packetsDemanded1, packetsDemanded2, packetsDemanded3, packetsDemanded,
+          balanceClasses1, balanceClasses2, balanceClasses3,
+          balancePackets1, balancePackets2, balancePackets3, balancePackets,
+          utilizationPct, isOverQuota, totalAmount
         };
       }).sort((a, b) => a.institution_name.localeCompare(b.institution_name));
     }, [safeInstitutions, safeDemands, yearFilter]);
@@ -1302,7 +1340,7 @@ export default function RefreshmentReports() {
               <h3 className="font-black text-lg text-slate-900 uppercase tracking-tight flex items-center gap-2">
                 <School size={20} className="text-blue-500" /> School Annual Refreshment Summary
               </h3>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Quota Allocation: 35 Classes per Year (1 Packet/Cadet per Class)</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Quota Allocation: Configured Classes per Year (1 Packet/Cadet per Class)</p>
             </div>
             <div className="flex items-center gap-3">
               <input
@@ -1334,66 +1372,102 @@ export default function RefreshmentReports() {
             <table className="w-full text-left border-collapse min-w-[1200px] print:min-w-full">
               <thead className="sticky top-0 z-30">
                 <tr className="bg-slate-50 border-b border-slate-200 print:bg-slate-200 print:border-black">
-                  <th rowSpan={2} className="px-3 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200 w-10">No</th>
-                  <th rowSpan={2} className="px-4 py-3 text-[10px] font-black text-slate-700 uppercase tracking-widest print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Institution & ANO Details</th>
-                  <th colSpan={4} className="px-3 py-2 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center print:text-black border-r border-b border-slate-200 print:border-black bg-slate-100/50 print:bg-slate-300">Sanctioned Vacancy Strength</th>
-                  <th rowSpan={2} className="px-3 py-3 text-[10px] font-black text-blue-600 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Auth Classes</th>
-                  <th rowSpan={2} className="px-3 py-3 text-[10px] font-black text-indigo-400 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Auth Packets</th>
-                  <th rowSpan={2} className="px-3 py-3 text-[10px] font-black text-slate-700 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Cls Held</th>
-                  <th rowSpan={2} className="px-3 py-3 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Packets Demanded</th>
-                  <th rowSpan={2} className="px-3 py-3 text-[10px] font-black text-amber-400 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Bal Classes</th>
-                  <th rowSpan={2} className="px-3 py-3 text-[10px] font-black text-amber-500 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Bal Packets</th>
-                  <th rowSpan={2} className="px-3 py-3 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Utilization</th>
+                  <th rowSpan={2} className="px-2 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200 w-10">No</th>
+                  <th rowSpan={2} className="px-3 py-3 text-[10px] font-black text-slate-700 uppercase tracking-widest print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200 min-w-[200px]">Institution & ANO Details</th>
+                  <th colSpan={4} className="px-2 py-2 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center print:text-black border-r border-b border-slate-200 print:border-black bg-slate-100/50 print:bg-slate-300">Sanctioned Vacancy Strength</th>
+                  
+                  <th colSpan={5} className="px-2 py-2 text-[10px] font-black text-indigo-700 uppercase tracking-widest text-center print:text-black border-r border-b border-slate-200 print:border-black bg-indigo-50/50 print:bg-slate-300">1st Year Breakdown</th>
+                  <th colSpan={5} className="px-2 py-2 text-[10px] font-black text-purple-700 uppercase tracking-widest text-center print:text-black border-r border-b border-slate-200 print:border-black bg-purple-50/50 print:bg-slate-300">2nd Year Breakdown</th>
+                  <th colSpan={5} className="px-2 py-2 text-[10px] font-black text-emerald-700 uppercase tracking-widest text-center print:text-black border-r border-b border-slate-200 print:border-black bg-emerald-50/50 print:bg-slate-300">3rd Year Breakdown</th>
+                  
+                  <th rowSpan={2} className="px-2 py-3 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-100 print:bg-slate-200">Total Auth Pkts</th>
+                  <th rowSpan={2} className="px-2 py-3 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Total Demanded</th>
+                  <th rowSpan={2} className="px-2 py-3 text-[10px] font-black text-amber-500 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Total Balance</th>
+                  <th rowSpan={2} className="px-2 py-3 text-[10px] font-black text-slate-800 uppercase tracking-widest text-center print:text-black border-r border-slate-200 print:border-black bg-slate-50 print:bg-slate-200">Util %</th>
                 </tr>
                 <tr className="bg-white border-b-2 border-slate-300 print:bg-slate-100 print:border-black">
-                  <th className="px-2 py-2 text-[9px] font-black text-slate-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">1st Yr</th>
-                  <th className="px-2 py-2 text-[9px] font-black text-slate-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">2nd Yr</th>
-                  <th className="px-2 py-2 text-[9px] font-black text-slate-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">3rd Yr</th>
-                  <th className="px-2 py-2 text-[9px] font-black text-slate-800 uppercase text-center border-r border-slate-200 print:border-black print:text-black bg-slate-100/80 print:bg-slate-200">Total</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-slate-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">1st Yr</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-slate-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">2nd Yr</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-slate-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">3rd Yr</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-slate-800 uppercase text-center border-r border-slate-200 print:border-black print:text-black bg-slate-100/80 print:bg-slate-200">Total</th>
+                  
+                  <th className="px-1 py-2 text-[9px] font-black text-blue-600 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Auth Cls</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-indigo-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Auth Pkt</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-slate-700 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Cls Held</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-emerald-600 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Demnd</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-amber-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Bal Pkt</th>
+
+                  <th className="px-1 py-2 text-[9px] font-black text-blue-600 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Auth Cls</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-purple-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Auth Pkt</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-slate-700 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Cls Held</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-emerald-600 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Demnd</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-amber-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Bal Pkt</th>
+
+                  <th className="px-1 py-2 text-[9px] font-black text-blue-600 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Auth Cls</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-emerald-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Auth Pkt</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-slate-700 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Cls Held</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-emerald-600 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Demnd</th>
+                  <th className="px-1 py-2 text-[9px] font-black text-amber-500 uppercase text-center border-r border-slate-200 print:border-black print:text-black">Bal Pkt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 print:divide-black">
                 {filtered.map((row, idx) => (
-                  <tr key={row.id} className="hover:bg-slate-100/40 print:bg-white">
-                    <td className="px-3 py-3 text-xs font-bold text-slate-500 text-center border-r border-slate-200 print:border-black print:text-black">{idx + 1}</td>
-                    <td className="px-4 py-3 border-r border-slate-200 print:border-black">
-                      <div className="font-black text-xs text-slate-800 uppercase print:text-black truncate">{row.institution_name}</div>
-                      <div className="text-[10px] font-bold text-slate-500 uppercase print:text-slate-700">{row.ano_cto_name || '-'}</div>
-                      {row.isOverQuota && <div className="text-[9px] font-black text-rose-500 mt-0.5 print:text-rose-700">⚠️ OVER QUOTA</div>}
+                  <tr key={row.id} className="hover:bg-slate-100/40 print:bg-white text-[11px]">
+                    <td className="px-2 py-2 font-bold text-slate-500 text-center border-r border-slate-200 print:border-black print:text-black">{idx + 1}</td>
+                    <td className="px-3 py-2 border-r border-slate-200 print:border-black">
+                      <div className="font-black text-slate-800 uppercase print:text-black truncate">{row.institution_name}</div>
+                      <div className="text-[9px] font-bold text-slate-500 uppercase print:text-slate-700">{row.ano_cto_name || '-'}</div>
+                      {row.isOverQuota && <div className="text-[8px] font-black text-rose-500 mt-0.5 print:text-rose-700">⚠️ OVER QUOTA</div>}
                     </td>
-                    <td className="px-2 py-3 text-xs font-bold text-slate-500 text-center border-r border-slate-200 print:border-black print:text-black">{row.strength_1st_year}</td>
-                    <td className="px-2 py-3 text-xs font-bold text-slate-500 text-center border-r border-slate-200 print:border-black print:text-black">{row.strength_2nd_year}</td>
-                    <td className="px-2 py-3 text-xs font-bold text-slate-500 text-center border-r border-slate-200 print:border-black print:text-black">{row.strength_3rd_year}</td>
-                    <td className="px-2 py-3 text-xs font-black text-slate-900 text-center border-r border-slate-200 print:border-black print:text-black bg-slate-100/30 print:bg-slate-100">{row.vacancy}</td>
+                    <td className="px-1 py-2 font-bold text-slate-500 text-center border-r border-slate-200 print:border-black print:text-black">{row.s1}</td>
+                    <td className="px-1 py-2 font-bold text-slate-500 text-center border-r border-slate-200 print:border-black print:text-black">{row.s2}</td>
+                    <td className="px-1 py-2 font-bold text-slate-500 text-center border-r border-slate-200 print:border-black print:text-black">{row.s3}</td>
+                    <td className="px-1 py-2 font-black text-slate-900 text-center border-r border-slate-200 print:border-black print:text-black bg-slate-100/30 print:bg-slate-100">{row.vacancy}</td>
                     
-                    <td className="px-3 py-3 text-xs font-black text-blue-600 text-center border-r border-slate-200 print:border-black print:text-black bg-blue-950/10">{row.authClasses}</td>
-                    <td className="px-3 py-3 text-xs font-black text-indigo-400 text-center border-r border-slate-200 print:border-black print:text-black bg-indigo-950/20">{row.authPackets.toLocaleString()}</td>
-                    <td className="px-3 py-3 text-xs font-black text-slate-700 text-center border-r border-slate-200 print:border-black print:text-black">{row.classesHeld}</td>
-                    <td className="px-3 py-3 text-xs font-black text-emerald-600 text-center border-r border-slate-200 print:border-black print:text-black bg-emerald-950/20">{row.packetsDemanded.toLocaleString()}</td>
+                    {/* 1st Yr */}
+                    <td className="px-1 py-2 font-black text-blue-600 text-center border-r border-slate-200 print:border-black print:text-black">{row.authClasses1}</td>
+                    <td className="px-1 py-2 font-black text-indigo-400 text-center border-r border-slate-200 print:border-black print:text-black">{row.authPackets1.toLocaleString()}</td>
+                    <td className="px-1 py-2 font-black text-slate-700 text-center border-r border-slate-200 print:border-black print:text-black">{row.classesHeld1}</td>
+                    <td className="px-1 py-2 font-black text-emerald-600 text-center border-r border-slate-200 print:border-black print:text-black">{row.packetsDemanded1.toLocaleString()}</td>
+                    <td className={`px-1 py-2 font-black text-center border-r border-slate-200 print:border-black print:text-black ${row.balancePackets1 < 0 ? 'text-rose-500 bg-rose-50' : 'text-amber-500'}`}>{row.balancePackets1.toLocaleString()}</td>
+
+                    {/* 2nd Yr */}
+                    <td className="px-1 py-2 font-black text-blue-600 text-center border-r border-slate-200 print:border-black print:text-black">{row.authClasses2}</td>
+                    <td className="px-1 py-2 font-black text-purple-400 text-center border-r border-slate-200 print:border-black print:text-black">{row.authPackets2.toLocaleString()}</td>
+                    <td className="px-1 py-2 font-black text-slate-700 text-center border-r border-slate-200 print:border-black print:text-black">{row.classesHeld2}</td>
+                    <td className="px-1 py-2 font-black text-emerald-600 text-center border-r border-slate-200 print:border-black print:text-black">{row.packetsDemanded2.toLocaleString()}</td>
+                    <td className={`px-1 py-2 font-black text-center border-r border-slate-200 print:border-black print:text-black ${row.balancePackets2 < 0 ? 'text-rose-500 bg-rose-50' : 'text-amber-500'}`}>{row.balancePackets2.toLocaleString()}</td>
+
+                    {/* 3rd Yr */}
+                    <td className="px-1 py-2 font-black text-blue-600 text-center border-r border-slate-200 print:border-black print:text-black">{row.authClasses3}</td>
+                    <td className="px-1 py-2 font-black text-emerald-400 text-center border-r border-slate-200 print:border-black print:text-black">{row.authPackets3.toLocaleString()}</td>
+                    <td className="px-1 py-2 font-black text-slate-700 text-center border-r border-slate-200 print:border-black print:text-black">{row.classesHeld3}</td>
+                    <td className="px-1 py-2 font-black text-emerald-600 text-center border-r border-slate-200 print:border-black print:text-black">{row.packetsDemanded3.toLocaleString()}</td>
+                    <td className={`px-1 py-2 font-black text-center border-r border-slate-200 print:border-black print:text-black ${row.balancePackets3 < 0 ? 'text-rose-500 bg-rose-50' : 'text-amber-500'}`}>{row.balancePackets3.toLocaleString()}</td>
                     
-                    <td className="px-3 py-3 text-xs font-black text-amber-500 text-center border-r border-slate-200 print:border-black print:text-black">{row.balanceClasses}</td>
-                    <td className={`px-3 py-3 text-xs font-black text-center border-r border-slate-200 print:border-black print:text-black ${row.isOverQuota ? 'text-rose-500 bg-rose-950/30' : 'text-amber-500 bg-amber-950/10'}`}>
-                      {row.balancePackets < 0 ? `${row.balancePackets.toLocaleString()} (EXCESS)` : row.balancePackets.toLocaleString()}
+                    {/* Totals */}
+                    <td className="px-2 py-2 font-black text-slate-800 text-center border-r border-slate-200 print:border-black print:text-black bg-slate-50">{row.authPackets.toLocaleString()}</td>
+                    <td className="px-2 py-2 font-black text-emerald-600 text-center border-r border-slate-200 print:border-black print:text-black bg-emerald-50/30">{row.packetsDemanded.toLocaleString()}</td>
+                    <td className={`px-2 py-2 font-black text-center border-r border-slate-200 print:border-black print:text-black ${row.isOverQuota ? 'text-rose-500 bg-rose-100/50' : 'text-amber-500 bg-amber-50/30'}`}>
+                      {row.balancePackets.toLocaleString()}
                     </td>
-                    <td className="px-3 py-3 text-center border-r border-slate-200 print:border-black">
-                      <span className={`px-2 py-1 rounded-md text-[10px] font-black ${row.isOverQuota ? 'bg-rose-900/50 text-rose-600 border border-rose-800' : 'bg-slate-100 text-slate-700'} print:bg-white print:text-black`}>
+                    <td className="px-1 py-2 text-center border-r border-slate-200 print:border-black">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${row.isOverQuota ? 'bg-rose-900/50 text-rose-600' : 'bg-slate-100 text-slate-700'} print:bg-white print:text-black`}>
                         {row.utilizationPct}%
                       </span>
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-slate-50 border-t-2 border-slate-200 print:bg-slate-200 print:border-black font-black text-xs">
+              <tfoot className="bg-slate-50 border-t-2 border-slate-200 print:bg-slate-200 print:border-black font-black text-[11px]">
                 <tr>
-                  <td colSpan={5} className="px-4 py-4 text-right uppercase tracking-widest text-slate-500 print:text-black">Grand Total</td>
-                  <td className="px-2 py-4 text-center text-slate-800 print:text-black">{filteredVacancy}</td>
-                  <td className="px-3 py-4 text-center text-blue-600 print:text-black">-</td>
-                  <td className="px-3 py-4 text-center text-indigo-400 print:text-black">{filteredAuthPackets.toLocaleString()}</td>
-                  <td className="px-3 py-4 text-center text-slate-800 print:text-black">-</td>
-                  <td className="px-3 py-4 text-center text-emerald-600 print:text-black">{filteredPacketsDemanded.toLocaleString()}</td>
-                  <td className="px-3 py-4 text-center text-amber-500 print:text-black">-</td>
-                  <td className="px-3 py-4 text-center text-amber-500 print:text-black">{filteredBalancePackets.toLocaleString()}</td>
-                  <td className="px-3 py-4 text-center text-slate-800 print:text-black">{filteredUtilization}%</td>
+                  <td colSpan={5} className="px-3 py-3 text-right uppercase tracking-widest text-slate-500 print:text-black">Grand Total</td>
+                  <td className="px-1 py-3 text-center text-slate-800 print:text-black">{filteredVacancy}</td>
+                  <td colSpan={15} className="px-1 py-3 border-r border-slate-200 print:border-black text-center text-slate-400 font-medium">Yearwise Totals</td>
+                  <td className="px-2 py-3 text-center text-slate-800 print:text-black bg-slate-100">{filteredAuthPackets.toLocaleString()}</td>
+                  <td className="px-2 py-3 text-center text-emerald-600 print:text-black bg-emerald-50/50">{filteredPacketsDemanded.toLocaleString()}</td>
+                  <td className="px-2 py-3 text-center text-amber-500 print:text-black bg-amber-50/50">{filteredBalancePackets.toLocaleString()}</td>
+                  <td className="px-1 py-3 text-center text-slate-800 print:text-black">{filteredUtilization}%</td>
                 </tr>
               </tfoot>
             </table>

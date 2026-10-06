@@ -101,7 +101,7 @@ router.put('/:id', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (re
     return res.status(403).json({ error: 'Access denied. You can only edit your own unit.' });
   }
   try {
-    const { unit_name, unit_code, location, ncc_group, unit_email, login_id, password } = req.body;
+    const { unit_name, unit_code, location, ncc_group, unit_email, login_id, password, auth_classes_1, auth_classes_2, auth_classes_3 } = req.body;
     const db = await getDB();
 
     const existingUnit = await db.get('SELECT * FROM units WHERE id = ?', [req.params.id]);
@@ -113,6 +113,9 @@ router.put('/:id', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (re
     const finalUnitCode = (unit_code !== undefined && unit_code !== null && String(unit_code).trim() !== '') ? unit_code.trim() : existingUnit.unit_code;
     const finalLocation = (location !== undefined && location !== null) ? location : (existingUnit.location || '');
     const finalNccGroup = (ncc_group !== undefined && ncc_group !== null && String(ncc_group).trim() !== '') ? ncc_group : (existingUnit.ncc_group || 'Group B');
+    const finalAuthClasses1 = (auth_classes_1 !== undefined && auth_classes_1 !== null) ? Number(auth_classes_1) : (existingUnit.auth_classes_1 !== null ? existingUnit.auth_classes_1 : 40);
+    const finalAuthClasses2 = (auth_classes_2 !== undefined && auth_classes_2 !== null) ? Number(auth_classes_2) : (existingUnit.auth_classes_2 !== null ? existingUnit.auth_classes_2 : 35);
+    const finalAuthClasses3 = (auth_classes_3 !== undefined && auth_classes_3 !== null) ? Number(auth_classes_3) : (existingUnit.auth_classes_3 !== null ? existingUnit.auth_classes_3 : 35);
     
     // Check if unit_code already exists for another unit
     if (finalUnitCode && finalUnitCode !== existingUnit.unit_code) {
@@ -138,8 +141,8 @@ router.put('/:id', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (re
     }
 
     await db.run(
-      'UPDATE units SET unit_name = ?, unit_code = ?, location = ?, ncc_group = ? WHERE id = ?',
-      [finalUnitName, finalUnitCode, finalLocation, finalNccGroup, req.params.id]
+      'UPDATE units SET unit_name = ?, unit_code = ?, location = ?, ncc_group = ?, auth_classes_1 = ?, auth_classes_2 = ?, auth_classes_3 = ? WHERE id = ?',
+      [finalUnitName, finalUnitCode, finalLocation, finalNccGroup, finalAuthClasses1, finalAuthClasses2, finalAuthClasses3, req.params.id]
     );
 
     // Update User

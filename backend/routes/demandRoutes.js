@@ -65,6 +65,9 @@ router.get('/', authenticateToken, async (req, res) => {
         rev.name as reviewed_by_name,
         (SELECT SUM(di.quantity * di.unit_price_snapshot) FROM demand_items di WHERE di.demand_id = d.id) as total_amount,
         (SELECT SUM(di.quantity) FROM demand_items di WHERE di.demand_id = d.id) as total_quantity,
+        (SELECT SUM(di.quantity) FROM demand_items di WHERE di.demand_id = d.id AND di.year_group = '1st Year') as y1_quantity,
+        (SELECT SUM(di.quantity) FROM demand_items di WHERE di.demand_id = d.id AND di.year_group = '2nd Year') as y2_quantity,
+        (SELECT SUM(di.quantity) FROM demand_items di WHERE di.demand_id = d.id AND di.year_group = '3rd Year') as y3_quantity,
         (SELECT AVG(di.unit_price_snapshot) FROM demand_items di WHERE di.demand_id = d.id) as avg_unit_price,
         (SELECT GROUP_CONCAT(ri.item_name, ', ') FROM demand_items di JOIN refreshment_items ri ON di.item_id = ri.id WHERE di.demand_id = d.id) as item_name
       FROM demands d
