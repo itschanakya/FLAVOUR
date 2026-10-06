@@ -6,8 +6,8 @@ import {
   Truck, MapPin, ArrowUp, ArrowDown, Navigation, Phone, Calendar, Clock,
   CheckCircle2, AlertTriangle, Users, Package, Search,
   Printer, Plus, RefreshCw, X, ArrowUpRight, ExternalLink,
-  ShieldCheck, Filter, ChevronRight, UserCheck, MessageCircle,
-  Building2, Layers, FileCheck, Gauge
+  ShieldCheck, Filter, ChevronRight, UserCheck, MessageCircle, ChevronDown,
+  Building2, Layers, FileCheck, Gauge, LayoutGrid, LayoutList
 } from 'lucide-react';
 
 export default function DeliveryManagement() {
@@ -21,6 +21,7 @@ export default function DeliveryManagement() {
 
   // Filters
   const [viewMode, setViewMode] = useState('STOPS'); // 'STOPS' | 'FLEET_LOADS'
+  const [stopsViewType, setStopsViewType] = useState('CARD'); // 'CARD' | 'TABLE'
   const [selectedPin, setSelectedPin] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedPartner, setSelectedPartner] = useState('ALL');
@@ -423,6 +424,24 @@ export default function DeliveryManagement() {
       };
     });
   }, [filteredDemands]);
+
+  const [expandedDates, setExpandedDates] = useState({});
+
+  useEffect(() => {
+    const initial = {};
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    
+    groupedDateAndUnit.forEach(g => {
+      const ts = parseDateToTimestamp(g.date);
+      initial[g.date] = ts >= todayMidnight;
+    });
+    setExpandedDates(initial);
+  }, [groupedDateAndUnit]);
+
+  const toggleDate = (dateKey) => {
+    setExpandedDates(prev => ({ ...prev, [dateKey]: !prev[dateKey] }));
+  };
 
   // Grouped Partner Vehicle Loads & Items Summary
   const partnerLoads = useMemo(() => {
@@ -1291,6 +1310,29 @@ _National Cadet Corps - Supply & Logistics Portal_`;
         {/* Search and Filters */}
         {viewMode === 'STOPS' && (
           <div className="flex flex-wrap xl:flex-nowrap items-center gap-4 w-full justify-between xl:justify-end">
+            {/* View Type Toggle */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0 border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setStopsViewType('TABLE')}
+                className={`p-1.5 rounded-lg flex items-center justify-center transition-all ${
+                  stopsViewType === 'TABLE' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'
+                }`}
+                title="Table View"
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setStopsViewType('CARD')}
+                className={`p-1.5 rounded-lg flex items-center justify-center transition-all ${
+                  stopsViewType === 'CARD' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'
+                }`}
+                title="Summary Card View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
             {/* Search Input */}
             <div className="relative w-full xl:w-auto flex-1 min-w-[200px]">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1660,8 +1702,12 @@ _National Cadet Corps - Supply & Logistics Portal_`;
             <div key={dateGroup.date} className="space-y-4">
               
               {/* DATE BANNER HEADER (Light Theme) */}
-              <div className="bg-gradient-to-r from-blue-50/90 via-slate-50 to-white rounded-2xl p-3.5 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-blue-200/80">
+              <div 
+                onClick={() => toggleDate(dateGroup.date)}
+                className="bg-gradient-to-r from-blue-50/90 via-slate-50 to-white rounded-2xl p-3.5 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-blue-200/80 cursor-pointer hover:shadow-md transition-shadow"
+              >
                 <div className="flex items-center gap-3">
+                  {expandedDates[dateGroup.date] ? <ChevronDown className="w-5 h-5 text-blue-500" /> : <ChevronRight className="w-5 h-5 text-blue-500" />}
                   <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs shadow-blue-500/25">
                     <Calendar className="w-5 h-5" />
                   </div>
@@ -1703,8 +1749,9 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               </div>
 
               {/* UNIT SECTIONS FOR THIS DATE */}
-              <div className="space-y-6 pl-0 md:pl-2">
-                {dateGroup.unitList.map(unitGroup => (
+              {expandedDates[dateGroup.date] && (
+                <div className="space-y-6 pl-0 md:pl-2">
+                  {dateGroup.unitList.map(unitGroup => (
                   <div key={unitGroup.unitName} className="space-y-3 bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-2xs">
                     
                     {/* UNIT HEADER */}
@@ -1742,7 +1789,67 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                       </div>
                     </div>
 
-                     {/* DEMAND STOPS LIST FOR THIS UNIT (GRID OF CARDS) */}
+                     {/* DEMAND STOPS LIST FOR THIS UNIT (GRID OF CARDS OR TABLE) */}
+                    {stopsViewType === 'TABLE' ? (
+                      <div className="overflow-x-auto mt-4 rounded-xl border border-slate-200">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                          <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-black">
+                            <tr>
+                              <th className="px-4 py-3"># / Ref</th>
+                              <th className="px-4 py-3">Institution</th>
+                              <th className="px-4 py-3 text-center">Pkts & PIN</th>
+                              <th className="px-4 py-3">Driver / Status</th>
+                              <th className="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {unitGroup.demands.map((dem, idx) => {
+                              const isDelivered = dem.delivery_status === 'DELIVERED';
+                              const isOut = dem.delivery_status === 'OUT_FOR_DELIVERY';
+                              const mapsUrl = getGoogleMapsUrl(dem);
+                              return (
+                                <tr key={dem.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedDemandForSummary(dem)}>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-800 border border-slate-200">{idx + 1}</div>
+                                      <span className="text-blue-700 font-bold text-xs">{dem.demand_number}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 max-w-xs truncate cursor-pointer" onClick={() => setSelectedDemandForSummary(dem)}>
+                                    <div className="font-bold text-slate-900 truncate">{dem.institution_name}</div>
+                                    <div className="text-[11px] text-slate-500 truncate">{dem.complete_address}</div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center justify-center gap-2">
+                                      <span className="font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">{dem.total_quantity || 0} Pkts</span>
+                                      <span className="text-rose-700 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">PIN {dem.pin_code}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 cursor-pointer" onClick={() => handleOpenAssign(dem)}>
+                                    <div className="flex flex-col gap-1">
+                                      <span className={`text-xs font-bold ${dem.delivery_partner_name ? 'text-indigo-700' : 'text-amber-600'}`}>
+                                        {dem.delivery_partner_name || '+ Assign Driver'}
+                                      </span>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full w-fit ${
+                                        isDelivered ? 'bg-emerald-100 text-emerald-800' : isOut ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
+                                      }`}>
+                                        {dem.delivery_status.replace(/_/g, ' ')}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200" title="Maps Navigation"><Navigation className="w-4 h-4" /></a>
+                                      <button onClick={(e) => { e.stopPropagation(); handleSendWhatsAppAlert(dem); }} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200" title="WhatsApp Alert"><MessageCircle className="w-4 h-4" /></button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
                       {unitGroup.demands.map((dem, idx) => {
                         const isDelivered = dem.delivery_status === 'DELIVERED';
@@ -1912,9 +2019,11 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                         );
                       })}
                     </div>
+                    )}
                   </div>
                 ))}
               </div>
+              )}
 
             </div>
           ))}
