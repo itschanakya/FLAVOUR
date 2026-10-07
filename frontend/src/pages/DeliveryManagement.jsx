@@ -1871,7 +1871,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       {dem.delivery_mode === 'PORTER' || dem.delivery_partner_name === 'Handled by Porter' ? (
                                         <button
                                           type="button"
-                                          onClick={() => handleOpenAssign(dem)}
+                                          onClick={(e) => { e.stopPropagation(); handleOpenAssign(dem); }}
                                           className="flex-1 py-1.5 px-3 border border-dashed border-purple-300 text-purple-800 font-bold text-xs rounded-xl bg-purple-50 flex items-center justify-center gap-1.5 transition-all hover:bg-purple-100 truncate"
                                         >
                                           <Package className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Porter Assigned</span>
@@ -1879,7 +1879,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       ) : dem.delivery_mode === 'SELF_DELIVERY' || dem.delivery_partner_name === 'Admin Self Delivery' ? (
                                         <button
                                           type="button"
-                                          onClick={() => handleOpenAssign(dem)}
+                                          onClick={(e) => { e.stopPropagation(); handleOpenAssign(dem); }}
                                           className="flex-1 py-1.5 px-3 border border-dashed border-emerald-300 text-emerald-800 font-bold text-xs rounded-xl bg-emerald-50 flex items-center justify-center gap-1.5 transition-all hover:bg-emerald-100 truncate"
                                         >
                                           <Building2 className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Self Delivery</span>
@@ -1887,7 +1887,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       ) : dem.delivery_partner_name ? (
                                         <button
                                           type="button"
-                                          onClick={() => handleOpenAssign(dem)}
+                                          onClick={(e) => { e.stopPropagation(); handleOpenAssign(dem); }}
                                           className="flex-1 py-1.5 px-3 border border-blue-200 text-blue-700 font-bold text-xs rounded-xl bg-blue-50 flex items-center justify-center gap-1.5 transition-all hover:bg-blue-100 truncate"
                                         >
                                           <Truck className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{dem.delivery_partner_name}</span>
@@ -1895,7 +1895,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       ) : (
                                         <button
                                           type="button"
-                                          onClick={() => handleOpenAssign(dem)}
+                                          onClick={(e) => { e.stopPropagation(); handleOpenAssign(dem); }}
                                           className="flex-1 py-1.5 px-3 border border-dashed border-amber-300 text-amber-800 font-bold text-xs rounded-xl bg-amber-50/70 flex items-center justify-center gap-1.5 transition-all hover:bg-amber-100 truncate"
                                         >
                                           <Plus className="w-3.5 h-3.5 text-amber-600 shrink-0" /> <span className="truncate">Assign Mode</span>
@@ -1905,7 +1905,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       {/* Status Action Button */}
                                       {isDelivered ? (
                                         <span className="flex-1 py-1.5 px-3 border border-emerald-200 text-emerald-700 font-bold text-xs rounded-xl bg-emerald-50 flex items-center justify-center gap-1.5 shadow-sm truncate cursor-default">
-                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Delivered</span>
+                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" /> <span className="truncate">Done</span>
                                         </span>
                                       ) : dem.delivery_status === 'REJECTED' ? (
                                         <span className="flex-1 py-1.5 px-3 border border-rose-200 text-rose-700 font-bold text-xs rounded-xl bg-rose-50 flex items-center justify-center gap-1.5 shadow-sm truncate cursor-default">
@@ -1914,7 +1914,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       ) : dem.delivery_status === 'ARRIVED' ? (
                                         <button
                                           type="button"
-                                          onClick={() => handleUpdateStatus(dem.id, 'DELIVERED')}
+                                          onClick={(e) => { e.stopPropagation(); handleUpdateStatus(dem.id, 'DELIVERED'); }}
                                           className="flex-1 py-1.5 px-3 border border-emerald-400 text-white font-black text-xs rounded-xl bg-emerald-500 flex items-center justify-center gap-1.5 shadow-xs hover:bg-emerald-600 transition-all active:scale-95 truncate"
                                         >
                                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Mark Delivered</span>
@@ -1922,7 +1922,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       ) : isOut ? (
                                         <button
                                           type="button"
-                                          onClick={() => handleUpdateStatus(dem.id, 'ARRIVED')}
+                                          onClick={(e) => { e.stopPropagation(); handleUpdateStatus(dem.id, 'ARRIVED'); }}
                                           className="flex-1 py-1.5 px-3 border border-indigo-400 text-white font-black text-xs rounded-xl bg-indigo-500 flex items-center justify-center gap-1.5 shadow-xs hover:bg-indigo-600 transition-all active:scale-95 truncate"
                                         >
                                           <MapPin className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">In at Gate</span>
