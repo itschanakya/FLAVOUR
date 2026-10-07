@@ -63,18 +63,32 @@ router.get('/', authenticateToken, async (req, res) => {
         CASE WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name) ELSE COALESCE(i.institution_name, u.unit_name) END as beneficiary_name,
         usr.name as raised_by_name,
         rev.name as reviewed_by_name,
-        (SELECT SUM(di.quantity * di.unit_price_snapshot) FROM demand_items di WHERE di.demand_id = d.id) as total_amount,
-        (SELECT SUM(di.quantity) FROM demand_items di WHERE di.demand_id = d.id) as total_quantity,
-        (SELECT SUM(di.quantity) FROM demand_items di WHERE di.demand_id = d.id AND di.year_group = '1st Year') as y1_quantity,
-        (SELECT SUM(di.quantity) FROM demand_items di WHERE di.demand_id = d.id AND di.year_group = '2nd Year') as y2_quantity,
-        (SELECT SUM(di.quantity) FROM demand_items di WHERE di.demand_id = d.id AND di.year_group = '3rd Year') as y3_quantity,
-        (SELECT AVG(di.unit_price_snapshot) FROM demand_items di WHERE di.demand_id = d.id) as avg_unit_price,
-        (SELECT GROUP_CONCAT(ri.item_name, ', ') FROM demand_items di JOIN refreshment_items ri ON di.item_id = ri.id WHERE di.demand_id = d.id) as item_name
+        COALESCE(di_agg.total_amount, 0) as total_amount,
+        COALESCE(di_agg.total_quantity, 0) as total_quantity,
+        COALESCE(di_agg.y1_quantity, 0) as y1_quantity,
+        COALESCE(di_agg.y2_quantity, 0) as y2_quantity,
+        COALESCE(di_agg.y3_quantity, 0) as y3_quantity,
+        di_agg.avg_unit_price,
+        di_agg.item_name
       FROM demands d
       LEFT JOIN institutions i ON d.institution_id = i.id
       JOIN units u ON d.unit_id = u.id
       JOIN users usr ON d.raised_by = usr.id
       LEFT JOIN users rev ON d.reviewed_by = rev.id
+      LEFT JOIN (
+        SELECT 
+          di.demand_id,
+          SUM(di.quantity * di.unit_price_snapshot) as total_amount,
+          SUM(di.quantity) as total_quantity,
+          SUM(CASE WHEN di.year_group = '1st Year' THEN di.quantity ELSE 0 END) as y1_quantity,
+          SUM(CASE WHEN di.year_group = '2nd Year' THEN di.quantity ELSE 0 END) as y2_quantity,
+          SUM(CASE WHEN di.year_group = '3rd Year' THEN di.quantity ELSE 0 END) as y3_quantity,
+          AVG(di.unit_price_snapshot) as avg_unit_price,
+          GROUP_CONCAT(ri.item_name SEPARATOR ', ') as item_name
+        FROM demand_items di
+        LEFT JOIN refreshment_items ri ON di.item_id = ri.id
+        GROUP BY di.demand_id
+      ) di_agg ON di_agg.demand_id = d.id
       WHERE d.is_deleted = 0
     `;
 
