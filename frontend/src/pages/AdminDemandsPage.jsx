@@ -87,37 +87,32 @@ export default function AdminDemandsPage() {
 
   const fetchDemandsData = async () => {
     try {
-      // 1. Fetch summary stats
-      const sumRes = await fetch('/api/reports/summary', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const sumData = await sumRes.json();
-      setSummary(sumData);
+      const [sumRes, demRes, unitsRes, instRes] = await Promise.all([
+        fetch('/api/reports/summary', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/demands', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/units', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/institutions', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
 
-      // 2. Fetch demands for supply point dispatch
-      const demRes = await fetch('/api/demands', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const demData = await demRes.json();
-      if (Array.isArray(demData)) {
-        setDemands(demData.filter(d => ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED'].includes(d.status)));
-      } else {
-        setDemands([]);
+      if (sumRes.ok) {
+        setSummary(await sumRes.json());
+      }
+      
+      if (demRes.ok) {
+        const demData = await demRes.json();
+        setDemands(Array.isArray(demData) ? demData.filter(d => ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED'].includes(d.status)) : []);
       }
 
-      // 3. Fetch all onboarded NCC units
-      const unitsRes = await fetch('/api/units', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const unitsData = await unitsRes.json();
-      setOnboardUnits(Array.isArray(unitsData) ? unitsData : []);
+      if (unitsRes.ok) {
+        const unitsData = await unitsRes.json();
+        setOnboardUnits(Array.isArray(unitsData) ? unitsData : []);
+      }
 
-      // 4. Fetch all institutions for institution filter
-      const instRes = await fetch('/api/institutions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const instData = await instRes.json();
-      setInstitutions(Array.isArray(instData) ? instData : []);
+      if (instRes.ok) {
+        const instData = await instRes.json();
+        setInstitutions(Array.isArray(instData) ? instData : []);
+      }
+
 
     } catch (err) {
       console.error(err);

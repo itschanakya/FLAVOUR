@@ -76,21 +76,30 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
 
     const demands = await db.all(query, params);
 
-    // Fetch items for each demand and coerce quantities to numbers
-    for (const dem of demands) {
-      dem.total_quantity = Number(dem.total_quantity) || 0;
-      dem.total_amount = Number(dem.total_amount) || 0;
-      const items = await db.all(
+    if (demands.length > 0) {
+      const demandIds = demands.map(d => d.id);
+      // Fetch all items in one single query to prevent N+1 problem
+      const allItems = await db.all(
         `SELECT di.*, 
                 COALESCE(di.unit_price_snapshot, 0) AS unit_price,
                 (di.quantity * COALESCE(di.unit_price_snapshot, 0)) AS total_cost,
                 ri.item_name, ri.unit_of_measure 
          FROM demand_items di 
          JOIN refreshment_items ri ON di.item_id = ri.id 
-         WHERE di.demand_id = ?`,
-        [dem.id]
+         WHERE di.demand_id IN (${demandIds.join(',')})`
       );
-      dem.items = items;
+
+      const itemsMap = {};
+      for (const item of allItems) {
+        if (!itemsMap[item.demand_id]) itemsMap[item.demand_id] = [];
+        itemsMap[item.demand_id].push(item);
+      }
+
+      for (const dem of demands) {
+        dem.items = itemsMap[dem.id] || [];
+        dem.total_quantity = dem.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+        dem.total_amount = dem.items.reduce((sum, item) => sum + (Number(item.total_cost) || 0), 0);
+      }
     }
 
     res.json(demands);
