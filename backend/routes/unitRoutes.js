@@ -11,20 +11,27 @@ router.get('/', authenticateToken, async (req, res) => {
     if (req.user.role === 'ADMIN') {
       const units = await db.all(`
         SELECT u.*, 
-          (SELECT COUNT(*) FROM institutions WHERE unit_id = u.id) as institution_count,
-          (SELECT email FROM users WHERE unit_id = u.id AND role = 'UNIT' LIMIT 1) as unit_email,
-          (SELECT login_id FROM users WHERE unit_id = u.id AND role = 'UNIT' LIMIT 1) as login_id
+          COUNT(i.id) as institution_count,
+          usr.email as unit_email,
+          usr.login_id as login_id
         FROM units u
+        LEFT JOIN institutions i ON i.unit_id = u.id
+        LEFT JOIN users usr ON usr.unit_id = u.id AND usr.role = 'UNIT'
+        GROUP BY u.id
         ORDER BY u.created_at DESC
       `);
       return res.json(units);
     } else if (req.user.role === 'UNIT') {
       const unit = await db.get(`
         SELECT u.*, 
-          (SELECT COUNT(*) FROM institutions WHERE unit_id = u.id) as institution_count,
-          (SELECT email FROM users WHERE unit_id = u.id AND role = 'UNIT' LIMIT 1) as unit_email,
-          (SELECT login_id FROM users WHERE unit_id = u.id AND role = 'UNIT' LIMIT 1) as login_id
-        FROM units u WHERE id = ?
+          COUNT(i.id) as institution_count,
+          usr.email as unit_email,
+          usr.login_id as login_id
+        FROM units u 
+        LEFT JOIN institutions i ON i.unit_id = u.id
+        LEFT JOIN users usr ON usr.unit_id = u.id AND usr.role = 'UNIT'
+        WHERE u.id = ?
+        GROUP BY u.id
       `, [req.user.unit_id]);
       return res.json(unit ? [unit] : []);
     } else {
