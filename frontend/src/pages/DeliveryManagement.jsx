@@ -25,6 +25,18 @@ export default function DeliveryManagement() {
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedPartner, setSelectedPartner] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Table Sorting
+  const [tableSort, setTableSort] = useState({ key: null, direction: 'asc' });
+
+  const handleTableSort = (key) => {
+    setTableSort(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
 
   // Modals
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -408,21 +420,51 @@ export default function DeliveryManagement() {
 
     return sortedDates.map(dateKey => {
       const dateEntry = dateMap[dateKey];
-      const unitList = Object.values(dateEntry.units).map(u => ({
-        ...u,
-        demands: [...u.demands].sort((a, b) => {
-          const tsA = parseDateToTimestamp(a.demand_date);
-          const tsB = parseDateToTimestamp(b.demand_date);
-          if (tsA !== tsB) return tsA - tsB;
-          return (a.id || 0) - (b.id || 0);
-        })
-      })).sort((a, b) => a.unitName.localeCompare(b.unitName));
+      const unitList = Object.values(dateEntry.units).map(u => {
+        let sortedDemands = [...u.demands];
+        if (tableSort.key) {
+           sortedDemands.sort((a, b) => {
+             let valA, valB;
+             if (tableSort.key === 'id') {
+                valA = a.id || 0;
+                valB = b.id || 0;
+             } else if (tableSort.key === 'institution') {
+                valA = (a.institution_name || '').toLowerCase();
+                valB = (b.institution_name || '').toLowerCase();
+             } else if (tableSort.key === 'pkts') {
+                valA = a.total_quantity || 0;
+                valB = b.total_quantity || 0;
+             } else if (tableSort.key === 'pin') {
+                valA = a.pin_code || '';
+                valB = b.pin_code || '';
+             } else if (tableSort.key === 'driver') {
+                valA = (a.delivery_partner_name || '').toLowerCase();
+                valB = (b.delivery_partner_name || '').toLowerCase();
+             }
+             
+             if (valA < valB) return tableSort.direction === 'asc' ? -1 : 1;
+             if (valA > valB) return tableSort.direction === 'asc' ? 1 : -1;
+             return 0;
+           });
+        } else {
+           sortedDemands.sort((a, b) => {
+             const tsA = parseDateToTimestamp(a.demand_date);
+             const tsB = parseDateToTimestamp(b.demand_date);
+             if (tsA !== tsB) return tsA - tsB;
+             return (a.id || 0) - (b.id || 0);
+           });
+        }
+        return {
+          ...u,
+          demands: sortedDemands
+        };
+      }).sort((a, b) => a.unitName.localeCompare(b.unitName));
       return {
         ...dateEntry,
         unitList
       };
     });
-  }, [filteredDemands]);
+  }, [filteredDemands, tableSort]);
 
   const [expandedDates, setExpandedDates] = useState({});
 
@@ -1022,6 +1064,11 @@ _National Cadet Corps - Supply & Logistics Portal_`;
     } finally {
       setSavingPartner(false);
     }
+  };
+
+  const renderSortIcon = (key) => {
+    if (tableSort.key !== key) return <ArrowDown className="w-3 h-3 text-slate-300 ml-1 inline" />;
+    return tableSort.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600 ml-1 inline" /> : <ArrowDown className="w-3 h-3 text-blue-600 ml-1 inline" />;
   };
 
   return (
@@ -1777,10 +1824,21 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                         <table className="w-full text-left text-sm whitespace-nowrap">
                           <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-black">
                             <tr>
-                              <th className="px-4 py-3"># / Ref</th>
-                              <th className="px-4 py-3">Institution</th>
-                              <th className="px-4 py-3 text-center">Pkts & PIN</th>
-                              <th className="px-4 py-3 min-w-[200px]">Driver / Status</th>
+                              <th className="px-4 py-3 cursor-pointer select-none" onClick={() => handleTableSort('id')}>
+                                # / Ref {renderSortIcon('id')}
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer select-none" onClick={() => handleTableSort('institution')}>
+                                Institution {renderSortIcon('institution')}
+                              </th>
+                              <th className="px-4 py-3 text-center cursor-pointer select-none" onClick={() => handleTableSort('pkts')}>
+                                Pkts {renderSortIcon('pkts')}
+                              </th>
+                              <th className="px-4 py-3 text-center cursor-pointer select-none" onClick={() => handleTableSort('pin')}>
+                                PIN {renderSortIcon('pin')}
+                              </th>
+                              <th className="px-4 py-3 min-w-[200px] cursor-pointer select-none" onClick={() => handleTableSort('driver')}>
+                                Driver / Status {renderSortIcon('driver')}
+                              </th>
                               <th className="px-4 py-3 text-right">Actions</th>
                             </tr>
                           </thead>
@@ -1801,11 +1859,11 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                     <div className="font-bold text-slate-900 truncate">{dem.institution_name}</div>
                                     <div className="text-[11px] text-slate-500 truncate">{dem.complete_address}</div>
                                   </td>
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center justify-center gap-2">
-                                      <span className="font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">{dem.total_quantity || 0} Pkts</span>
-                                      <span className="text-rose-700 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">PIN {dem.pin_code}</span>
-                                    </div>
+                                  <td className="px-4 py-3 text-center">
+                                    <span className="font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200 inline-block">{dem.total_quantity || 0} Pkts</span>
+                                  </td>
+                                  <td className="px-4 py-3 text-center">
+                                    <span className="text-rose-700 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 inline-block">PIN {dem.pin_code}</span>
                                   </td>
                                   <td className="px-4 py-3 min-w-[200px]">
                                     <div className="flex items-center gap-2">
