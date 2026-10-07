@@ -427,15 +427,22 @@ export default function DeliveryManagement() {
   const [expandedDates, setExpandedDates] = useState({});
 
   useEffect(() => {
-    const initial = {};
-    const now = new Date();
-    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    
-    groupedDateAndUnit.forEach(g => {
-      const ts = parseDateToTimestamp(g.date);
-      initial[g.date] = ts >= todayMidnight;
+    setExpandedDates(prev => {
+      const updated = { ...prev };
+      const now = new Date();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      
+      let hasChanges = false;
+      groupedDateAndUnit.forEach(g => {
+        if (updated[g.date] === undefined) {
+          const ts = parseDateToTimestamp(g.date);
+          updated[g.date] = ts >= todayMidnight;
+          hasChanges = true;
+        }
+      });
+      
+      return hasChanges ? updated : prev;
     });
-    setExpandedDates(initial);
   }, [groupedDateAndUnit]);
 
   const toggleDate = (dateKey) => {
@@ -1773,7 +1780,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                               <th className="px-4 py-3"># / Ref</th>
                               <th className="px-4 py-3">Institution</th>
                               <th className="px-4 py-3 text-center">Pkts & PIN</th>
-                              <th className="px-4 py-3">Driver / Status</th>
+                              <th className="px-4 py-3 w-full min-w-[300px]">Driver / Status</th>
                               <th className="px-4 py-3 text-right">Actions</th>
                             </tr>
                           </thead>
@@ -1800,16 +1807,73 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       <span className="text-rose-700 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">PIN {dem.pin_code}</span>
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3 cursor-pointer" onClick={() => handleOpenAssign(dem)}>
-                                    <div className="flex flex-col gap-1">
-                                      <span className={`text-xs font-bold ${dem.delivery_partner_name ? 'text-indigo-700' : 'text-amber-600'}`}>
-                                        {dem.delivery_partner_name || '+ Assign Driver'}
-                                      </span>
-                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full w-fit ${
-                                        isDelivered ? 'bg-emerald-100 text-emerald-800' : isOut ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
-                                      }`}>
-                                        {dem.delivery_status.replace(/_/g, ' ')}
-                                      </span>
+                                  <td className="px-4 py-3 w-full min-w-[300px]">
+                                    <div className="flex items-center gap-2 w-full">
+                                      {/* Assign Mode Button */}
+                                      {dem.delivery_mode === 'PORTER' || dem.delivery_partner_name === 'Handled by Porter' ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenAssign(dem)}
+                                          className="flex-1 py-1.5 px-3 border border-dashed border-purple-300 text-purple-800 font-bold text-xs rounded-xl bg-purple-50 flex items-center justify-center gap-1.5 transition-all hover:bg-purple-100 truncate"
+                                        >
+                                          <Package className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Porter Assigned</span>
+                                        </button>
+                                      ) : dem.delivery_mode === 'SELF_DELIVERY' || dem.delivery_partner_name === 'Admin Self Delivery' ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenAssign(dem)}
+                                          className="flex-1 py-1.5 px-3 border border-dashed border-emerald-300 text-emerald-800 font-bold text-xs rounded-xl bg-emerald-50 flex items-center justify-center gap-1.5 transition-all hover:bg-emerald-100 truncate"
+                                        >
+                                          <Building2 className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Self Delivery</span>
+                                        </button>
+                                      ) : dem.delivery_partner_name ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenAssign(dem)}
+                                          className="flex-1 py-1.5 px-3 border border-blue-200 text-blue-700 font-bold text-xs rounded-xl bg-blue-50 flex items-center justify-center gap-1.5 transition-all hover:bg-blue-100 truncate"
+                                        >
+                                          <Truck className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{dem.delivery_partner_name}</span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenAssign(dem)}
+                                          className="flex-1 py-1.5 px-3 border border-dashed border-amber-300 text-amber-800 font-bold text-xs rounded-xl bg-amber-50/70 flex items-center justify-center gap-1.5 transition-all hover:bg-amber-100 truncate"
+                                        >
+                                          <Plus className="w-3.5 h-3.5 text-amber-600 shrink-0" /> <span className="truncate">Assign Mode</span>
+                                        </button>
+                                      )}
+
+                                      {/* Status Action Button */}
+                                      {isDelivered ? (
+                                        <span className="flex-1 py-1.5 px-3 border border-emerald-200 text-emerald-700 font-bold text-xs rounded-xl bg-emerald-50 flex items-center justify-center gap-1.5 shadow-sm truncate cursor-default">
+                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Delivered</span>
+                                        </span>
+                                      ) : dem.delivery_status === 'REJECTED' ? (
+                                        <span className="flex-1 py-1.5 px-3 border border-rose-200 text-rose-700 font-bold text-xs rounded-xl bg-rose-50 flex items-center justify-center gap-1.5 shadow-sm truncate cursor-default">
+                                          <X className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Rejected</span>
+                                        </span>
+                                      ) : dem.delivery_status === 'ARRIVED' ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUpdateStatus(dem.id, 'DELIVERED')}
+                                          className="flex-1 py-1.5 px-3 border border-emerald-400 text-white font-black text-xs rounded-xl bg-emerald-500 flex items-center justify-center gap-1.5 shadow-xs hover:bg-emerald-600 transition-all active:scale-95 truncate"
+                                        >
+                                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Mark Delivered</span>
+                                        </button>
+                                      ) : isOut ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUpdateStatus(dem.id, 'ARRIVED')}
+                                          className="flex-1 py-1.5 px-3 border border-indigo-400 text-white font-black text-xs rounded-xl bg-indigo-500 flex items-center justify-center gap-1.5 shadow-xs hover:bg-indigo-600 transition-all active:scale-95 truncate"
+                                        >
+                                          <MapPin className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">In at Gate</span>
+                                        </button>
+                                      ) : (
+                                        <span className="flex-1 py-1.5 px-3 border border-amber-200 text-amber-700 font-black text-xs rounded-xl bg-amber-50 flex items-center justify-center gap-1.5 shadow-sm truncate cursor-default">
+                                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" /> <span className="truncate">Ready for Dispatch</span>
+                                        </span>
+                                      )}
                                     </div>
                                   </td>
                                   <td className="px-4 py-3 text-right">
