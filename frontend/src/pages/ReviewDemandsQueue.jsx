@@ -386,16 +386,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-slate-50 via-slate-100 to-slate-50 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-600">
-              <th className="py-3.5 px-4 w-10 text-center">
-                <input 
-                  type="checkbox" 
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
-                  onChange={() => toggleSelectAll(demands)}
-                  checked={demands.filter(eligibleForBulk).length > 0 && demands.filter(eligibleForBulk).every(d => selectedDemandIds.has(d.id))}
-                  disabled={demands.filter(eligibleForBulk).length === 0}
-                  title="Select/Deselect all eligible demands in view"
-                />
-              </th>
+              <th className="py-3.5 px-4 w-10 text-center"></th>
               <th className="py-3.5 px-4">Demand Ref & Date</th>
               <th className="py-3.5 px-4">Institution & In-charge</th>
               <th className="py-3.5 px-4">Event / Purpose</th>
@@ -416,6 +407,15 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
                   <tr className="bg-slate-50/80 cursor-pointer" onClick={() => toggleDate(g.key)}>
                     <td colSpan="9" className="px-4 py-2 border-b border-slate-200">
                       <div className="flex items-center gap-3 flex-wrap">
+                        <input 
+                          type="checkbox"
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSelectAll(g.items)}
+                          checked={g.items.filter(eligibleForBulk).length > 0 && g.items.filter(eligibleForBulk).every(d => selectedDemandIds.has(d.id))}
+                          disabled={g.items.filter(eligibleForBulk).length === 0}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
+                          title="Select all eligible demands in this date"
+                        />
                         {expandedDates[g.key] ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
                         <Calendar className="w-4 h-4 text-slate-500" />
                         <span className="font-extrabold text-slate-800 text-xs">{fmtDMY(g.key)} · {weekdayOf(g.key)}</span>
@@ -1159,7 +1159,19 @@ export default function ReviewDemandsQueue() {
 
   // Filtered demands for the active tab and search query
   const displayedDemands = useMemo(() => {
-    let list = safeDemands;
+    let list = safeDemands.filter(d => {
+      // 0. Only show Today and Tomorrow for Active Queues
+      if (statusFilter !== 'HISTORY') {
+        const dDate = d.demand_date ? String(d.demand_date).split('T')[0].split(' ')[0] : null;
+        if (dDate) {
+          const today = new Date().toISOString().split('T')[0];
+          const diff = Math.floor(new Date(dDate).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
+          if (diff !== 0 && diff !== 1) return false;
+        }
+      }
+      return true;
+    });
+
     if (statusFilter !== 'ALL') {
       list = list.filter(d => matchesDemandStatus(d, statusFilter));
     }

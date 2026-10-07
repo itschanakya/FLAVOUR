@@ -266,6 +266,16 @@ export default function AdminDemandsPage() {
   // Filter demands by unit, institution, status, time, and keyword search
   const safeDemands = Array.isArray(demands) ? demands : [];
   const baseDemands = safeDemands.filter(d => {
+    // 0. Only show Today and Tomorrow for Active Queues
+    if (statusFilter !== 'REJECTED') {
+      const dDate = d.demand_date ? String(d.demand_date).split('T')[0].split(' ')[0] : null;
+      if (dDate) {
+        const today = new Date().toISOString().split('T')[0];
+        const diff = Math.floor(new Date(dDate).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
+        if (diff !== 0 && diff !== 1) return false;
+      }
+    }
+
     // 1. Unit filter
     if (selectedUnitId !== 'ALL' && String(d.unit_id) !== String(selectedUnitId)) {
       return false;
@@ -875,16 +885,7 @@ export default function AdminDemandsPage() {
               <table className="w-full text-left text-xs sm:text-sm relative">
                 <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                   <tr>
-                    <th className="p-3.5 w-10 text-center">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
-                        onChange={toggleSelectAll}
-                        checked={displayedDemands.filter(eligibleForBulk).length > 0 && displayedDemands.filter(eligibleForBulk).every(d => selectedDemandIds.has(d.id))}
-                        disabled={displayedDemands.filter(eligibleForBulk).length === 0}
-                        title="Select/Deselect all pending demands in view"
-                      />
-                    </th>
+                    <th className="p-3.5 w-10 text-center"></th>
                     <th className="p-3.5">Demand Ref</th>
                     <th className="p-3.5">NCC Unit</th>
                     <th className="p-3.5">Type</th>
@@ -937,6 +938,22 @@ export default function AdminDemandsPage() {
                       <tr className="bg-slate-100/90 cursor-pointer select-none" onClick={() => setCollapsedDates(p => ({ ...p, [g.key]: !p[g.key] }))}>
                         <td colSpan="10" className="px-3.5 py-2">
                           <div className="flex items-center gap-3 flex-wrap">
+                            <input 
+                              type="checkbox"
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={() => {
+                                const eligible = g.items.filter(eligibleForBulk);
+                                if (!eligible.length) return;
+                                const allSel = eligible.every(d => selectedDemandIds.has(d.id));
+                                const next = new Set(selectedDemandIds);
+                                eligible.forEach(d => allSel ? next.delete(d.id) : next.add(d.id));
+                                setSelectedDemandIds(next);
+                              }}
+                              checked={g.items.filter(eligibleForBulk).length > 0 && g.items.filter(eligibleForBulk).every(d => selectedDemandIds.has(d.id))}
+                              disabled={g.items.filter(eligibleForBulk).length === 0}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
+                              title="Select all eligible demands in this date"
+                            />
                             <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
                             <span className="font-extrabold text-slate-800 text-xs">{formatDMY(g.key)} · {weekdayOf(g.key)}</span>
                             {badge && <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${badge.cls}`}>{badge.label}</span>}

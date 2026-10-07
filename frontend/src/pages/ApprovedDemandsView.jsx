@@ -305,6 +305,16 @@ export default function ApprovedDemandsView() {
   // Filter demands by Group (GP) and Unit and Time
   const filteredDemands = useMemo(() => {
     return demands.filter(d => {
+      // 0. Only show Today and Tomorrow for Active Queues
+      if (newDemandFilter !== 'HISTORY') {
+        const dDate = d.demand_date ? String(d.demand_date).split('T')[0].split(' ')[0] : null;
+        if (dDate) {
+          const today = new Date().toISOString().split('T')[0];
+          const diff = Math.floor(new Date(dDate).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
+          if (diff !== 0 && diff !== 1) return false;
+        }
+      }
+
       if (selectedGroup !== 'ALL') {
         const dGroup = d.ncc_group || units.find(u => u.id === d.unit_id)?.ncc_group;
         if (dGroup !== selectedGroup) return false;
@@ -1013,16 +1023,7 @@ export default function ApprovedDemandsView() {
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th className="p-3.5 w-10 text-center">
-                        <input 
-                          type="checkbox" 
-                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
-                          onChange={toggleSelectAll}
-                          checked={filteredDemands.filter(eligibleForBulk).length > 0 && filteredDemands.filter(eligibleForBulk).every(d => selectedDemandIds.has(d.id))}
-                          disabled={filteredDemands.filter(eligibleForBulk).length === 0}
-                          title="Select/Deselect all eligible demands in view"
-                        />
-                      </th>
+                      <th className="p-3.5 w-10 text-center"></th>
                       <th className="p-3.5">Demand Ref</th>
                       <th className="p-3.5">Institution</th>
                       <th className="p-3.5">NCC Unit</th>
@@ -1043,6 +1044,22 @@ export default function ApprovedDemandsView() {
                           <tr className="bg-slate-100/90 cursor-pointer" onClick={() => toggleDate(g.key)}>
                             <td colSpan="9" className="px-3.5 py-2">
                               <div className="flex items-center gap-3 flex-wrap">
+                                <input 
+                                  type="checkbox"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={() => {
+                                    const eligible = g.items.filter(eligibleForBulk);
+                                    if (!eligible.length) return;
+                                    const allSel = eligible.every(d => selectedDemandIds.has(d.id));
+                                    const next = new Set(selectedDemandIds);
+                                    eligible.forEach(d => allSel ? next.delete(d.id) : next.add(d.id));
+                                    setSelectedDemandIds(next);
+                                  }}
+                                  checked={g.items.filter(eligibleForBulk).length > 0 && g.items.filter(eligibleForBulk).every(d => selectedDemandIds.has(d.id))}
+                                  disabled={g.items.filter(eligibleForBulk).length === 0}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
+                                  title="Select all eligible demands in this date"
+                                />
                                 {expandedDates[g.key] ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
                                 <Calendar className="w-4 h-4 text-slate-500" />
                                 <span className="font-extrabold text-slate-800 text-xs">{fmtDMY(g.key)} · {weekdayOf(g.key)}</span>
