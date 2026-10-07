@@ -303,18 +303,16 @@ export default function ApprovedDemandsView() {
   };
 
   // Filter demands by Group (GP) and Unit and Time
-  const filteredDemands = useMemo(() => {
-    return demands.filter(d => {
-      // 0. Only show Today and Tomorrow for Active Queues
-      if (newDemandFilter !== 'HISTORY') {
-        const dDate = d.demand_date ? String(d.demand_date).split('T')[0].split(' ')[0] : null;
-        if (dDate) {
-          const today = new Date().toISOString().split('T')[0];
-          const diff = Math.floor(new Date(dDate).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
-          if (diff !== 0 && diff !== 1) return false;
-        }
-      }
+  const isActiveDate = (dDate) => {
+    if (!dDate) return false;
+    const dStr = String(dDate).split('T')[0].split(' ')[0];
+    const today = new Date().toISOString().split('T')[0];
+    const diff = Math.floor(new Date(dStr).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
+    return diff === 0 || diff === 1;
+  };
 
+  const baseFilteredDemands = useMemo(() => {
+    return demands.filter(d => {
       if (selectedGroup !== 'ALL') {
         const dGroup = d.ncc_group || units.find(u => u.id === d.unit_id)?.ncc_group;
         if (dGroup !== selectedGroup) return false;
@@ -327,6 +325,24 @@ export default function ApprovedDemandsView() {
       return true;
     });
   }, [demands, units, selectedGroup, selectedUnit, timeFilter, passesTimeFilter]);
+
+  const activeFilteredDemands = useMemo(() => baseFilteredDemands.filter(d => isActiveDate(d.demand_date)), [baseFilteredDemands]);
+
+  const preparingList = activeFilteredDemands.filter(d => d.status === 'PREPARING');
+  const acceptedList = activeFilteredDemands.filter(d => d.status === 'ACCEPTED');
+  const historyList = baseFilteredDemands.filter(d => ['READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED'].includes(d.status));
+
+  // Demands currently active in Supply Point
+  const inSupplyPointList = activeFilteredDemands.filter(d => d.status === 'ACCEPTED' || d.status === 'PREPARING');
+
+  const shownList = useMemo(() => {
+    if (newDemandFilter === 'ACCEPTED') return acceptedList;
+    if (newDemandFilter === 'PREPARING') return preparingList;
+    if (newDemandFilter === 'HISTORY') return historyList;
+    return inSupplyPointList;
+  }, [newDemandFilter, inSupplyPointList, acceptedList, preparingList, historyList]);
+
+  const filteredDemands = shownList;
 
   const eligibleForBulk = (d) => d.status === 'ACCEPTED' || d.status === 'PREPARING';
   
@@ -450,19 +466,7 @@ export default function ApprovedDemandsView() {
     }
   };
 
-  const preparingList = filteredDemands.filter(d => d.status === 'PREPARING');
-  const acceptedList = filteredDemands.filter(d => d.status === 'ACCEPTED');
-  const historyList = filteredDemands.filter(d => ['READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED'].includes(d.status));
 
-  // Demands currently active in Supply Point
-  const inSupplyPointList = filteredDemands.filter(d => d.status === 'ACCEPTED' || d.status === 'PREPARING');
-
-  const shownList = useMemo(() => {
-    if (newDemandFilter === 'ACCEPTED') return acceptedList;
-    if (newDemandFilter === 'PREPARING') return preparingList;
-    if (newDemandFilter === 'HISTORY') return historyList;
-    return inSupplyPointList;
-  }, [newDemandFilter, inSupplyPointList, acceptedList, preparingList, historyList]);
 
   // Date-wise grouping: nearest date first
   const dateKeyOf = (d) => String(d.demand_date || '').split('T')[0].split(' ')[0];

@@ -415,9 +415,19 @@ export default function AdminDemandsPage() {
   const selectedUnit = onboardUnits.find(u => String(u.id) === String(selectedUnitId));
   const selectedInstitution = institutions.find(i => String(i.id) === String(selectedInstitutionId));
 
+  const isActiveDate = (dDate) => {
+    if (!dDate) return false;
+    const dStr = String(dDate).split('T')[0].split(' ')[0];
+    const today = new Date().toISOString().split('T')[0];
+    const diff = Math.floor(new Date(dStr).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
+    return diff === 0 || diff === 1;
+  };
+
+  const activeDemands = Array.isArray(demands) ? demands.filter(d => isActiveDate(d.demand_date)) : [];
+
   // Status count counters for quick pill badges
-  const pendingCount = safeDemands.filter(d => d.status === 'APPROVED').length;
-  const acceptedCount = safeDemands.filter(d => ['ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED'].includes(d.status)).length;
+  const pendingCount = activeDemands.filter(d => d.status === 'APPROVED').length;
+  const acceptedCount = activeDemands.filter(d => ['ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED'].includes(d.status)).length;
   const rejectedCount = safeDemands.filter(d => d.status === 'REJECTED').length;
 
   const hasActiveFilters = selectedUnitId !== 'ALL' || selectedInstitutionId !== 'ALL' || statusFilter !== 'ALL' || timeFilter !== 'ALL' || !!dateFilter || demandSearch.trim() !== '';
