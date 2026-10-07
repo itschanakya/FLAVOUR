@@ -1780,7 +1780,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                               <th className="px-4 py-3"># / Ref</th>
                               <th className="px-4 py-3">Institution</th>
                               <th className="px-4 py-3 text-center">Pkts & PIN</th>
-                              <th className="px-4 py-3 w-full min-w-[300px]">Driver / Status</th>
+                              <th className="px-4 py-3 min-w-[200px]">Driver / Status</th>
                               <th className="px-4 py-3 text-right">Actions</th>
                             </tr>
                           </thead>
@@ -1807,8 +1807,8 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       <span className="text-rose-700 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">PIN {dem.pin_code}</span>
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3 w-full min-w-[300px]">
-                                    <div className="flex items-center gap-2 w-full">
+                                  <td className="px-4 py-3 min-w-[200px]">
+                                    <div className="flex items-center gap-2">
                                       {/* Assign Mode Button */}
                                       {dem.delivery_mode === 'PORTER' || dem.delivery_partner_name === 'Handled by Porter' ? (
                                         <button
