@@ -412,15 +412,6 @@ export default function AdminDemandsPage() {
 
   const hasActiveFilters = selectedUnitId !== 'ALL' || selectedInstitutionId !== 'ALL' || statusFilter !== 'ALL' || timeFilter !== 'ALL' || !!dateFilter || demandSearch.trim() !== '';
 
-  if (loading) {
-    return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center">
-        <TricolorSpinner size="h-14 w-14" />
-        <div className="text-slate-600 font-bold text-sm mt-4">Loading Refreshment Demands Console...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full space-y-6">
       {/* 2-Column Layout: ONBOARDED NCC UNITS (Sidebar) on the Left, Demands Console on the Right */}
@@ -910,7 +901,16 @@ export default function AdminDemandsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {displayedDemands.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan="10" className="p-12 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <TricolorSpinner size="h-10 w-10" />
+                          <div className="text-slate-500 font-bold text-xs mt-3">Loading demands data...</div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : displayedDemands.length === 0 ? (
                     <tr>
                       <td colSpan="10" className="p-8 text-center text-slate-500 font-medium">
                         No demands matching the selected criteria.
