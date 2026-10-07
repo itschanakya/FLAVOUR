@@ -21,7 +21,6 @@ export default function DeliveryManagement() {
 
   // Filters
   const [viewMode, setViewMode] = useState('STOPS'); // 'STOPS' | 'FLEET_LOADS'
-  const [stopsViewType, setStopsViewType] = useState('CARD'); // 'CARD' | 'TABLE'
   const [selectedPin, setSelectedPin] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedPartner, setSelectedPartner] = useState('ALL');
@@ -1310,29 +1309,6 @@ _National Cadet Corps - Supply & Logistics Portal_`;
         {/* Search and Filters */}
         {viewMode === 'STOPS' && (
           <div className="flex flex-wrap xl:flex-nowrap items-center gap-4 w-full justify-between xl:justify-end">
-            {/* View Type Toggle */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0 border border-slate-200">
-              <button
-                type="button"
-                onClick={() => setStopsViewType('TABLE')}
-                className={`p-1.5 rounded-lg flex items-center justify-center transition-all ${
-                  stopsViewType === 'TABLE' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'
-                }`}
-                title="Table View"
-              >
-                <LayoutList className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setStopsViewType('CARD')}
-                className={`p-1.5 rounded-lg flex items-center justify-center transition-all ${
-                  stopsViewType === 'CARD' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'
-                }`}
-                title="Summary Card View"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-            </div>
             {/* Search Input */}
             <div className="relative w-full xl:w-auto flex-1 min-w-[200px]">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1789,8 +1765,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                       </div>
                     </div>
 
-                     {/* DEMAND STOPS LIST FOR THIS UNIT (GRID OF CARDS OR TABLE) */}
-                    {stopsViewType === 'TABLE' ? (
+                     {/* DEMAND STOPS LIST FOR THIS UNIT (TABLE) */}
                       <div className="overflow-x-auto mt-4 rounded-xl border border-slate-200">
                         <table className="w-full text-left text-sm whitespace-nowrap">
                           <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-black">
@@ -1849,177 +1824,6 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                           </tbody>
                         </table>
                       </div>
-                    ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
-                      {unitGroup.demands.map((dem, idx) => {
-                        const isDelivered = dem.delivery_status === 'DELIVERED';
-                        const isOut = dem.delivery_status === 'OUT_FOR_DELIVERY';
-                        const mapsUrl = getGoogleMapsUrl(dem);
-                        const timeRemaining = getTimeRemaining(dem.demand_date, dem.demand_time, dem.delivery_status);
-
-                        return (
-                          <div
-                            key={dem.id}
-                            onClick={() => {
-                              if (isDelivered) {
-                                setSelectedDemandForSummary(dem);
-                              } else if (!dem.delivery_partner_name) {
-                                handleOpenAssign(dem);
-                              }
-                            }}
-                            className="p-4 bg-white rounded-[24px] shadow-sm border border-slate-200 relative hover:border-slate-300 transition-all cursor-pointer group flex flex-col"
-                          >
-                            {/* Top Row: Index, DEM-ID, Date/Time */}
-                            <div className="flex flex-wrap items-center gap-2 mb-3">
-                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-sm text-slate-800 border border-slate-200">
-                                {idx + 1}
-                              </div>
-                              <div className="px-2 py-1 bg-blue-50 text-blue-700 text-[11px] font-black rounded-md border border-blue-100">
-                                {dem.demand_number}
-                              </div>
-                              <div className="text-[11px] text-slate-500 flex items-center gap-1 font-bold ml-1">
-                                <Calendar className="w-3.5 h-3.5" /> {formatDDMMYYYY(dem.demand_date)}
-                                <Clock className="w-3.5 h-3.5 ml-1" /> {dem.demand_time || '08:00'}
-                              </div>
-                            </div>
-
-                            {/* PIN Code Badge */}
-                            <div className="mb-2">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-rose-50 text-rose-700 text-xs font-black rounded-full border border-rose-100">
-                                <MapPin className="w-3 h-3" /> PIN {dem.pin_code || 'N/A'}
-                              </span>
-                            </div>
-
-                            {/* Institution */}
-                            <div className="mb-1 flex-1">
-                              <h3 className="font-black text-slate-900 text-base group-hover:text-blue-600 transition-colors uppercase leading-tight">
-                                {dem.institution_name}
-                              </h3>
-                              <div className="text-slate-500 text-[13px] font-medium mt-1 truncate">
-                                {dem.complete_address || 'Address provided at registry'}
-                              </div>
-                            </div>
-
-                            {/* Pkts & Due Time */}
-                            <div className="flex items-center justify-between mt-3 mb-4">
-                              <span className="px-3 py-1 bg-indigo-50 text-indigo-900 text-sm font-black rounded-[14px]">
-                                {dem.total_quantity || 0} Pkts
-                              </span>
-                              
-                              {timeRemaining.type === 'delivered' ? (
-                                <div className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                                  <CheckCircle2 className="w-3.5 h-3.5" /> Done
-                                </div>
-                              ) : timeRemaining.isOverdue ? (
-                                <div className="text-xs font-black text-rose-600 flex items-center gap-1">
-                                  <Clock className="w-3.5 h-3.5" /> {timeRemaining.text}
-                                </div>
-                              ) : timeRemaining.type === 'urgent' ? (
-                                <div className="text-xs font-black text-amber-700 flex items-center gap-1">
-                                  <Clock className="w-3.5 h-3.5" /> {timeRemaining.text}
-                                </div>
-                              ) : (
-                                <div className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                                  <Clock className="w-3.5 h-3.5" /> {timeRemaining.text}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Action Buttons Centered */}
-                            <div className="flex flex-col items-center gap-2 mb-10 w-[90%] mx-auto" onClick={e => e.stopPropagation()}>
-                              {/* Assign Mode Button */}
-                              {dem.delivery_mode === 'PORTER' || dem.delivery_partner_name === 'Handled by Porter' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenAssign(dem)}
-                                  className="w-full py-2 border-2 border-dashed border-purple-300 text-purple-800 font-bold text-sm rounded-[24px] bg-purple-50 flex items-center justify-center gap-2 transition-all hover:bg-purple-100"
-                                >
-                                  <Package className="w-4 h-4" /> Porter Assigned
-                                </button>
-                              ) : dem.delivery_mode === 'SELF_DELIVERY' || dem.delivery_partner_name === 'Admin Self Delivery' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenAssign(dem)}
-                                  className="w-full py-2 border-2 border-dashed border-emerald-300 text-emerald-800 font-bold text-sm rounded-[24px] bg-emerald-50 flex items-center justify-center gap-2 transition-all hover:bg-emerald-100"
-                                >
-                                  <Building2 className="w-4 h-4" /> Self Delivery
-                                </button>
-                              ) : dem.delivery_partner_name ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenAssign(dem)}
-                                  className="w-full py-2 border-2 border-blue-200 text-blue-700 font-bold text-sm rounded-[24px] bg-blue-50 flex items-center justify-center gap-2 transition-all hover:bg-blue-100"
-                                >
-                                  <Truck className="w-4 h-4" /> {dem.delivery_partner_name}
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenAssign(dem)}
-                                  className="w-full py-2 border-2 border-dashed border-amber-300 text-amber-800 font-bold text-sm rounded-[24px] bg-amber-50/70 flex items-center justify-center gap-2 transition-all hover:bg-amber-100"
-                                >
-                                  <Plus className="w-4 h-4 text-amber-600" /> Assign Mode
-                                </button>
-                              )}
-
-                              {/* Status Action Button */}
-                              {isDelivered ? (
-                                <span className="w-full py-2 border-2 border-emerald-200 text-emerald-700 font-bold text-sm rounded-[24px] bg-emerald-50 flex items-center justify-center gap-2 shadow-sm">
-                                  <CheckCircle2 className="w-4 h-4" /> Delivered
-                                </span>
-                              ) : dem.delivery_status === 'REJECTED' ? (
-                                <span className="w-full py-2 border-2 border-rose-200 text-rose-700 font-bold text-sm rounded-[24px] bg-rose-50 flex items-center justify-center gap-2 shadow-sm">
-                                  <X className="w-4 h-4" /> Rejected
-                                </span>
-                              ) : dem.delivery_status === 'ARRIVED' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateStatus(dem.id, 'DELIVERED')}
-                                  className="w-full py-2 border-2 border-emerald-400 text-white font-black text-sm rounded-[24px] bg-emerald-500 flex items-center justify-center gap-2 shadow-md hover:bg-emerald-600 transition-all active:scale-95"
-                                >
-                                  <CheckCircle2 className="w-4 h-4" /> Mark Delivered
-                                </button>
-                              ) : isOut ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateStatus(dem.id, 'ARRIVED')}
-                                  className="w-full py-2 border-2 border-indigo-400 text-white font-black text-sm rounded-[24px] bg-indigo-500 flex items-center justify-center gap-2 shadow-md hover:bg-indigo-600 transition-all active:scale-95"
-                                >
-                                  <MapPin className="w-4 h-4" /> In at Gate
-                                </button>
-                              ) : (
-                                <span className="w-full py-2 border-2 border-amber-200 text-amber-700 font-black text-sm rounded-[24px] bg-amber-50 flex items-center justify-center gap-2 shadow-sm">
-                                  <AlertTriangle className="w-4 h-4 text-amber-600" /> Ready for Dispatch
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Floating Action Buttons */}
-                            <div className="absolute bottom-4 right-4 flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                              <a
-                                href={mapsUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-10 h-10 rounded-full border border-blue-200 text-blue-600 flex items-center justify-center bg-blue-50 hover:bg-blue-100 transition-colors shadow-sm"
-                                title="Open Google Maps Navigation"
-                              >
-                                <Navigation className="w-4 h-4" />
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => handleSendWhatsAppAlert(dem)}
-                                className="w-10 h-10 rounded-full border border-emerald-200 text-emerald-600 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 transition-colors shadow-sm"
-                                title="Send WhatsApp Alert to ANO"
-                              >
-                                <MessageCircle className="w-4 h-4" />
-                              </button>
-                            </div>
-
-                          </div>
-                        );
-                      })}
-                    </div>
-                    )}
                   </div>
                 ))}
               </div>
