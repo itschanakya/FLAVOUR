@@ -128,13 +128,20 @@ export default function AdminDemandsPage() {
 
   const handleAccept = async (demandId) => {
     if (!window.confirm('Accept this demand for fulfillment? It will move to Supply Point for packing and dispatch.')) return;
+    
+    // Optimistic UI Update
+    setDemands(prev => prev.map(d => d.id === demandId ? { ...d, status: 'ACCEPTED' } : d));
+
     try {
       const res = await fetch(`/api/demands/${demandId}/accept`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+        fetchDemandsData(); // Revert on error
+        throw new Error(data.error);
+      }
       fetchDemandsData();
       window.dispatchEvent(new Event('demand-status-changed'));
     } catch (err) {
@@ -145,6 +152,10 @@ export default function AdminDemandsPage() {
   const handleReject = async (demandId) => {
     const reason = window.prompt('Reason for rejection:');
     if (reason === null) return;
+    
+    // Optimistic UI Update
+    setDemands(prev => prev.map(d => d.id === demandId ? { ...d, status: 'REJECTED' } : d));
+
     try {
       const res = await fetch(`/api/demands/${demandId}/admin-reject`, {
         method: 'POST',
@@ -155,7 +166,10 @@ export default function AdminDemandsPage() {
         body: JSON.stringify({ reason: reason || 'Rejected by Vendor/Admin.' })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+        fetchDemandsData(); // Revert on error
+        throw new Error(data.error);
+      }
       fetchDemandsData();
       window.dispatchEvent(new Event('demand-status-changed'));
     } catch (err) {
@@ -177,7 +191,10 @@ export default function AdminDemandsPage() {
     if (selectedDemandIds.size === 0) return;
     if (!window.confirm(`Accept ${selectedDemandIds.size} demands for fulfillment?`)) return;
     
+    // Optimistic UI Update
+    setDemands(prev => prev.map(d => selectedDemandIds.has(d.id) ? { ...d, status: 'ACCEPTED' } : d));
     setIsBulkLoading(true);
+
     try {
       const promises = Array.from(selectedDemandIds).map(id =>
         fetch(`/api/demands/${id}/accept`, {
@@ -190,6 +207,7 @@ export default function AdminDemandsPage() {
       setSelectedDemandIds(new Set());
       window.dispatchEvent(new Event('demand-status-changed'));
     } catch (err) {
+      fetchDemandsData(); // Revert on error
       alert(`Bulk accept failed: ${err.message}`);
     } finally {
       setIsBulkLoading(false);
@@ -201,7 +219,10 @@ export default function AdminDemandsPage() {
     const reason = window.prompt(`Reason for rejecting ${selectedDemandIds.size} demands:`);
     if (reason === null) return;
     
+    // Optimistic UI Update
+    setDemands(prev => prev.map(d => selectedDemandIds.has(d.id) ? { ...d, status: 'REJECTED' } : d));
     setIsBulkLoading(true);
+
     try {
       const promises = Array.from(selectedDemandIds).map(id =>
         fetch(`/api/demands/${id}/admin-reject`, {
@@ -218,6 +239,7 @@ export default function AdminDemandsPage() {
       setSelectedDemandIds(new Set());
       window.dispatchEvent(new Event('demand-status-changed'));
     } catch (err) {
+      fetchDemandsData(); // Revert on error
       alert(`Bulk reject failed: ${err.message}`);
     } finally {
       setIsBulkLoading(false);
