@@ -525,6 +525,14 @@ router.get('/dashboard-analytics', authenticateToken, async (req, res) => {
       kpiParams.push(targetYear);
     }
 
+    // 2. Daywise Parameters
+    const dayParams = [...params];
+    let dayWhere = baseWhere;
+    if (targetYear && targetYear !== 'ALL') {
+      dayWhere += " AND DATE_FORMAT(d.demand_date, '%Y') = ?";
+      dayParams.push(targetYear);
+    }
+
     // Run all heavy SQL queries concurrently to significantly boost performance
     const [kpis, dailyRows, weeklyRows, monthlyRows, annualRows, unitDistribution] = await Promise.all([
       // 1. Overall KPI Counters (All-time or year-scoped)
