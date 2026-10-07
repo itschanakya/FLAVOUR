@@ -1074,14 +1074,14 @@ _National Cadet Corps - Supply & Logistics Portal_`;
   return (
     <div className="w-full space-y-3.5">
       {/* Smart Executive Header with Action Buttons */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-center relative min-h-[72px]">
         {/* Title & Badge */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="p-2 bg-blue-50 rounded-xl border border-blue-100 shadow-2xs">
             <Truck className="w-5 h-5 text-blue-600" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2">
               <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
                 Delivery & Route Logistics
               </h1>
@@ -1096,7 +1096,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center justify-center gap-2.5 mt-3 sm:mt-0 sm:absolute sm:right-5">
           <Link
             to="/documentation"
             className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs shadow-xs transition-all flex items-center gap-1.5"
