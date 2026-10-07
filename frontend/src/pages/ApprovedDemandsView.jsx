@@ -472,13 +472,22 @@ export default function ApprovedDemandsView() {
     return groups;
   }, [shownList]);
 
+  const initializedDatesRef = useRef(new Set());
+
   useEffect(() => {
-    const initial = {};
     const todayStr = new Date().toISOString().split('T')[0];
-    dateGroups.forEach(g => {
-      initial[g.key] = g.key >= todayStr;
+    setExpandedDates(prev => {
+      let changed = false;
+      const next = { ...prev };
+      dateGroups.forEach(g => {
+        if (!initializedDatesRef.current.has(g.key)) {
+          next[g.key] = g.key >= todayStr;
+          initializedDatesRef.current.add(g.key);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
     });
-    setExpandedDates(initial);
   }, [dateGroups]);
 
   const toggleDate = (dateKey) => {
