@@ -525,159 +525,156 @@ router.get('/dashboard-analytics', authenticateToken, async (req, res) => {
       kpiParams.push(targetYear);
     }
 
-    const kpis = await db.get(
-      `SELECT 
-         COUNT(DISTINCT d.id) as total_demands,
-         COUNT(DISTINCT d.unit_id) as active_units,
-         COUNT(DISTINCT d.institution_id) as active_institutions,
-         COALESCE(SUM(di.quantity), 0) as total_packets_demanded,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as total_packets_delivered,
-         COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as total_packets_in_transit,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount_delivered,
-         COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount_demanded,
-         COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as pending_vendor_demands,
-         COALESCE(SUM(CASE WHEN d.status IN ('ACCEPTED', 'PREPARING') THEN 1 ELSE 0 END), 0) as accepted_demands,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_demands
-       FROM demands d
-       LEFT JOIN demand_items di ON d.id = di.demand_id
-       ${kpiWhere}`,
-      kpiParams
-    );
+    // Run all heavy SQL queries concurrently to significantly boost performance
+    const [kpis, dailyRows, weeklyRows, monthlyRows, annualRows, unitDistribution] = await Promise.all([
+      // 1. Overall KPI Counters (All-time or year-scoped)
+      db.get(
+        `SELECT 
+           COUNT(DISTINCT d.id) as total_demands,
+           COUNT(DISTINCT d.unit_id) as active_units,
+           COUNT(DISTINCT d.institution_id) as active_institutions,
+           COALESCE(SUM(di.quantity), 0) as total_packets_demanded,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as total_packets_delivered,
+           COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as total_packets_in_transit,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount_delivered,
+           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount_demanded,
+           COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as pending_vendor_demands,
+           COALESCE(SUM(CASE WHEN d.status IN ('ACCEPTED', 'PREPARING') THEN 1 ELSE 0 END), 0) as accepted_demands,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_demands
+         FROM demands d
+         LEFT JOIN demand_items di ON d.id = di.demand_id
+         ${kpiWhere}`,
+        kpiParams
+      ),
 
-    // 2. Daywise (Daily) Breakdown
-    const dayParams = [...params];
-    let dayWhere = baseWhere;
-    if (targetYear && targetYear !== 'ALL') {
-      dayWhere += " AND DATE_FORMAT(d.demand_date, '%Y') = ?";
-      dayParams.push(targetYear);
-    }
+      // 2. Daywise (Daily) Breakdown
+      db.all(
+        `SELECT 
+           DATE_FORMAT(d.demand_date, '%Y-%m-%d') as date,
+           DATE_FORMAT(d.demand_date, '%d/%m/%Y') as date_formatted,
+           DATE_FORMAT(d.demand_date, '%W') as day_name,
+           GROUP_CONCAT(DISTINCT u.unit_code SEPARATOR ', ') as unit_codes,
+           COUNT(DISTINCT d.id) as demand_count,
+           COUNT(DISTINCT d.unit_id) as unit_count,
+           COUNT(DISTINCT d.institution_id) as institution_count,
+           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
+           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
+           COALESCE(SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count,
+           COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
+           COALESCE(SUM(CASE WHEN d.status IN ('ACCEPTED', 'PREPARING') THEN 1 ELSE 0 END), 0) as accepted_count,
+           COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
+           COALESCE(SUM(CASE WHEN d.status IN ('CANCELLED', 'REJECTED') THEN 1 ELSE 0 END), 0) as rejected_count
+         FROM demands d
+         LEFT JOIN demand_items di ON d.id = di.demand_id
+         LEFT JOIN units u ON d.unit_id = u.id
+         ${dayWhere}
+         GROUP BY DATE_FORMAT(d.demand_date, '%Y-%m-%d'), DATE_FORMAT(d.demand_date, '%d/%m/%Y'), DATE_FORMAT(d.demand_date, '%W')
+         ORDER BY date DESC`,
+        dayParams
+      ),
 
-    const dailyRows = await db.all(
-      `SELECT 
-         DATE_FORMAT(d.demand_date, '%Y-%m-%d') as date,
-         DATE_FORMAT(d.demand_date, '%d/%m/%Y') as date_formatted,
-         DATE_FORMAT(d.demand_date, '%W') as day_name,
-         GROUP_CONCAT(DISTINCT u.unit_code SEPARATOR ', ') as unit_codes,
-         COUNT(DISTINCT d.id) as demand_count,
-         COUNT(DISTINCT d.unit_id) as unit_count,
-         COUNT(DISTINCT d.institution_id) as institution_count,
-         COALESCE(SUM(di.quantity), 0) as total_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-         COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
-         COALESCE(SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count,
-         COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
-         COALESCE(SUM(CASE WHEN d.status IN ('ACCEPTED', 'PREPARING') THEN 1 ELSE 0 END), 0) as accepted_count,
-         COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
-         COALESCE(SUM(CASE WHEN d.status IN ('CANCELLED', 'REJECTED') THEN 1 ELSE 0 END), 0) as rejected_count
-       FROM demands d
-       LEFT JOIN demand_items di ON d.id = di.demand_id
-       LEFT JOIN units u ON d.unit_id = u.id
-       ${dayWhere}
-       GROUP BY DATE_FORMAT(d.demand_date, '%Y-%m-%d'), DATE_FORMAT(d.demand_date, '%d/%m/%Y'), DATE_FORMAT(d.demand_date, '%W')
-       ORDER BY date DESC`,
-      dayParams
-    );
+      // 3. Weekly Breakdown
+      db.all(
+        `SELECT 
+           DATE_FORMAT(d.demand_date, '%x-W%v') as week_key,
+           DATE_FORMAT(d.demand_date, '%v') as week_number,
+           MIN(DATE_FORMAT(d.demand_date, '%d/%m/%Y')) as week_start,
+           MAX(DATE_FORMAT(d.demand_date, '%d/%m/%Y')) as week_end,
+           COUNT(DISTINCT d.id) as demand_count,
+           COUNT(DISTINCT d.unit_id) as unit_count,
+           COUNT(DISTINCT d.institution_id) as institution_count,
+           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
+           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
+           COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
+           COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
+           COALESCE(SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count
+         FROM demands d
+         LEFT JOIN demand_items di ON d.id = di.demand_id
+         ${dayWhere}
+         GROUP BY week_key, week_number
+         ORDER BY week_key DESC`,
+        dayParams
+      ),
 
-    // 3. Weekly Breakdown
-    const weeklyRows = await db.all(
-      `SELECT 
-         DATE_FORMAT(d.demand_date, '%x-W%v') as week_key,
-         DATE_FORMAT(d.demand_date, '%v') as week_number,
-         MIN(DATE_FORMAT(d.demand_date, '%d/%m/%Y')) as week_start,
-         MAX(DATE_FORMAT(d.demand_date, '%d/%m/%Y')) as week_end,
-         COUNT(DISTINCT d.id) as demand_count,
-         COUNT(DISTINCT d.unit_id) as unit_count,
-         COUNT(DISTINCT d.institution_id) as institution_count,
-         COALESCE(SUM(di.quantity), 0) as total_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-         COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
-         COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
-         COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
-         COALESCE(SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count
-       FROM demands d
-       LEFT JOIN demand_items di ON d.id = di.demand_id
-       ${dayWhere}
-       GROUP BY week_key, week_number
-       ORDER BY week_key DESC`,
-      dayParams
-    );
+      // 4. Monthly Breakdown
+      db.all(
+        `SELECT 
+           DATE_FORMAT(d.demand_date, '%Y-%m') as month_key,
+           DATE_FORMAT(d.demand_date, '%m') as month_number,
+           DATE_FORMAT(d.demand_date, '%M') as month_name,
+           COUNT(DISTINCT d.id) as demand_count,
+           COUNT(DISTINCT d.unit_id) as unit_count,
+           COUNT(DISTINCT d.institution_id) as institution_count,
+           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
+           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
+           COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
+           COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
+           COALESCE(SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count
+         FROM demands d
+         LEFT JOIN demand_items di ON d.id = di.demand_id
+         ${dayWhere}
+         GROUP BY month_key, month_number, month_name
+         ORDER BY month_key DESC`,
+        dayParams
+      ),
 
-    // 4. Monthly Breakdown
-    const monthlyRows = await db.all(
-      `SELECT 
-         DATE_FORMAT(d.demand_date, '%Y-%m') as month_key,
-         DATE_FORMAT(d.demand_date, '%m') as month_number,
-         DATE_FORMAT(d.demand_date, '%M') as month_name,
-         COUNT(DISTINCT d.id) as demand_count,
-         COUNT(DISTINCT d.unit_id) as unit_count,
-         COUNT(DISTINCT d.institution_id) as institution_count,
-         COALESCE(SUM(di.quantity), 0) as total_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-         COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
-         COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
-         COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
-         COALESCE(SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count
-       FROM demands d
-       LEFT JOIN demand_items di ON d.id = di.demand_id
-       ${dayWhere}
-       GROUP BY month_key, month_number, month_name
-       ORDER BY month_key DESC`,
-      dayParams
-    );
+      // 5. Annually Breakdown (Multi-year overview)
+      db.all(
+        `SELECT 
+           DATE_FORMAT(d.demand_date, '%Y') as year,
+           COUNT(DISTINCT d.id) as demand_count,
+           COUNT(DISTINCT d.unit_id) as unit_count,
+           COUNT(DISTINCT d.institution_id) as institution_count,
+           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
+           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
+           COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
+           COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
+           COALESCE(SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count
+         FROM demands d
+         LEFT JOIN demand_items di ON d.id = di.demand_id
+         ${baseWhere}
+         GROUP BY year
+         ORDER BY year DESC`,
+        params
+      ),
 
-    // 5. Annually Breakdown (Multi-year overview)
-    const annualRows = await db.all(
-      `SELECT 
-         DATE_FORMAT(d.demand_date, '%Y') as year,
-         COUNT(DISTINCT d.id) as demand_count,
-         COUNT(DISTINCT d.unit_id) as unit_count,
-         COUNT(DISTINCT d.institution_id) as institution_count,
-         COALESCE(SUM(di.quantity), 0) as total_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-         COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
-         COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
-         COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
-         COALESCE(SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count
-       FROM demands d
-       LEFT JOIN demand_items di ON d.id = di.demand_id
-       ${baseWhere}
-       GROUP BY year
-       ORDER BY year DESC`,
-      params
-    );
-
-    // 6. Unit-wise Distribution for Charts
-    const unitDistribution = await db.all(
-      `SELECT 
-         u.id as unit_id,
-         u.unit_name,
-         u.unit_code,
-         u.ncc_group,
-         COUNT(DISTINCT d.id) as demand_count,
-         COALESCE(SUM(di.quantity), 0) as total_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
-         COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-         COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount
-       FROM units u
-       LEFT JOIN demands d ON u.id = d.unit_id AND d.is_deleted = 0 ${targetYear && targetYear !== 'ALL' ? "AND DATE_FORMAT(d.demand_date, '%Y') = ?" : ""}
-       LEFT JOIN demand_items di ON d.id = di.demand_id
-       GROUP BY u.id, u.unit_name, u.unit_code, u.ncc_group
-       HAVING total_packets > 0 OR demand_count > 0
-       ORDER BY total_packets DESC`,
-      targetYear && targetYear !== 'ALL' ? [targetYear] : []
-    );
+      // 6. Unit-wise Distribution for Charts
+      db.all(
+        `SELECT 
+           u.id as unit_id,
+           u.unit_name,
+           u.unit_code,
+           u.ncc_group,
+           COUNT(DISTINCT d.id) as demand_count,
+           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
+           COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
+           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount
+         FROM units u
+         LEFT JOIN demands d ON u.id = d.unit_id AND d.is_deleted = 0 ${targetYear && targetYear !== 'ALL' ? "AND DATE_FORMAT(d.demand_date, '%Y') = ?" : ""}
+         LEFT JOIN demand_items di ON d.id = di.demand_id
+         GROUP BY u.id, u.unit_name, u.unit_code, u.ncc_group
+         HAVING total_packets > 0 OR demand_count > 0
+         ORDER BY total_packets DESC`,
+        targetYear && targetYear !== 'ALL' ? [targetYear] : []
+      )
+    ]);
 
     res.json({
       targetYear,
