@@ -12,8 +12,8 @@ router.get('/', authenticateToken, async (req, res) => {
       const units = await db.all(`
         SELECT u.*, 
           COUNT(i.id) as institution_count,
-          usr.email as unit_email,
-          usr.login_id as login_id
+          MAX(usr.email) as unit_email,
+          MAX(usr.login_id) as login_id
         FROM units u
         LEFT JOIN institutions i ON i.unit_id = u.id
         LEFT JOIN users usr ON usr.unit_id = u.id AND usr.role = 'UNIT'
@@ -25,8 +25,8 @@ router.get('/', authenticateToken, async (req, res) => {
       const unit = await db.get(`
         SELECT u.*, 
           COUNT(i.id) as institution_count,
-          usr.email as unit_email,
-          usr.login_id as login_id
+          MAX(usr.email) as unit_email,
+          MAX(usr.login_id) as login_id
         FROM units u 
         LEFT JOIN institutions i ON i.unit_id = u.id
         LEFT JOIN users usr ON usr.unit_id = u.id AND usr.role = 'UNIT'
