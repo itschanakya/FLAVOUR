@@ -223,7 +223,8 @@ export default function ApprovedDemandsView() {
        }
     }
     try {
-      const res = await fetch('/api/demands', { headers: { Authorization: `Bearer ${token}` } });
+      const timestamp = Date.now();
+      const res = await fetch(`/api/demands?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (res.ok) {
         sessionStorage.setItem('approved_demands_cache', JSON.stringify(data));

@@ -98,7 +98,8 @@ export default function InstitutionDashboard() {
   const fetchDemandsHistory = useCallback(async () => {
     if (!token) return;
     try {
-      const demRes = await fetch('/api/demands', {
+      const timestamp = Date.now();
+      const demRes = await fetch(`/api/demands?t=${timestamp}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (demRes.ok) {

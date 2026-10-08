@@ -88,10 +88,11 @@ export default function DeliveryManagement() {
     }
     
     try {
+      const timestamp = Date.now();
       const [demRes, partRes, kmRes] = await Promise.all([
-        fetch('/api/delivery/demands', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/delivery/partners', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/delivery/km-logs', { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`/api/delivery/demands?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/delivery/partners?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/delivery/km-logs?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       if (demRes.ok) {

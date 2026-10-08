@@ -26,15 +26,16 @@ export default function UnitDashboard() {
   const fetchUnitData = useCallback(async () => {
     if (!token) return;
     try {
+      const timestamp = Date.now();
       // 1. Fetch all demands for this unit
-      const demRes = await fetch('/api/demands?unit_id=' + (user?.unit_id || ''), {
+      const demRes = await fetch(`/api/demands?unit_id=${user?.unit_id || ''}&t=${timestamp}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const demData = await demRes.json();
       setDemands(Array.isArray(demData) ? demData : []);
 
       // 2. Fetch institutions count
-      const instRes = await fetch('/api/institutions', {
+      const instRes = await fetch(`/api/institutions?t=${timestamp}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const instData = await instRes.json();

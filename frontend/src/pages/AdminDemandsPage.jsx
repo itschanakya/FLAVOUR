@@ -103,11 +103,12 @@ export default function AdminDemandsPage() {
         }
       }
 
+      const timestamp = Date.now();
       const [sumRes, demRes, unitsRes, instRes] = await Promise.all([
-        fetch('/api/reports/summary', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/demands', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/units', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/institutions', { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`/api/reports/summary?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/demands?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/units?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/institutions?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       if (sumRes.ok) {
