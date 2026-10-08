@@ -237,10 +237,16 @@ export default function ApprovedDemandsView() {
   }, [token]);
 
   const fetchUnits = useCallback(async () => {
+    const cached = sessionStorage.getItem('approved_units_cache');
+    if (cached) setUnits(JSON.parse(cached));
+    
     try {
       const res = await fetch('/api/units', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      if (res.ok && Array.isArray(data)) setUnits(data);
+      if (res.ok && Array.isArray(data)) {
+        sessionStorage.setItem('approved_units_cache', JSON.stringify(data));
+        setUnits(data);
+      }
     } catch (err) {
       console.error(err);
     }

@@ -76,9 +76,11 @@ export default function DeliveryManagement() {
     if (!silent) {
       const cachedDem = sessionStorage.getItem('delivery_demands_cache');
       const cachedPart = sessionStorage.getItem('delivery_partners_cache');
-      if (cachedDem && cachedPart) {
+      const cachedKm = sessionStorage.getItem('delivery_km_cache');
+      if (cachedDem && cachedPart && cachedKm) {
         setDemands(JSON.parse(cachedDem));
         setPartners(JSON.parse(cachedPart));
+        setKmLogs(JSON.parse(cachedKm));
         setLoading(false);
       } else {
         setLoading(true);
@@ -106,7 +108,9 @@ export default function DeliveryManagement() {
       }
       if (kmRes && kmRes.ok) {
         const kmData = await kmRes.json();
-        setKmLogs(Array.isArray(kmData) ? kmData : []);
+        const filteredKm = Array.isArray(kmData) ? kmData : [];
+        sessionStorage.setItem('delivery_km_cache', JSON.stringify(filteredKm));
+        setKmLogs(filteredKm);
       }
     } catch (err) {
       console.error('Error fetching delivery data:', err);

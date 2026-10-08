@@ -88,9 +88,16 @@ export default function AdminDemandsPage() {
   const fetchDemandsData = async (silent = false) => {
     try {
       if (!silent) {
-        const cached = sessionStorage.getItem('admin_demands_cache');
-        if (cached) {
-          setDemands(JSON.parse(cached));
+        const cachedDem = sessionStorage.getItem('admin_demands_cache');
+        const cachedSum = sessionStorage.getItem('admin_summary_cache');
+        const cachedUnits = sessionStorage.getItem('admin_units_cache');
+        const cachedInst = sessionStorage.getItem('admin_inst_cache');
+        if (cachedDem && cachedSum && cachedUnits && cachedInst) {
+          setDemands(JSON.parse(cachedDem));
+          setSummary(JSON.parse(cachedSum));
+          setOnboardUnits(JSON.parse(cachedUnits));
+          setInstitutions(JSON.parse(cachedInst));
+          setLoading(false);
         } else {
           setLoading(true);
         }
@@ -104,7 +111,9 @@ export default function AdminDemandsPage() {
       ]);
 
       if (sumRes.ok) {
-        setSummary(await sumRes.json());
+        const sumData = await sumRes.json();
+        sessionStorage.setItem('admin_summary_cache', JSON.stringify(sumData));
+        setSummary(sumData);
       }
       
       if (demRes.ok) {
@@ -116,12 +125,16 @@ export default function AdminDemandsPage() {
 
       if (unitsRes.ok) {
         const unitsData = await unitsRes.json();
-        setOnboardUnits(Array.isArray(unitsData) ? unitsData : []);
+        const arr = Array.isArray(unitsData) ? unitsData : [];
+        sessionStorage.setItem('admin_units_cache', JSON.stringify(arr));
+        setOnboardUnits(arr);
       }
 
       if (instRes.ok) {
         const instData = await instRes.json();
-        setInstitutions(Array.isArray(instData) ? instData : []);
+        const arr = Array.isArray(instData) ? instData : [];
+        sessionStorage.setItem('admin_inst_cache', JSON.stringify(arr));
+        setInstitutions(arr);
       }
 
     } catch (err) {
