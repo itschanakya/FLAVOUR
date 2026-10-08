@@ -320,11 +320,7 @@ export default function ApprovedDemandsView() {
 
   // Filter demands by Group (GP) and Unit and Time
   const isActiveDate = (dDate) => {
-    if (!dDate) return false;
-    const dStr = String(dDate).split('T')[0].split(' ')[0];
-    const today = new Date().toISOString().split('T')[0];
-    const diff = Math.floor(new Date(dStr).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
-    return diff === 0 || diff === 1;
+    return true;
   };
 
   const baseFilteredDemands = useMemo(() => {

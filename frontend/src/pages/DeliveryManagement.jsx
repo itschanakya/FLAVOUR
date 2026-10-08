@@ -151,15 +151,7 @@ export default function DeliveryManagement() {
   // Filtered Demands List
   const filteredDemands = useMemo(() => {
     return demands.filter(d => {
-      // 0. Only show Today and Tomorrow for Active Queues
-      if (selectedStatus !== 'DELIVERED') {
-        const dDate = d.demand_date ? String(d.demand_date).split('T')[0].split(' ')[0] : null;
-        if (dDate) {
-          const today = new Date().toISOString().split('T')[0];
-          const diff = Math.floor(new Date(dDate).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
-          if (diff !== 0 && diff !== 1) return false;
-        }
-      }
+      // 0. (Removed hardcoded today/tomorrow restriction, pagination now handles performance)
 
       // PIN Filter
       if (selectedPin !== 'ALL' && d.pin_code !== selectedPin) return false;

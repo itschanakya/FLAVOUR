@@ -289,15 +289,7 @@ export default function AdminDemandsPage() {
   // Filter demands by unit, institution, status, time, and keyword search
   const safeDemands = Array.isArray(demands) ? demands : [];
   const baseDemands = safeDemands.filter(d => {
-    // 0. Only show Today and Tomorrow for Active Queues
-    if (statusFilter !== 'REJECTED') {
-      const dDate = d.demand_date ? String(d.demand_date).split('T')[0].split(' ')[0] : null;
-      if (dDate) {
-        const today = new Date().toISOString().split('T')[0];
-        const diff = Math.floor(new Date(dDate).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
-        if (diff !== 0 && diff !== 1) return false;
-      }
-    }
+    // 0. (Removed hardcoded today/tomorrow restriction, pagination now handles performance)
 
     // 1. Unit filter
     if (selectedUnitId !== 'ALL' && String(d.unit_id) !== String(selectedUnitId)) {
@@ -457,11 +449,7 @@ export default function AdminDemandsPage() {
   const selectedInstitution = institutions.find(i => String(i.id) === String(selectedInstitutionId));
 
   const isActiveDate = (dDate) => {
-    if (!dDate) return false;
-    const dStr = String(dDate).split('T')[0].split(' ')[0];
-    const today = new Date().toISOString().split('T')[0];
-    const diff = Math.floor(new Date(dStr).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
-    return diff === 0 || diff === 1;
+    return true;
   };
 
   const activeDemands = Array.isArray(demands) ? demands.filter(d => isActiveDate(d.demand_date)) : [];
