@@ -385,6 +385,21 @@ export default function AdminDemandsPage() {
     if (last && last.key === k) last.items.push(d);
     else dateGroups.push({ key: k, items: [d] });
   });
+  
+  dateGroups.sort((ga, gb) => {
+    const isPastA = ga.key < todayKey;
+    const isPastB = gb.key < todayKey;
+
+    if (isPastA && !isPastB) return sortAsc ? 1 : -1;
+    if (!isPastA && isPastB) return sortAsc ? -1 : 1;
+    
+    if (isPastA && isPastB) {
+      return sortAsc ? gb.key.localeCompare(ga.key) : ga.key.localeCompare(gb.key);
+    }
+    
+    return sortAsc ? ga.key.localeCompare(gb.key) : gb.key.localeCompare(ga.key);
+  });
+  
   const pktsOf = (d) => Number(d.total_packets || d.total_quantity || d.quantity || 0);
 
   const dateBadge = (key) => {
