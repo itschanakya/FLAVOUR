@@ -1011,7 +1011,7 @@ export default function ReviewDemandsQueue() {
         }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
       );
       await Promise.all(promises);
-      fetchDemands();
+      fetchDemands(true);
       // Keep other selections, just remove the processed ones so they don't get selected again if we refresh state
       const next = new Set(selectedDemandIds);
       actionIds.forEach(id => next.delete(id));
@@ -1024,8 +1024,8 @@ export default function ReviewDemandsQueue() {
     }
   };
 
-  const fetchDemands = useCallback(async () => {
-    setLoading(true);
+  const fetchDemands = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch('/api/demands', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
@@ -1033,7 +1033,7 @@ export default function ReviewDemandsQueue() {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [token]);
 
@@ -1043,13 +1043,13 @@ export default function ReviewDemandsQueue() {
 
   useEffect(() => {
     if (events?.DEMAND_UPDATED || events?.timestamp) {
-      fetchDemands();
+      fetchDemands(true);
     }
   }, [events?.DEMAND_UPDATED, events?.timestamp, fetchDemands]);
 
   useEffect(() => {
     const handleStatusChange = () => {
-      fetchDemands();
+      fetchDemands(true);
     };
     window.addEventListener('demand-status-changed', handleStatusChange);
     return () => {
@@ -1057,21 +1057,16 @@ export default function ReviewDemandsQueue() {
     };
   }, [fetchDemands]);
 
-  const handleAction = async (demand, action) => {
-    setSelectedDemand(demand);
-    setReviewAction(action);
-  };
-
-  const handleConfirm = async (remarks) => {
-    if (!selectedDemand || !reviewAction || processing) return;
+  const executeActionCall = async (demand, action, remarks) => {
+    if (processing) return;
     setProcessing(true);
     try {
-      const endpoint = reviewAction === 'CANCEL'
-        ? `/api/demands/${selectedDemand.id}/cancel`
-        : `/api/demands/${selectedDemand.id}/review`;
-      const payload = reviewAction === 'CANCEL'
+      const endpoint = action === 'CANCEL'
+        ? `/api/demands/${demand.id}/cancel`
+        : `/api/demands/${demand.id}/review`;
+      const payload = action === 'CANCEL'
         ? { remarks }
-        : { action: reviewAction, remarks };
+        : { action, remarks };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -1083,25 +1078,38 @@ export default function ReviewDemandsQueue() {
 
       // Immediate local multi-window dispatch
       try {
-        window.dispatchEvent(new CustomEvent('demand-status-changed', { detail: { id: selectedDemand.id, action: reviewAction, ...data } }));
+        window.dispatchEvent(new CustomEvent('demand-status-changed', { detail: { id: demand.id, action, ...data } }));
         if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
           const syncChan = new BroadcastChannel('ncc_demands_sync');
-          syncChan.postMessage({ type: 'DEMAND_UPDATED', payload: { id: selectedDemand.id, action: reviewAction, ...data } });
+          syncChan.postMessage({ type: 'DEMAND_UPDATED', payload: { id: demand.id, action, ...data } });
           syncChan.close();
         }
       } catch (e) {}
 
-      setSelectedDemand(null);
-      setReviewAction(null);
-      fetchDemands();
+      fetchDemands(true);
     } catch (err) {
       alert(err.message);
-      setSelectedDemand(null);
-      setReviewAction(null);
-      fetchDemands();
+      fetchDemands(true);
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleAction = async (demand, action) => {
+    if (action === 'APPROVE') {
+      if (!window.confirm(`Approve demand ${demand.demand_number}?`)) return;
+      await executeActionCall(demand, action, 'Approved directly');
+    } else {
+      setSelectedDemand(demand);
+      setReviewAction(action);
+    }
+  };
+
+  const handleConfirm = async (remarks) => {
+    if (!selectedDemand || !reviewAction) return;
+    await executeActionCall(selectedDemand, reviewAction, remarks);
+    setSelectedDemand(null);
+    setReviewAction(null);
   };
 
   const handleDelete = async (dem) => {
@@ -1120,7 +1128,7 @@ export default function ReviewDemandsQueue() {
         }
       } catch (e) {}
 
-      fetchDemands();
+      fetchDemands(true);
     } catch (err) {
       alert(err.message);
     }
