@@ -197,6 +197,7 @@ export default function AppSettings() {
   const [deliveryPartnersList, setDeliveryPartnersList] = useState([]);
   const [editingDeliveryPartner, setEditingDeliveryPartner] = useState(null);
   const [isAddingDeliveryPartner, setIsAddingDeliveryPartner] = useState(false);
+  const [partnerOnboardMode, setPartnerOnboardMode] = useState('DRIVER'); // DRIVER | PORTER | SELF_SERVICE
   const [showPartnerPassword, setShowPartnerPassword] = useState(false);
   const [deliveryPartnerForm, setDeliveryPartnerForm] = useState({
     name: '',
@@ -732,6 +733,7 @@ export default function AppSettings() {
       password: '',
       is_active: 1
     });
+    setPartnerOnboardMode('DRIVER');
     setIsAddingDeliveryPartner(true);
     setEditingDeliveryPartner(null);
     setShowPartnerPassword(false);
@@ -741,6 +743,12 @@ export default function AppSettings() {
   const handleOpenEditDeliveryPartner = (partner) => {
     setEditingDeliveryPartner(partner);
     setIsAddingDeliveryPartner(false);
+    
+    let mode = 'DRIVER';
+    if (partner.vehicle_type === 'PORTER') mode = 'PORTER';
+    if (partner.vehicle_type === 'SELF_SERVICE') mode = 'SELF_SERVICE';
+    setPartnerOnboardMode(mode);
+
     setDeliveryPartnerForm({
       name: partner.name || '',
       phone: partner.phone || '',
@@ -853,6 +861,25 @@ export default function AppSettings() {
     try {
       setSaving(true);
       setError('');
+      
+      const payload = { ...deliveryPartnerForm };
+      if (partnerOnboardMode === 'PORTER') {
+        payload.vehicle_type = 'PORTER';
+        payload.vehicle_no = 'N/A';
+        payload.vehicle_model = 'Porter Delivery';
+        payload.load_capacity_packets = 0;
+        payload.max_travel_km = 0;
+        payload.login_id = '';
+        payload.password = '';
+      } else if (partnerOnboardMode === 'SELF_SERVICE') {
+        payload.vehicle_type = 'SELF_SERVICE';
+        payload.vehicle_no = 'N/A';
+        payload.vehicle_model = 'Self Service Pick-up';
+        payload.load_capacity_packets = 0;
+        payload.max_travel_km = 0;
+        payload.login_id = '';
+        payload.password = '';
+      }
       const url = isAddingDeliveryPartner
         ? '/api/delivery/partners'
         : `/api/delivery/partners/${editingDeliveryPartner.id}`;
@@ -864,7 +891,7 @@ export default function AppSettings() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(deliveryPartnerForm)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed to save delivery partner');
@@ -2685,10 +2712,56 @@ export default function AppSettings() {
               </div>
             )}
 
+            {/* Mode Selector Tabs */}
+            {isAddingDeliveryPartner && (
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-1.5">
+                  Select Role / Delivery Mode
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setPartnerOnboardMode('DRIVER')}
+                    className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                      partnerOnboardMode === 'DRIVER'
+                        ? 'bg-white text-blue-700 shadow-xs border border-blue-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Truck className="w-3.5 h-3.5 shrink-0" /> Driver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPartnerOnboardMode('PORTER')}
+                    className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                      partnerOnboardMode === 'PORTER'
+                        ? 'bg-white text-purple-700 shadow-xs border border-purple-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5 shrink-0" /> Porter
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPartnerOnboardMode('SELF_SERVICE')}
+                    className={`py-2 px-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                      partnerOnboardMode === 'SELF_SERVICE'
+                        ? 'bg-white text-emerald-700 shadow-xs border border-emerald-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5 shrink-0" /> Self Service
+                  </button>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSaveDeliveryPartner} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Full Name / Driver Name *</label>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    {partnerOnboardMode === 'DRIVER' ? 'Full Name / Driver Name' : partnerOnboardMode === 'PORTER' ? 'Porter Name' : 'Self Service Contact Name'} *
+                  </label>
                   <input
                     type="text"
                     required
@@ -2700,7 +2773,9 @@ export default function AppSettings() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Mobile Phone (Login / OTP) *</label>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    {partnerOnboardMode === 'DRIVER' ? 'Mobile Phone (Login / OTP)' : 'Contact Number'} *
+                  </label>
                   <input
                     type="tel"
                     required
@@ -2712,7 +2787,9 @@ export default function AppSettings() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {partnerOnboardMode === 'DRIVER' && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">User ID / Login ID *</label>
                   <input
@@ -2885,6 +2962,9 @@ export default function AppSettings() {
                   Active for Deliveries (Driver can sign in and accept drop-offs)
                 </label>
               </div>
+
+                </>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button

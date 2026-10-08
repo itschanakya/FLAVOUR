@@ -639,7 +639,15 @@ export default function DeliveryManagement() {
   }, [partners, selectedDemandForAssign]);
 
   const displayedDrivers = useMemo(() => {
-    return partners;
+    return partners.filter(p => p.vehicle_type !== 'PORTER' && p.vehicle_type !== 'SELF_SERVICE');
+  }, [partners]);
+
+  const displayedPorters = useMemo(() => {
+    return partners.filter(p => p.vehicle_type === 'PORTER');
+  }, [partners]);
+
+  const displayedSelfService = useMemo(() => {
+    return partners.filter(p => p.vehicle_type === 'SELF_SERVICE');
   }, [partners]);
 
   const selectedPartnerObj = useMemo(() => {
@@ -787,13 +795,13 @@ _National Cadet Corps - Supply & Logistics Portal_`;
       let pVehicle = customVehicleNo.trim();
 
       if (mode === 'PORTER') {
-        pName = 'Handled by Porter';
+        pName = customPartnerName || 'Handled by Porter';
         pPhone = customPartnerPhone || '';
-        pVehicle = 'Porter Transport';
+        pVehicle = customVehicleNo || 'Porter Transport';
       } else if (mode === 'SELF_DELIVERY') {
-        pName = 'Admin Self Delivery';
-        pPhone = '';
-        pVehicle = 'Admin Direct Handover';
+        pName = customPartnerName || 'Admin Self Delivery';
+        pPhone = customPartnerPhone || '';
+        pVehicle = customVehicleNo || 'Admin Direct Handover';
       }
 
       const s = (mode === 'DRIVER' && resolvedStartKm !== null && resolvedStartKm !== undefined && resolvedStartKm !== '')
@@ -811,7 +819,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
         body: JSON.stringify({
           demandIds: [selectedDemandForAssign.id],
           deliveryMode: mode,
-          partnerId: mode === 'DRIVER' && assignPartnerId ? parseInt(assignPartnerId) : null,
+          partnerId: assignPartnerId ? parseInt(assignPartnerId) : null,
           partnerName: pName,
           partnerPhone: pPhone,
           partnerVehicle: pVehicle,
@@ -828,7 +836,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
       const updatedDem = {
         ...selectedDemandForAssign,
         delivery_mode: mode,
-        delivery_partner_id: mode === 'DRIVER' && assignPartnerId ? parseInt(assignPartnerId) : null,
+        delivery_partner_id: assignPartnerId ? parseInt(assignPartnerId) : null,
         delivery_partner_name: pName,
         delivery_partner_phone: pPhone,
         delivery_partner_vehicle: pVehicle,
@@ -2416,36 +2424,92 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                   </div>
                 )
               ) : deliveryMode === 'PORTER' ? (
-                <div className="bg-purple-50/80 p-3.5 rounded-2xl border border-purple-200 space-y-1.5 text-xs text-purple-900">
+                <div className="bg-purple-50/80 p-3.5 rounded-2xl border border-purple-200 space-y-2 text-xs text-purple-900">
                   <div className="font-black flex items-center gap-1.5 text-purple-800">
                     <Package className="w-4 h-4 text-purple-600" />
                     <span>Porter Mode Active</span>
                   </div>
+                  
+                  {displayedPorters.length > 0 && (
+                    <div className="mt-2.5 pt-2.5 border-t border-purple-200/50">
+                      <label className="block text-xs font-bold text-purple-800 mb-1">Select Registered Porter</label>
+                      <select
+                        value={assignPartnerId}
+                        onChange={(e) => handlePartnerSelect(e.target.value)}
+                        className="w-full px-2.5 py-2 border border-purple-200 rounded-xl text-xs bg-white text-purple-900 focus:outline-none focus:border-purple-500 font-bold shadow-sm"
+                      >
+                        <option value="">-- Choose Porter or Type Below --</option>
+                        {displayedPorters.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div className="mt-2.5 pt-2.5 border-t border-purple-200/50">
-                    <label className="block text-xs font-bold text-purple-800 mb-1">Porter Contact No. (Optional)</label>
+                    <label className="block text-xs font-bold text-purple-800 mb-1">Porter Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Raju (Optional)"
+                      value={customPartnerName}
+                      onChange={(e) => setCustomPartnerName(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-purple-200 rounded-xl text-xs bg-white text-purple-900 focus:outline-none focus:border-purple-500 placeholder-purple-300 shadow-sm"
+                    />
+                  </div>
+
+                  <div className="mt-2.5 pt-2.5 border-t border-purple-200/50">
+                    <label className="block text-xs font-bold text-purple-800 mb-1">Porter Contact No.</label>
                     <input
                       type="text"
                       placeholder="e.g. 9876543210 (For ANO to contact)"
                       value={customPartnerPhone}
                       onChange={(e) => setCustomPartnerPhone(e.target.value)}
-                      className="w-full px-2.5 py-2 border border-purple-200 rounded-xl text-xs bg-white text-purple-900 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 placeholder-purple-300 shadow-sm"
+                      className="w-full px-2.5 py-2 border border-purple-200 rounded-xl text-xs bg-white text-purple-900 focus:outline-none focus:border-purple-500 placeholder-purple-300 shadow-sm"
                     />
                   </div>
                 </div>
               ) : (
-                <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 space-y-1.5 text-xs text-emerald-900">
+                <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 space-y-2 text-xs text-emerald-900">
                   <div className="font-black flex items-center gap-1.5 text-emerald-800">
                     <Building2 className="w-4 h-4 text-emerald-600" />
                     <span>Self Delivery Mode Active</span>
                   </div>
+
+                  {displayedSelfService.length > 0 && (
+                    <div className="mt-2.5 pt-2.5 border-t border-emerald-200/50">
+                      <label className="block text-xs font-bold text-emerald-800 mb-1">Select Registered Rep</label>
+                      <select
+                        value={assignPartnerId}
+                        onChange={(e) => handlePartnerSelect(e.target.value)}
+                        className="w-full px-2.5 py-2 border border-emerald-200 rounded-xl text-xs bg-white text-emerald-900 focus:outline-none focus:border-emerald-500 font-bold shadow-sm"
+                      >
+                        <option value="">-- Choose Rep or Type Below --</option>
+                        {displayedSelfService.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div className="mt-2.5 pt-2.5 border-t border-emerald-200/50">
-                    <label className="block text-xs font-bold text-emerald-800 mb-1">Self Service Rep Contact No. (Optional)</label>
+                    <label className="block text-xs font-bold text-emerald-800 mb-1">Self Service Rep Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Amit Kumar (Optional)"
+                      value={customPartnerName}
+                      onChange={(e) => setCustomPartnerName(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-emerald-200 rounded-xl text-xs bg-white text-emerald-900 focus:outline-none focus:border-emerald-500 placeholder-emerald-300 shadow-sm"
+                    />
+                  </div>
+
+                  <div className="mt-2.5 pt-2.5 border-t border-emerald-200/50">
+                    <label className="block text-xs font-bold text-emerald-800 mb-1">Self Service Rep Contact No.</label>
                     <input
                       type="text"
                       placeholder="e.g. 9876543210 (For ANO to contact)"
                       value={customPartnerPhone}
                       onChange={(e) => setCustomPartnerPhone(e.target.value)}
-                      className="w-full px-2.5 py-2 border border-emerald-200 rounded-xl text-xs bg-white text-emerald-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder-emerald-300 shadow-sm"
+                      className="w-full px-2.5 py-2 border border-emerald-200 rounded-xl text-xs bg-white text-emerald-900 focus:outline-none focus:border-emerald-500 placeholder-emerald-300 shadow-sm"
                     />
                   </div>
                 </div>
