@@ -634,64 +634,57 @@ export default function AdminDemandsPage() {
 
             {/* Compact Summary Cards - Flex in center */}
             <div className="flex items-center flex-wrap gap-2 xl:gap-3 flex-1 xl:justify-center">
-              <div className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-200 rounded-xl px-3.5 py-2 min-w-[140px]">
-                <div className="bg-white p-1.5 rounded-lg shadow-sm">
-                  <ClipboardList className="w-4 h-4 text-blue-500" />
+              <div 
+                onClick={() => setStatusFilter('ALL')}
+                className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100 transition-all border border-slate-200 rounded-2xl px-4 py-3 min-w-[160px] cursor-pointer shadow-sm hover:shadow-md"
+              >
+                <div className="bg-white p-2 rounded-xl shadow-sm">
+                  <ClipboardList className="w-5 h-5 text-blue-500" />
                 </div>
                 <div>
-                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Total Demands</div>
-                  <div className="text-sm font-black text-slate-900 leading-none mt-0.5">{safeDemands.length} <span className="text-[10px] text-slate-500 font-medium">{(summary?.financials?.total_packets_demanded || 0).toLocaleString('en-IN')} pkts</span></div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Demands</div>
+                  <div className="text-base font-black text-slate-900 leading-none mt-1">{safeDemands.length} <span className="text-[11px] text-slate-500 font-medium">{(summary?.financials?.total_packets_demanded || 0).toLocaleString('en-IN')} pkts</span></div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5 bg-amber-50 hover:bg-amber-100 transition-colors border border-amber-200 rounded-xl px-3.5 py-2 min-w-[140px]">
-                <div className="bg-white p-1.5 rounded-lg shadow-sm border border-amber-100">
-                  <Clock className="w-4 h-4 text-amber-500" />
+              <div 
+                onClick={() => setStatusFilter('PENDING')}
+                className="flex items-center gap-3 bg-amber-50 hover:bg-amber-100 transition-all border border-amber-200 rounded-2xl px-4 py-3 min-w-[160px] cursor-pointer shadow-sm hover:shadow-md"
+              >
+                <div className="bg-white p-2 rounded-xl shadow-sm border border-amber-100">
+                  <Clock className="w-5 h-5 text-amber-500" />
                 </div>
                 <div>
-                  <div className="text-[9px] font-bold text-amber-600 uppercase tracking-wider">Pending Action</div>
-                  <div className="text-sm font-black text-amber-700 leading-none mt-0.5">{pendingCount} <span className="text-[10px] font-medium opacity-80">review req</span></div>
+                  <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Pending Action</div>
+                  <div className="text-base font-black text-amber-700 leading-none mt-1">{pendingCount} <span className="text-[11px] font-medium opacity-80">review req</span></div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5 bg-emerald-50 hover:bg-emerald-100 transition-colors border border-emerald-200 rounded-xl px-3.5 py-2 min-w-[140px]">
-                <div className="bg-white p-1.5 rounded-lg shadow-sm border border-emerald-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <div 
+                onClick={() => setStatusFilter('ACCEPTED')}
+                className="flex items-center gap-3 bg-emerald-50 hover:bg-emerald-100 transition-all border border-emerald-200 rounded-2xl px-4 py-3 min-w-[160px] cursor-pointer shadow-sm hover:shadow-md"
+              >
+                <div className="bg-white p-2 rounded-xl shadow-sm border border-emerald-100">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                 </div>
                 <div>
-                  <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">In Supply</div>
-                  <div className="text-sm font-black text-emerald-700 leading-none mt-0.5">{acceptedCount} <span className="text-[10px] font-medium opacity-80">active</span></div>
+                  <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">In Supply</div>
+                  <div className="text-base font-black text-emerald-700 leading-none mt-1">{acceptedCount} <span className="text-[11px] font-medium opacity-80">active</span></div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-200 rounded-xl px-3.5 py-2 min-w-[140px]">
-                <div className="bg-white p-1.5 rounded-lg shadow-sm border border-slate-100">
-                  <IndianRupee className="w-4 h-4 text-emerald-600" />
+              <div className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100 transition-all border border-slate-200 rounded-2xl px-4 py-3 min-w-[160px] cursor-default shadow-sm">
+                <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
+                  <IndianRupee className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Total Value</div>
-                  <div className="text-sm font-black text-slate-900 leading-none mt-0.5">₹{(summary?.financials?.total_amount_delivered || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Value</div>
+                  <div className="text-base font-black text-slate-900 leading-none mt-1">₹{(summary?.financials?.total_amount_delivered || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2.5 shrink-0">
-              <Link
-                to="/approved-demands"
-                className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-extrabold shadow-sm transition-all flex items-center gap-1.5"
-              >
-                <Truck className="w-4 h-4" />
-                Go to Supply Point
-              </Link>
-              <Link
-                to="/admin/delivery-tracking"
-                className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-extrabold shadow-sm transition-all flex items-center gap-1.5"
-              >
-                <Navigation className="w-4 h-4" />
-                Live Tracking
-              </Link>
-            </div>
+
           </div>
 
           {/* Demands Table Container */}
@@ -749,6 +742,18 @@ export default function AdminDemandsPage() {
                       ))}
                     </select>
                   </div>
+
+                  {/* Search Bar */}
+                  <div className="relative w-full sm:w-auto mt-2 sm:mt-0">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search ref, institute, unit..."
+                      value={demandSearch}
+                      onChange={(e) => setDemandSearch(e.target.value)}
+                      className="w-full sm:w-56 pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-xs"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -788,10 +793,10 @@ export default function AdminDemandsPage() {
                 </div>
               )}
 
-              {/* Row 2: Status, Time, Date Filters & Search */}
+              {/* Row 2: Status & Time Filters */}
               <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pt-2 border-t border-slate-100">
                 
-                {/* Left side: Slicers & Dates */}
+                {/* Left side: Slicers */}
                 <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
                   {/* Status Slicer */}
                   <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar gap-1 shrink-0">
@@ -836,53 +841,10 @@ export default function AdminDemandsPage() {
                       </button>
                     ))}
                   </div>
-
-                  {/* Date Strip */}
-                  {dateChips.length > 0 && (
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 lg:flex-none">
-                      <button onClick={() => stepDate(-1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer shrink-0" title="Previous date">
-                        <ChevronLeft className="w-4 h-4 text-slate-600" />
-                      </button>
-                      <button
-                        onClick={() => setDateFilter(null)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border cursor-pointer shrink-0 ${!dateFilter ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                      >
-                        All dates
-                      </button>
-                      {dateChips.map(c => {
-                        const b = dateBadge(c.key);
-                        const active = dateFilter === c.key;
-                        return (
-                          <button
-                            key={c.key}
-                            onClick={() => setDateFilter(active ? null : c.key)}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap border cursor-pointer shrink-0 ${active ? 'bg-blue-600 text-white border-blue-600' : (b && b.label.startsWith('Overdue') ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50')}`}
-                            title={`${formatDMY(c.key)} ${weekdayOf(c.key)}`}
-                          >
-                            {shortDate(c.key)} <span className="opacity-70">({c.count})</span>
-                          </button>
-                        );
-                      })}
-                      <button onClick={() => stepDate(1)} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer shrink-0" title="Next date">
-                        <ChevronRight className="w-4 h-4 text-slate-600" />
-                      </button>
-                    </div>
-                  )}
                 </div>
 
-                {/* Right side: Search & Reset */}
+                {/* Right side: Reset */}
                 <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto mt-2 xl:mt-0">
-                  <div className="relative w-full sm:w-auto">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Search ref, institute, unit..."
-                      value={demandSearch}
-                      onChange={(e) => setDemandSearch(e.target.value)}
-                      className="w-full sm:w-64 pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-xs"
-                    />
-                  </div>
-
                   {hasActiveFilters && (
                     <button
                       onClick={resetAllFilters}

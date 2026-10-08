@@ -18,7 +18,9 @@ import {
   FileEdit,
   Truck,
   CheckCircle2,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { IndianRupee } from 'lucide-react';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
@@ -82,6 +84,10 @@ export default function InstitutionDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedDemand, setSelectedDemand] = useState(null);
   const [editDemandData, setEditDemandData] = useState(null);
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   
   // Form State
   const [demandPrefix, setDemandPrefix] = useState('FIRST');
@@ -491,6 +497,11 @@ export default function InstitutionDashboard() {
     }
   };
 
+  const indexOfLastItem = currentPage * (itemsPerPage === 'All' ? recentDemands.length || 1 : itemsPerPage);
+  const indexOfFirstItem = indexOfLastItem - (itemsPerPage === 'All' ? recentDemands.length || 1 : itemsPerPage);
+  const currentDemands = itemsPerPage === 'All' ? recentDemands : recentDemands.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = itemsPerPage === 'All' ? 1 : Math.ceil(recentDemands.length / itemsPerPage);
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -879,7 +890,7 @@ export default function InstitutionDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentDemands.length === 0 ? (
+                {currentDemands.length === 0 ? (
                   <tr>
                     <td colSpan="11" className="py-28 text-center text-slate-400 font-bold bg-slate-50/50 rounded-2xl">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -889,7 +900,7 @@ export default function InstitutionDashboard() {
                     </td>
                   </tr>
                 ) : (
-                  recentDemands.map((dem, idx) => (
+                  currentDemands.map((dem, idx) => (
                     <tr 
                       key={dem.id} 
                       className="group hover:bg-orange-50/60 transition-colors"
@@ -897,7 +908,7 @@ export default function InstitutionDashboard() {
                       <td className="pl-6 pr-2 py-4 rounded-l-2xl">
                         <input type="checkbox" className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 transition-colors" />
                       </td>
-                      <td className="px-3 py-4 font-bold text-slate-500 text-xs">#{idx + 1}</td>
+                      <td className="px-3 py-4 font-bold text-slate-500 text-xs">#{indexOfFirstItem + idx + 1}</td>
                       <td className="px-3 py-4">
                         <div className="font-black text-slate-800 tracking-tight text-xs">{formatDMY(dem.demand_date)}</div>
                         <div className="text-[10px] font-bold text-slate-400 mt-0.5 tracking-wider">{formatTimeDisplay(dem.demand_time, dem.created_at)}</div>
@@ -974,6 +985,50 @@ export default function InstitutionDashboard() {
                 </tbody>
             </table>
           </div>
+
+          {recentDemands.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50 mt-auto">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Show:</span>
+                <select 
+                  value={itemsPerPage} 
+                  onChange={(e) => {
+                    setItemsPerPage(e.target.value === 'All' ? 'All' : Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={30}>30</option>
+                  <option value="All">All</option>
+                </select>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">entries</span>
+              </div>
+              
+              {itemsPerPage !== 'All' && totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1 rounded bg-white border border-slate-200 text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs font-bold text-slate-600">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-1 rounded bg-white border border-slate-200 text-slate-600 disabled:opacity-50 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <DemandDetailSidePanel 
