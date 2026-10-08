@@ -6,28 +6,28 @@ import { SSEProvider } from './context/SSEContext';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 
-import LoginPage from './pages/LoginPage';
-import Dashboard from './pages/Dashboard';
-import RaiseDemandPage from './pages/RaiseDemandPage';
-import MyDemandsList from './pages/MyDemandsList';
-import ReviewDemandsQueue from './pages/ReviewDemandsQueue';
-import ManageInstitutions from './pages/ManageInstitutions';
-import ManageUnits from './pages/ManageUnits';
-import ManageCatalog from './pages/ManageCatalog';
-import InventoryPage from './pages/InventoryPage';
-import ApprovedDemandsView from './pages/ApprovedDemandsView';
-import RefreshmentReports from './pages/RefreshmentReports';
-import AppSettings from './pages/AppSettings';
-import SummaryWeeklyMonthly from './pages/SummaryWeeklyMonthly';
-import SchoolAnnualSummary from './pages/SchoolAnnualSummary';
-import BillSubmission from './pages/BillSubmission';
-import BillCollection from './pages/BillCollection';
-import DeliveryManagement from './pages/DeliveryManagement';
-import DocumentationPage from './pages/DocumentationPage';
-import DriverDeliverySummaryPage from './pages/DriverDeliverySummaryPage';
-import UnitDemandPage from './pages/UnitDemandPage';
-import AdminDeliveryTracking from './pages/AdminDeliveryTracking';
-import AdminDemandsPage from './pages/AdminDemandsPage';
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const RaiseDemandPage = React.lazy(() => import('./pages/RaiseDemandPage'));
+const MyDemandsList = React.lazy(() => import('./pages/MyDemandsList'));
+const ReviewDemandsQueue = React.lazy(() => import('./pages/ReviewDemandsQueue'));
+const ManageInstitutions = React.lazy(() => import('./pages/ManageInstitutions'));
+const ManageUnits = React.lazy(() => import('./pages/ManageUnits'));
+const ManageCatalog = React.lazy(() => import('./pages/ManageCatalog'));
+const InventoryPage = React.lazy(() => import('./pages/InventoryPage'));
+const ApprovedDemandsView = React.lazy(() => import('./pages/ApprovedDemandsView'));
+const RefreshmentReports = React.lazy(() => import('./pages/RefreshmentReports'));
+const AppSettings = React.lazy(() => import('./pages/AppSettings'));
+const SummaryWeeklyMonthly = React.lazy(() => import('./pages/SummaryWeeklyMonthly'));
+const SchoolAnnualSummary = React.lazy(() => import('./pages/SchoolAnnualSummary'));
+const BillSubmission = React.lazy(() => import('./pages/BillSubmission'));
+const BillCollection = React.lazy(() => import('./pages/BillCollection'));
+const DeliveryManagement = React.lazy(() => import('./pages/DeliveryManagement'));
+const DocumentationPage = React.lazy(() => import('./pages/DocumentationPage'));
+const DriverDeliverySummaryPage = React.lazy(() => import('./pages/DriverDeliverySummaryPage'));
+const UnitDemandPage = React.lazy(() => import('./pages/UnitDemandPage'));
+const AdminDeliveryTracking = React.lazy(() => import('./pages/AdminDeliveryTracking'));
+const AdminDemandsPage = React.lazy(() => import('./pages/AdminDemandsPage'));
 function SummaryRouter() {
   const { user } = useAuth();
   if (user?.role === 'DELIVERY') {
@@ -61,35 +61,37 @@ export default function App() {
         <AuthProvider>
           <SSEProvider>
             <BrowserRouter>
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
+              <React.Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500 font-medium">Loading modules...</div>}>
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
 
-                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/demands" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDemandsPage /></ProtectedRoute>} />
-                <Route path="/raise-demand" element={<ProtectedRoute allowedRoles={['INSTITUTION']}><RaiseDemandPage /></ProtectedRoute>} />
-                <Route path="/unit-demand" element={<ProtectedRoute allowedRoles={['UNIT']}><UnitDemandPage /></ProtectedRoute>} />
-                <Route path="/my-demands" element={<ProtectedRoute><MyDemandsList /></ProtectedRoute>} />
-                <Route path="/demand-history" element={<ProtectedRoute><MyDemandsList /></ProtectedRoute>} />
-                <Route path="/review-demands" element={<ProtectedRoute allowedRoles={['UNIT']}><ReviewDemandsQueue /></ProtectedRoute>} />
-                <Route path="/institutions" element={<ProtectedRoute><ManageInstitutions /></ProtectedRoute>} />
-                <Route path="/units" element={<Navigate to="/settings?tab=units" replace />} />
-                <Route path="/catalog" element={<Navigate to="/settings?tab=inventory" replace />} />
-                <Route path="/inventory" element={<Navigate to="/settings?tab=inventory" replace />} />
-                <Route path="/stock" element={<ProtectedRoute allowedRoles={['ADMIN']}><InventoryPage /></ProtectedRoute>} />
-                <Route path="/approved-demands" element={<ProtectedRoute><ApprovedDemandsView /></ProtectedRoute>} />
-                <Route path="/delivery" element={<ProtectedRoute><DeliveryManagement /></ProtectedRoute>} />
-                <Route path="/admin/delivery-tracking" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDeliveryTracking /></ProtectedRoute>} />
-                <Route path="/documentation" element={<ProtectedRoute><DocumentationPage /></ProtectedRoute>} />
-                <Route path="/reports" element={<ProtectedRoute><RefreshmentReports /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute><AppSettings /></ProtectedRoute>} />
-                <Route path="/summary" element={<ProtectedRoute><SummaryRouter /></ProtectedRoute>} />
-                <Route path="/driver-summary" element={<ProtectedRoute><DriverDeliverySummaryPage /></ProtectedRoute>} />
-                <Route path="/school-summary" element={<ProtectedRoute><SchoolAnnualSummary /></ProtectedRoute>} />
-                <Route path="/bills" element={<ProtectedRoute><BillSubmission /></ProtectedRoute>} />
-                <Route path="/bill-collection" element={<ProtectedRoute><BillCollection /></ProtectedRoute>} />
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/demands" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDemandsPage /></ProtectedRoute>} />
+                  <Route path="/raise-demand" element={<ProtectedRoute allowedRoles={['INSTITUTION']}><RaiseDemandPage /></ProtectedRoute>} />
+                  <Route path="/unit-demand" element={<ProtectedRoute allowedRoles={['UNIT']}><UnitDemandPage /></ProtectedRoute>} />
+                  <Route path="/my-demands" element={<ProtectedRoute><MyDemandsList /></ProtectedRoute>} />
+                  <Route path="/demand-history" element={<ProtectedRoute><MyDemandsList /></ProtectedRoute>} />
+                  <Route path="/review-demands" element={<ProtectedRoute allowedRoles={['UNIT']}><ReviewDemandsQueue /></ProtectedRoute>} />
+                  <Route path="/institutions" element={<ProtectedRoute><ManageInstitutions /></ProtectedRoute>} />
+                  <Route path="/units" element={<Navigate to="/settings?tab=units" replace />} />
+                  <Route path="/catalog" element={<Navigate to="/settings?tab=inventory" replace />} />
+                  <Route path="/inventory" element={<Navigate to="/settings?tab=inventory" replace />} />
+                  <Route path="/stock" element={<ProtectedRoute allowedRoles={['ADMIN']}><InventoryPage /></ProtectedRoute>} />
+                  <Route path="/approved-demands" element={<ProtectedRoute><ApprovedDemandsView /></ProtectedRoute>} />
+                  <Route path="/delivery" element={<ProtectedRoute><DeliveryManagement /></ProtectedRoute>} />
+                  <Route path="/admin/delivery-tracking" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDeliveryTracking /></ProtectedRoute>} />
+                  <Route path="/documentation" element={<ProtectedRoute><DocumentationPage /></ProtectedRoute>} />
+                  <Route path="/reports" element={<ProtectedRoute><RefreshmentReports /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><AppSettings /></ProtectedRoute>} />
+                  <Route path="/summary" element={<ProtectedRoute><SummaryRouter /></ProtectedRoute>} />
+                  <Route path="/driver-summary" element={<ProtectedRoute><DriverDeliverySummaryPage /></ProtectedRoute>} />
+                  <Route path="/school-summary" element={<ProtectedRoute><SchoolAnnualSummary /></ProtectedRoute>} />
+                  <Route path="/bills" element={<ProtectedRoute><BillSubmission /></ProtectedRoute>} />
+                  <Route path="/bill-collection" element={<ProtectedRoute><BillCollection /></ProtectedRoute>} />
 
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </React.Suspense>
             </BrowserRouter>
           </SSEProvider>
         </AuthProvider>
