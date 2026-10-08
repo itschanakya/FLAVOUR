@@ -1333,8 +1333,7 @@ export default function ReviewDemandsQueue() {
         </div>
       </div>
 
-      {/* Official Standard Refreshment Packet (₹75) Specification with Expiry Dates */}
-      <StandardPacketViewer defaultOpen={false} />
+
 
       <div className="px-0 space-y-4">
         {/* Dynamic Filter Tabs & Search Bar & View Mode Toggle */}
