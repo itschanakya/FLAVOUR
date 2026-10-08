@@ -72,22 +72,28 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
       params.push(partner_id);
     }
 
-    query += ` ORDER BY d.demand_date DESC, d.id DESC`;
+    query += ` ORDER BY d.demand_date DESC, d.id DESC LIMIT 1000`;
 
     const demands = await db.all(query, params);
 
     if (demands.length > 0) {
       const demandIds = demands.map(d => d.id);
-      // Fetch all items in one single query to prevent N+1 problem
-      const allItems = await db.all(
-        `SELECT di.*, 
-                COALESCE(di.unit_price_snapshot, 0) AS unit_price,
-                (di.quantity * COALESCE(di.unit_price_snapshot, 0)) AS total_cost,
-                ri.item_name, ri.unit_of_measure 
-         FROM demand_items di 
-         JOIN refreshment_items ri ON di.item_id = ri.id 
-         WHERE di.demand_id IN (${demandIds.join(',')})`
-      );
+      
+      const allItems = [];
+      const chunkSize = 100;
+      for (let i = 0; i < demandIds.length; i += chunkSize) {
+        const chunk = demandIds.slice(i, i + chunkSize);
+        const chunkItems = await db.all(
+          `SELECT di.*, 
+                  COALESCE(di.unit_price_snapshot, 0) AS unit_price,
+                  (di.quantity * COALESCE(di.unit_price_snapshot, 0)) AS total_cost,
+                  ri.item_name, ri.unit_of_measure 
+           FROM demand_items di 
+           JOIN refreshment_items ri ON di.item_id = ri.id 
+           WHERE di.demand_id IN (${chunk.join(',')})`
+        );
+        allItems.push(...chunkItems);
+      }
 
       const itemsMap = {};
       for (const item of allItems) {

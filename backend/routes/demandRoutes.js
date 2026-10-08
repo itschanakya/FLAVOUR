@@ -128,7 +128,7 @@ router.get('/', authenticateToken, async (req, res) => {
       params.push(term, term, term, term);
     }
 
-    baseQuery += ' ORDER BY d.created_at DESC';
+    baseQuery += ' ORDER BY d.created_at DESC LIMIT 1000';
 
     const demands = await db.all(baseQuery, params);
 

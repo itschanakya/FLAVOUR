@@ -62,9 +62,9 @@ export default function RefreshmentReports() {
     fetchData();
   }, []);
   
-  const fetchData = async () => {
+  const fetchData = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       const headers = { Authorization: `Bearer ${token}` };
       
       const [demandsRes, instRes, unitsRes] = await Promise.all([
@@ -571,7 +571,7 @@ export default function RefreshmentReports() {
             return d;
           }));
           // Fresh background synchronization
-          fetchData();
+          fetchData(true);
         } else {
           if (!isAutoSave) toast.error(data.error || 'Failed to save invoices to database.');
         }
