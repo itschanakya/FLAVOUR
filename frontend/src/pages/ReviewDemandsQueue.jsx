@@ -255,11 +255,13 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
 
   const dateKeyOf = (d) => String(d.demand_date || '').split('T')[0].split(' ')[0];
   const dateGroups = React.useMemo(() => {
+    // First, sort demands purely chronologically and by demand number so they group correctly
     const sorted = [...demands].sort((a, b) => {
       const ka = dateKeyOf(a), kb = dateKeyOf(b);
       if (ka !== kb) return ka < kb ? -1 : 1;
       return String(a.demand_number || '').localeCompare(String(b.demand_number || ''));
     });
+    
     const groups = [];
     sorted.forEach(d => {
       const k = dateKeyOf(d);
@@ -267,6 +269,23 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
       if (last && last.key === k) last.items.push(d);
       else groups.push({ key: k, items: [d] });
     });
+
+    // Now re-sort the groups so today/future are on top (ascending), and past dates are at the bottom (descending)
+    const todayStr = new Date().toISOString().split('T')[0];
+    groups.sort((ga, gb) => {
+      const isPastA = ga.key < todayStr;
+      const isPastB = gb.key < todayStr;
+
+      if (isPastA && !isPastB) return 1;
+      if (!isPastA && isPastB) return -1;
+      
+      if (isPastA && isPastB) {
+        return gb.key.localeCompare(ga.key);
+      }
+      
+      return ga.key.localeCompare(gb.key);
+    });
+
     return groups;
   }, [demands]);
 
