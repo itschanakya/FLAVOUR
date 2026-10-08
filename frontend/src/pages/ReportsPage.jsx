@@ -445,6 +445,7 @@ export default function ReportsPage() {
               <input type="text" value={invoicePrefix} onChange={e => setInvoicePrefix(e.target.value)} placeholder="Prefix (e.g. INV-)" className="p-1.5 text-xs rounded border border-blue-200" />
               <input type="number" value={invoiceStartNo} onChange={e => setInvoiceStartNo(e.target.value)} placeholder="Start No." className="p-1.5 text-xs rounded border border-blue-200 w-24" />
               <button onClick={handleGenerateInvoices} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-sm">Auto Generate Invoice Nos</button>
+              <button onClick={() => { setInvoiceNos({}); setInvoiceDates({}); }} className="bg-red-500 hover:bg-red-600 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-sm">Clear Invoices</button>
             </div>
 
             {/* Table */}

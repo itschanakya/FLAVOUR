@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, History, Printer, Search, School, TrendingUp, CheckCircle2, Users, IndianRupee, MapPin, Building2, Save, Filter, Layers, FileText, FileSpreadsheet, RefreshCw, Zap, Sparkles, AlertTriangle } from 'lucide-react';
+import { Calendar, History, Printer, Search, School, TrendingUp, CheckCircle2, Users, IndianRupee, MapPin, Building2, Save, Filter, Layers, FileText, FileSpreadsheet, RefreshCw, Zap, Sparkles, AlertTriangle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import CustomDateInput from '../components/CustomDateInput';
@@ -450,6 +450,21 @@ export default function RefreshmentReports() {
 
     const [autoSaveTimer, setAutoSaveTimer] = useState(null);
 
+    const handleClearAllInvoices = async () => {
+      if (!window.confirm("Are you sure you want to completely remove the invoice date and number from ALL currently displayed demands? This will save immediately.")) return;
+      
+      let nosToUse = { ...invoiceNos };
+      let datesToUse = { ...invoiceDates };
+      getVisualOrderedDemands().forEach(d => {
+        nosToUse[d.id] = '';
+        datesToUse[d.id] = '';
+      });
+      setInvoiceNos(nosToUse);
+      setInvoiceDates(datesToUse);
+
+      await handleSaveAllInvoices(nosToUse, datesToUse, false, false);
+    };
+
     const handleSaveAllInvoices = async (customNos = null, customDates = null, isAutoSave = false, autoFillMissing = false) => {
       let nosToUse = { ...(customNos || invoiceNos) };
       let datesToUse = { ...(customDates || invoiceDates) };
@@ -885,6 +900,15 @@ export default function RefreshmentReports() {
                     className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black uppercase text-[11px] tracking-wider rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <Zap size={14} className="fill-current" /> Auto Generate Serials
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearAllInvoices}
+                    disabled={savingInvoices}
+                    className="px-3.5 py-1.5 bg-red-500 hover:bg-red-400 text-white font-black uppercase text-[11px] tracking-wider rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <X size={14} className="fill-current text-white" /> Clear All Invoices
                   </button>
 
                   <button
