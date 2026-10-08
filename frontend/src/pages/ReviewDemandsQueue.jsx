@@ -289,6 +289,9 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
     return groups;
   }, [demands]);
 
+  const [visibleLimit, setVisibleLimit] = useState(5);
+  const visibleDateGroups = dateGroups.slice(0, visibleLimit);
+
   useEffect(() => {
     const initial = {};
     const todayStr = new Date().toISOString().split('T')[0];
@@ -417,7 +420,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
-            {dateGroups.map(g => {
+            {visibleDateGroups.map(g => {
               const badge = dateBadge(g.key);
               const gPkts = g.items.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
               const gAmt = g.items.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
@@ -605,6 +608,16 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
       })}
     </tbody>
         </table>
+        {visibleLimit < dateGroups.length && (
+          <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-center">
+            <button
+              onClick={() => setVisibleLimit(v => v + 5)}
+              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            >
+              Load More Dates ({dateGroups.length - visibleLimit} remaining)
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table Footer with Summary Stats */}

@@ -423,6 +423,9 @@ export default function AdminDemandsPage() {
     return sortAsc ? ga.key.localeCompare(gb.key) : gb.key.localeCompare(ga.key);
   });
   
+  const [visibleLimit, setVisibleLimit] = useState(5);
+  const visibleDateGroups = dateGroups.slice(0, visibleLimit);
+  
   const pktsOf = (d) => Number(d.total_packets || d.total_quantity || d.quantity || 0);
 
   const dateBadge = (key) => {
@@ -976,7 +979,7 @@ export default function AdminDemandsPage() {
                       </td>
                     </tr>
                   ) : (
-                    dateGroups.map((g) => {
+                    visibleDateGroups.map((g) => {
                       const badge = dateBadge(g.key);
                       const collapsed = !!collapsedDates[g.key];
                       const gPkts = g.items.reduce((s, d) => s + pktsOf(d), 0);
@@ -1088,6 +1091,16 @@ export default function AdminDemandsPage() {
                   )}
                 </tbody>
               </table>
+              {visibleLimit < dateGroups.length && (
+                <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-center">
+                  <button
+                    onClick={() => setVisibleLimit(v => v + 5)}
+                    className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+                  >
+                    Load More Dates ({dateGroups.length - visibleLimit} remaining)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

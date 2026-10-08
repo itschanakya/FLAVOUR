@@ -495,6 +495,9 @@ export default function DeliveryManagement() {
     });
   }, [filteredDemands, tableSort]);
 
+  const [visibleLimit, setVisibleLimit] = useState(5);
+  const visibleDateGroups = useMemo(() => groupedDateAndUnit.slice(0, visibleLimit), [groupedDateAndUnit, visibleLimit]);
+
   const [expandedDates, setExpandedDates] = useState({});
 
   useEffect(() => {
@@ -1757,7 +1760,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
         </div>
       ) : (
         <div className="space-y-8">
-          {groupedDateAndUnit.map(dateGroup => (
+          {visibleDateGroups.map(dateGroup => (
             <div key={dateGroup.date} className="space-y-4">
               
               {/* DATE BANNER HEADER (Light Theme) */}
@@ -1982,6 +1985,16 @@ _National Cadet Corps - Supply & Logistics Portal_`;
 
             </div>
           ))}
+          {visibleLimit < groupedDateAndUnit.length && (
+            <div className="py-8 flex justify-center">
+              <button
+                onClick={() => setVisibleLimit(v => v + 5)}
+                className="px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+              >
+                Load More Dates ({groupedDateAndUnit.length - visibleLimit} remaining)
+              </button>
+            </div>
+          )}
         </div>
       )}
       </>

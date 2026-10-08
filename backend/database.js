@@ -84,6 +84,14 @@ async function getDB() {
 }
 
 async function upgradeInventorySchema(db) {
+  const addIndexes = async () => {
+    try { await db.run('CREATE INDEX idx_demand_date ON demands (demand_date(10))'); } catch (e) {}
+    try { await db.run('CREATE INDEX idx_status ON demands (status)'); } catch (e) {}
+    try { await db.run('CREATE INDEX idx_unit_id ON demands (unit_id)'); } catch (e) {}
+    try { await db.run('CREATE INDEX idx_delivery_status ON demands (delivery_status)'); } catch (e) {}
+  };
+  await addIndexes();
+
   const alterStatements = [
     // item_stock_logs enhancements (traceability, valuation, compatibility)
     'ALTER TABLE item_stock_logs ADD COLUMN previous_stock INTEGER NOT NULL DEFAULT 0',
