@@ -157,10 +157,10 @@ export default function AdminDemandsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        fetchDemandsData(); // Revert on error
+        fetchDemandsData(true); // Revert on error
         throw new Error(data.error);
       }
-      fetchDemandsData();
+      fetchDemandsData(true);
       window.dispatchEvent(new Event('demand-status-changed'));
     } catch (err) {
       alert(err.message);
@@ -185,10 +185,10 @@ export default function AdminDemandsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        fetchDemandsData(); // Revert on error
+        fetchDemandsData(true); // Revert on error
         throw new Error(data.error);
       }
-      fetchDemandsData();
+      fetchDemandsData(true);
       window.dispatchEvent(new Event('demand-status-changed'));
     } catch (err) {
       alert(err.message);
@@ -221,11 +221,11 @@ export default function AdminDemandsPage() {
         }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
       );
       await Promise.all(promises);
-      fetchDemandsData();
+      fetchDemandsData(true);
       setSelectedDemandIds(new Set());
       window.dispatchEvent(new Event('demand-status-changed'));
     } catch (err) {
-      fetchDemandsData(); // Revert on error
+      fetchDemandsData(true); // Revert on error
       alert(`Bulk accept failed: ${err.message}`);
     } finally {
       setIsBulkLoading(false);
@@ -253,11 +253,11 @@ export default function AdminDemandsPage() {
         }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
       );
       await Promise.all(promises);
-      fetchDemandsData();
+      fetchDemandsData(true);
       setSelectedDemandIds(new Set());
       window.dispatchEvent(new Event('demand-status-changed'));
     } catch (err) {
-      fetchDemandsData(); // Revert on error
+      fetchDemandsData(true); // Revert on error
       alert(`Bulk reject failed: ${err.message}`);
     } finally {
       setIsBulkLoading(false);
