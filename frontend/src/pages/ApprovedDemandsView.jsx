@@ -213,16 +213,26 @@ export default function ApprovedDemandsView() {
   
   const [expandedDates, setExpandedDates] = useState({});
 
-  const fetchDemands = useCallback(async () => {
-    setLoading(true);
+  const fetchDemands = useCallback(async (silent = false) => {
+    if (!silent) {
+       const cached = sessionStorage.getItem('approved_demands_cache');
+       if (cached) {
+         setDemands(JSON.parse(cached));
+       } else {
+         setLoading(true);
+       }
+    }
     try {
       const res = await fetch('/api/demands', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      setDemands(Array.isArray(data) ? data : []);
+      if (res.ok) {
+        sessionStorage.setItem('approved_demands_cache', JSON.stringify(data));
+        setDemands(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [token]);
 
@@ -243,7 +253,7 @@ export default function ApprovedDemandsView() {
 
   useEffect(() => {
     if (events?.DEMAND_UPDATED) {
-      fetchDemands();
+      fetchDemands(true);
     }
   }, [events?.DEMAND_UPDATED, fetchDemands]);
 

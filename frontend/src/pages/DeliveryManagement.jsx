@@ -71,9 +71,20 @@ export default function DeliveryManagement() {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch Demands for Delivery
-  const fetchDeliveryData = useCallback(async () => {
+  const fetchDeliveryData = useCallback(async (silent = false) => {
     if (!token) return;
+    if (!silent) {
+      const cachedDem = sessionStorage.getItem('delivery_demands_cache');
+      const cachedPart = sessionStorage.getItem('delivery_partners_cache');
+      if (cachedDem && cachedPart) {
+        setDemands(JSON.parse(cachedDem));
+        setPartners(JSON.parse(cachedPart));
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+    }
+    
     try {
       const [demRes, partRes, kmRes] = await Promise.all([
         fetch('/api/delivery/demands', { headers: { Authorization: `Bearer ${token}` } }),
@@ -83,11 +94,15 @@ export default function DeliveryManagement() {
 
       if (demRes.ok) {
         const demData = await demRes.json();
-        setDemands(Array.isArray(demData) ? demData : []);
+        const filtered = Array.isArray(demData) ? demData : [];
+        sessionStorage.setItem('delivery_demands_cache', JSON.stringify(filtered));
+        setDemands(filtered);
       }
       if (partRes.ok) {
         const partData = await partRes.json();
-        setPartners(Array.isArray(partData) ? partData : []);
+        const filteredPart = Array.isArray(partData) ? partData : [];
+        sessionStorage.setItem('delivery_partners_cache', JSON.stringify(filteredPart));
+        setPartners(filteredPart);
       }
       if (kmRes && kmRes.ok) {
         const kmData = await kmRes.json();
@@ -96,26 +111,26 @@ export default function DeliveryManagement() {
     } catch (err) {
       console.error('Error fetching delivery data:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [token]);
 
   // Initial load & Polling
   useEffect(() => {
     fetchDeliveryData();
-    const interval = setInterval(fetchDeliveryData, 15000);
+    const interval = setInterval(() => fetchDeliveryData(true), 15000);
     return () => clearInterval(interval);
   }, [fetchDeliveryData]);
 
   // React to SSE demand updates & instant local cross-tab sync
   useEffect(() => {
     if (events?.DEMAND_UPDATED || events?.timestamp) {
-      fetchDeliveryData();
+      fetchDeliveryData(true);
     }
   }, [events?.DEMAND_UPDATED, events?.timestamp, fetchDeliveryData]);
 
   useEffect(() => {
-    const handleSync = () => fetchDeliveryData();
+    const handleSync = () => fetchDeliveryData(true);
     window.addEventListener('demand-status-changed', handleSync);
     return () => window.removeEventListener('demand-status-changed', handleSync);
   }, [fetchDeliveryData]);

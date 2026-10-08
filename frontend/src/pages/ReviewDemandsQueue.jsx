@@ -1044,11 +1044,21 @@ export default function ReviewDemandsQueue() {
   };
 
   const fetchDemands = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+    if (!silent) {
+      const cached = sessionStorage.getItem('demands_queue_cache');
+      if (cached) {
+        setDemands(JSON.parse(cached));
+      } else {
+        setLoading(true);
+      }
+    }
     try {
       const res = await fetch('/api/demands', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      setDemands(Array.isArray(data) ? data : []);
+      if (res.ok) {
+        sessionStorage.setItem('demands_queue_cache', JSON.stringify(data));
+        setDemands(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
       console.error(err);
     } finally {

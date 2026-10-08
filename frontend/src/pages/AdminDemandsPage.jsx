@@ -81,12 +81,21 @@ export default function AdminDemandsPage() {
 
   useEffect(() => {
     if (events?.DEMAND_UPDATED) {
-      fetchDemandsData();
+      fetchDemandsData(true);
     }
   }, [events?.DEMAND_UPDATED]);
 
-  const fetchDemandsData = async () => {
+  const fetchDemandsData = async (silent = false) => {
     try {
+      if (!silent) {
+        const cached = sessionStorage.getItem('admin_demands_cache');
+        if (cached) {
+          setDemands(JSON.parse(cached));
+        } else {
+          setLoading(true);
+        }
+      }
+
       const [sumRes, demRes, unitsRes, instRes] = await Promise.all([
         fetch('/api/reports/summary', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/demands', { headers: { Authorization: `Bearer ${token}` } }),
@@ -100,7 +109,9 @@ export default function AdminDemandsPage() {
       
       if (demRes.ok) {
         const demData = await demRes.json();
-        setDemands(Array.isArray(demData) ? demData.filter(d => ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED'].includes(d.status)) : []);
+        const filtered = Array.isArray(demData) ? demData.filter(d => ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED'].includes(d.status)) : [];
+        sessionStorage.setItem('admin_demands_cache', JSON.stringify(filtered));
+        setDemands(filtered);
       }
 
       if (unitsRes.ok) {
@@ -113,11 +124,10 @@ export default function AdminDemandsPage() {
         setInstitutions(Array.isArray(instData) ? instData : []);
       }
 
-
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
