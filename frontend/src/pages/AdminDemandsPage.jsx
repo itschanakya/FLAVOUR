@@ -424,7 +424,7 @@ export default function AdminDemandsPage() {
   const dateBadge = (key) => {
     const diff = dayNum(key) - dayNum(todayKey);
     if (isNaN(diff)) return null;
-    if (diff < 0) return { label: `Overdue ${-diff}d`, cls: 'bg-rose-100 text-rose-700 border-rose-200' };
+    if (diff < 0) return null;
     if (diff === 0) return { label: 'Today', cls: 'bg-amber-100 text-amber-800 border-amber-200' };
     if (diff === 1) return { label: 'Tomorrow', cls: 'bg-blue-100 text-blue-700 border-blue-200' };
     return { label: `In ${diff}d`, cls: 'bg-slate-100 text-slate-600 border-slate-200' };
