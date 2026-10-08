@@ -1128,36 +1128,26 @@ export default function ReviewDemandsQueue() {
 
   const safeDemands = Array.isArray(demands) ? demands : [];
 
-  const isActiveDate = (dDate) => {
-    if (!dDate) return false;
-    const dStr = String(dDate).split('T')[0].split(' ')[0];
-    const today = new Date().toISOString().split('T')[0];
-    const diff = Math.floor(new Date(dStr).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
-    return diff === 0 || diff === 1;
-  };
-
-  const activeDemands = useMemo(() => safeDemands.filter(d => isActiveDate(d.demand_date)), [safeDemands]);
-
   // Dynamic status tab counts computed across all unit demands with unified matching
   const counts = useMemo(() => {
     const res = {};
     for (const st of Object.keys(STATUS_CONFIG)) {
-      res[st] = (st === 'HISTORY' ? safeDemands : activeDemands).filter(d => matchesDemandStatus(d, st)).length;
+      res[st] = safeDemands.filter(d => matchesDemandStatus(d, st)).length;
     }
     return res;
-  }, [safeDemands, activeDemands]);
+  }, [safeDemands]);
 
   // Comprehensive Metrics for Big Dynamic Summary Cards
-  const totalDemands = activeDemands.length;
-  const totalPackets = activeDemands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
-  const totalAmount = activeDemands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
+  const totalDemands = safeDemands.length;
+  const totalPackets = safeDemands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+  const totalAmount = safeDemands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
 
-  const pendingList = activeDemands.filter(d => matchesDemandStatus(d, 'PENDING'));
+  const pendingList = safeDemands.filter(d => matchesDemandStatus(d, 'PENDING'));
   const pendingCount = pendingList.length;
   const pendingPackets = pendingList.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
   const pendingAmount = pendingList.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
 
-  const approvedList = activeDemands.filter(d => matchesDemandStatus(d, 'APPROVED'));
+  const approvedList = safeDemands.filter(d => matchesDemandStatus(d, 'APPROVED'));
   const approvedCount = approvedList.length;
   const approvedPackets = approvedList.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
   const approvedAmount = approvedList.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
@@ -1169,18 +1159,7 @@ export default function ReviewDemandsQueue() {
 
   // Filtered demands for the active tab and search query
   const displayedDemands = useMemo(() => {
-    let list = safeDemands.filter(d => {
-      // 0. Only show Today and Tomorrow for Active Queues
-      if (statusFilter !== 'HISTORY') {
-        const dDate = d.demand_date ? String(d.demand_date).split('T')[0].split(' ')[0] : null;
-        if (dDate) {
-          const today = new Date().toISOString().split('T')[0];
-          const diff = Math.floor(new Date(dDate).getTime()/86400000) - Math.floor(new Date(today).getTime()/86400000);
-          if (diff !== 0 && diff !== 1) return false;
-        }
-      }
-      return true;
-    });
+    let list = safeDemands;
 
     if (statusFilter !== 'ALL') {
       list = list.filter(d => matchesDemandStatus(d, statusFilter));
