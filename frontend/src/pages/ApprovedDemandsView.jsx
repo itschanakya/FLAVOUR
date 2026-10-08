@@ -218,6 +218,7 @@ export default function ApprovedDemandsView() {
        const cached = sessionStorage.getItem('approved_demands_cache');
        if (cached) {
          setDemands(JSON.parse(cached));
+         setLoading(false);
        } else {
          setLoading(true);
        }
