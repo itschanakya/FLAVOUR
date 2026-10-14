@@ -653,17 +653,9 @@ export default function InstitutionDashboard() {
             <p className="leading-tight text-amber-900/90 font-medium">
               Demands for Mon–Sat must be placed on or before preceding <strong>Friday by 14:00 hrs</strong>. Instant / same-week demands are not accepted because Unit HQ office is closed.
             </p>
-            <div className="pt-1 border-t border-amber-200/70 flex flex-col gap-0.5 text-[9px] text-amber-800">
-              <div className="flex justify-between font-semibold">
-                <span>System Time:</span>
-                <span className="font-mono font-bold text-amber-950">{cutoffInfo.currentFormatted}</span>
-              </div>
-              <div className="flex justify-between font-semibold">
-                <span>Earliest Allowed Delivery:</span>
-                <span className="font-bold text-indigo-700 bg-white px-1.5 py-0.2 rounded border border-amber-200 shadow-2xs">
-                  {formatDMY(earliestAllowedDate)}
-                </span>
-              </div>
+            <div className="pt-1 border-t border-amber-200/70 flex items-center justify-between text-[9px] text-amber-800 font-semibold">
+              <span>System Time:</span>
+              <span className="font-mono font-bold text-amber-950">{cutoffInfo.currentFormatted}</span>
             </div>
           </div>
 

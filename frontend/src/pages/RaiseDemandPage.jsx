@@ -341,9 +341,9 @@ export default function RaiseDemandPage() {
         <p className="leading-relaxed text-amber-900/90 font-medium">
           Demands for Monday through Saturday must be placed on or before the preceding <strong>Friday by 14:00 hrs (2:00 PM)</strong>. Instant / same-week demands are not accepted because Unit HQ office is closed.
         </p>
-        <div className="pt-2 border-t border-amber-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="text-amber-800">System Time: <strong className="font-mono font-bold text-amber-950">{cutoffInfo.currentFormatted}</strong></span>
-          <span className="text-amber-800">Earliest Allowed Delivery Date: <strong className="font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-amber-200 shadow-2xs">{earliestAllowedDate.split('-').reverse().join('/')}</strong></span>
+        <div className="pt-2 border-t border-amber-200/80 flex items-center justify-between gap-2 text-xs">
+          <span className="text-amber-800">System Time:</span>
+          <strong className="font-mono font-bold text-amber-950">{cutoffInfo.currentFormatted}</strong>
         </div>
       </div>
 
