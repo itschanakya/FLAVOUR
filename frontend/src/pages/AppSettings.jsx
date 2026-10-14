@@ -6,7 +6,7 @@ import {
   Search, Edit3, ShieldAlert, X, ShoppingBag, Users, MapPin, ExternalLink,
   Truck, Plus, Trash2, Phone, ShieldCheck, Wifi, Eye, EyeOff, Boxes,
   Gauge, AlertCircle, Info, Navigation, Scale, Compass, Map, CalendarDays, History,
-  Download, Upload, RotateCcw, DatabaseBackup, Lock, ShieldOff, FileJson, Layers, ClipboardList
+  Download, Upload, RotateCcw, DatabaseBackup, Lock, ShieldOff, FileJson, Layers, ClipboardList, Clock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManageCatalog from './ManageCatalog';
@@ -182,6 +182,13 @@ export default function AppSettings() {
     auth_classes_3: 35
   });
 
+  const [unitCutoffForm, setUnitCutoffForm] = useState({
+    demand_cutoff_day: 'Friday',
+    demand_cutoff_time: '14:00',
+    demand_cutoff_notice: '',
+    demand_cutoff_enabled: 1
+  });
+
   const [instsList, setInstsList] = useState([]);
   const [editingInst, setEditingInst] = useState(null);
   const [instForm, setInstForm] = useState({
@@ -271,7 +278,7 @@ export default function AppSettings() {
       await fetchKmLogs(kmLogDate);
     } else if (activeTab === 'my-account' && role !== 'INSTITUTION') {
       await fetchMyCredentials();
-    } else if (activeTab === 'auth-classes-quota' && role === 'UNIT') {
+    } else if ((activeTab === 'auth-classes-quota' || activeTab === 'weekly-cutoff') && role === 'UNIT') {
       await fetchUnits();
     }
   };
@@ -390,10 +397,17 @@ export default function AppSettings() {
       if (res.ok) {
         setUnitsList(data);
         if (role === 'UNIT' && data.length > 0) {
+          const u = data[0];
           setUnitQuotaForm({
-            auth_classes_1: data[0].auth_classes_1 ?? 40,
-            auth_classes_2: data[0].auth_classes_2 ?? 35,
-            auth_classes_3: data[0].auth_classes_3 ?? 35
+            auth_classes_1: u.auth_classes_1 ?? 40,
+            auth_classes_2: u.auth_classes_2 ?? 35,
+            auth_classes_3: u.auth_classes_3 ?? 35
+          });
+          setUnitCutoffForm({
+            demand_cutoff_day: u.demand_cutoff_day || 'Friday',
+            demand_cutoff_time: u.demand_cutoff_time || '14:00',
+            demand_cutoff_notice: u.demand_cutoff_notice || '',
+            demand_cutoff_enabled: u.demand_cutoff_enabled !== undefined ? Number(u.demand_cutoff_enabled) : 1
           });
         }
       }
@@ -621,6 +635,36 @@ export default function AppSettings() {
       
       setSaveSuccess(true);
       fetchUnits();
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Unit: Save Weekly Cut-off Settings
+  const handleSaveUnitCutoff = async (e) => {
+    if (e) e.preventDefault();
+    if (unitsList.length === 0) return;
+    const unitId = unitsList[0].id;
+    try {
+      setSaving(true);
+      setError('');
+      setSaveSuccess(false);
+      const res = await fetch(`/api/units/${unitId}/cutoff`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(unitCutoffForm)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to update cut-off settings');
+      
+      setSaveSuccess(true);
+      await fetchUnits();
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       setError(err.message);
@@ -1032,6 +1076,13 @@ export default function AppSettings() {
             {role === 'UNIT' && (
               <>
                 <button
+                  onClick={() => setActiveTab('weekly-cutoff')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'weekly-cutoff' ? 'bg-amber-50 text-amber-800 font-bold border border-amber-300 shadow-xs' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  Weekly Cut-Off Settings
+                </button>
+                <button
                   onClick={() => setActiveTab('auth-classes-quota')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'auth-classes-quota' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
@@ -1105,6 +1156,7 @@ export default function AppSettings() {
                 {activeTab === 'stock' && 'Stock Management'}
                 {activeTab === 'unit-credentials' && 'Units Login Credentials & Access Control'}
                 {activeTab === 'delivery-partners' && 'Delivery Partners & Delivery Reps (Logins & Vehicle Fleets)'}
+                {activeTab === 'weekly-cutoff' && 'Weekly Demand Cut-Off & Timing Manager'}
                 {activeTab === 'auth-classes-quota' && 'Auth Classes Quota Distribution'}
                 {activeTab === 'inst-credentials' && 'Institutions Login Credentials & ANO Passwords'}
                 {activeTab === 'institution-details' && 'Institution Details & Delivery Address'}
@@ -1121,6 +1173,7 @@ export default function AppSettings() {
                 {activeTab === 'stock' && 'Live stock balance ledger, batch expiry tracking, consumed today metrics, and incoming restock shipments.'}
                 {activeTab === 'unit-credentials' && 'View, manage, and reset User ID & Passwords for all NCC Units under headquarters.'}
                 {activeTab === 'delivery-partners' && 'Manage Delivery Representatives, Driver Login IDs, Passwords, Vehicle details, and Assigned PIN codes.'}
+                {activeTab === 'weekly-cutoff' && 'Configure the weekly submission deadline day & time for Institutions/ANOs under your Unit, and publish holiday notices.'}
                 {activeTab === 'auth-classes-quota' && 'Configure the year-wise maximum authorized classes for the institutions under this unit.'}
                 {activeTab === 'inst-credentials' && 'Manage User ID, Login Emails & Passwords for ANOs/Schools under this NCC Unit.'}
                 {activeTab === 'institution-details' && 'Update your official institution name, ANO/CTO incharge, contact phone, delivery PIN code, Google Maps GPS link, and complete address.'}
@@ -1754,6 +1807,221 @@ export default function AppSettings() {
                 {/* ═══ DATA BACKUP TAB ═══ */}
                 {activeTab === 'data-backup' && role === 'ADMIN' && (
                   <DataBackupPanel token={token} />
+                )}
+
+                {/* ═══ WEEKLY CUT-OFF SETTINGS (UNIT ROLE) ═══ */}
+                {activeTab === 'weekly-cutoff' && role === 'UNIT' && (
+                  <div className="p-6 space-y-6 max-w-4xl">
+                    {/* Operational Notice Header */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border border-amber-200 flex items-start gap-3">
+                      <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-black text-slate-800 text-sm">Demand Review & Cut-Off Operational Rule</h3>
+                          <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2 py-0.5 rounded-full">
+                            Unit HQ Controlled
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                          Demands are delivered on a Monday–Saturday weekly cycle. When a deadline day (e.g. Friday) is a closed office day or Gazetted holiday, adjust the Cut-Off Day to Thursday or earlier so your staff can review and accept institutional demands before dispatch. Changes reflect instantly on all ANO portals.
+                        </p>
+                      </div>
+                    </div>
+
+                    {saveSuccess && (
+                      <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-bold flex items-center gap-2 shadow-xs">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        Weekly demand cut-off schedule and notices updated successfully! All ANO portals are synchronized.
+                      </div>
+                    )}
+
+                    {error && (
+                      <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-bold flex items-center gap-2 shadow-xs">
+                        <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                        {error}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSaveUnitCutoff} className="space-y-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* LEFT COLUMN: CUT-OFF CONFIGURATION FORM */}
+                        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 space-y-5 shadow-xs">
+                          <h4 className="font-black text-xs text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                            <Settings className="w-4 h-4 text-indigo-500" />
+                            SCHEDULE & DEADLINE PARAMETERS
+                          </h4>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Cut-off Day of Week */}
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                                Weekly Cut-Off Day <span className="text-rose-500">*</span>
+                              </label>
+                              <select
+                                value={unitCutoffForm.demand_cutoff_day}
+                                onChange={(e) => setUnitCutoffForm({ ...unitCutoffForm, demand_cutoff_day: e.target.value })}
+                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              >
+                                <option value="Monday">Monday (Earliest)</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday (Recommended for Friday Holiday)</option>
+                                <option value="Friday">Friday (Standard Working Day)</option>
+                                <option value="Saturday">Saturday</option>
+                              </select>
+                              <span className="text-[10px] text-slate-500 block mt-1">
+                                Day on or before which demands must be placed
+                              </span>
+                            </div>
+
+                            {/* Cut-off Time */}
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                                Cut-Off Time (IST) <span className="text-rose-500">*</span>
+                              </label>
+                              <input
+                                type="time"
+                                value={unitCutoffForm.demand_cutoff_time}
+                                onChange={(e) => setUnitCutoffForm({ ...unitCutoffForm, demand_cutoff_time: e.target.value })}
+                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                required
+                              />
+                              <span className="text-[10px] text-slate-500 block mt-1">
+                                Standard 24-hr time (e.g. 14:00 hrs)
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Cut-off Rule Status */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                              Enforcement Mode
+                            </label>
+                            <div className="grid grid-cols-2 gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setUnitCutoffForm({ ...unitCutoffForm, demand_cutoff_enabled: 1 })}
+                                className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-left transition-all ${
+                                  unitCutoffForm.demand_cutoff_enabled === 1
+                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                  <span>Strict Enforcement</span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                                  Block out-of-cycle demands automatically
+                                </p>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setUnitCutoffForm({ ...unitCutoffForm, demand_cutoff_enabled: 0 })}
+                                className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-left transition-all ${
+                                  unitCutoffForm.demand_cutoff_enabled === 0
+                                    ? 'bg-rose-50 border-rose-300 text-rose-800 shadow-2xs'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <ShieldOff className="w-4 h-4 text-rose-600" />
+                                  <span>Temporarily Bypass</span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                                  Allow emergency / ATC camp demands
+                                </p>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Custom Notice to ANOs */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                              Special Announcement / Holiday Notice to ANOs (Optional)
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={unitCutoffForm.demand_cutoff_notice}
+                              onChange={(e) => setUnitCutoffForm({ ...unitCutoffForm, demand_cutoff_notice: e.target.value })}
+                              placeholder="e.g. Notice: Unit office closed on Friday due to Gazetted Holiday. Demands for next week must be submitted by Thursday 14:00 hrs."
+                              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-slate-400"
+                            />
+                            <span className="text-[10px] text-slate-500 block mt-1">
+                              Appears prominently in the ANO portal demand banner. Clear when the holiday week is over.
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: LIVE ANO PORTAL PREVIEW */}
+                        <div className="lg:col-span-5 bg-slate-50/70 rounded-2xl border border-slate-200 p-5 space-y-4">
+                          <h4 className="font-black text-xs text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                            <Eye className="w-4 h-4 text-emerald-500" />
+                            LIVE PREVIEW (ANO PORTAL BANNER)
+                          </h4>
+
+                          <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                            This is exactly how the weekly demand notice card will appear to ANOs in their Institution Dashboard and Demand Entry view:
+                          </p>
+
+                          {/* Preview Card */}
+                          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-xs text-amber-950 space-y-2 shadow-xs">
+                            <div className="flex items-center justify-between font-black">
+                              <span className="flex items-center gap-1.5 text-amber-900 text-xs">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                                WEEKLY CUT-OFF NOTICE
+                              </span>
+                              <span className="font-mono text-[10px] bg-amber-200/80 text-amber-950 font-black px-2 py-0.5 rounded-md border border-amber-300">
+                                {unitCutoffForm.demand_cutoff_enabled === 0
+                                  ? 'Bypassed by Unit'
+                                  : `${unitCutoffForm.demand_cutoff_day} @ ${unitCutoffForm.demand_cutoff_time || '14:00'} Hrs`}
+                              </span>
+                            </div>
+
+                            <p className="leading-relaxed text-amber-900/90 text-[11px] font-medium">
+                              {unitCutoffForm.demand_cutoff_enabled === 0 ? (
+                                <span className="text-emerald-800 font-semibold">
+                                  Cut-off restrictions are currently temporarily relaxed by Unit HQ for emergency requirements.
+                                </span>
+                              ) : (
+                                <>
+                                  Demands for Mon–Sat must be placed on or before preceding <strong>{unitCutoffForm.demand_cutoff_day} by {unitCutoffForm.demand_cutoff_time || '14:00'} hrs</strong>. Instant / same-week demands are not accepted because Unit HQ office is closed.
+                                </>
+                              )}
+                            </p>
+
+                            {unitCutoffForm.demand_cutoff_notice && unitCutoffForm.demand_cutoff_notice.trim() && (
+                              <div className="p-2 bg-white/80 rounded-lg border border-amber-300/80 text-[10px] text-amber-900 font-bold">
+                                📢 {unitCutoffForm.demand_cutoff_notice.trim()}
+                              </div>
+                            )}
+
+                            <div className="pt-1.5 border-t border-amber-200/80 flex items-center justify-between text-[10px] text-amber-800 font-semibold">
+                              <span>System Time:</span>
+                              <span className="font-mono font-bold text-amber-950">
+                                {new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Bar */}
+                      <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md flex items-center gap-2 disabled:opacity-50 text-sm"
+                        >
+                          {saving ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          Save & Sync Cut-Off Schedule
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 )}
 
                 {activeTab === 'auth-classes-quota' && role === 'UNIT' && (

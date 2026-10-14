@@ -98,6 +98,12 @@ export default function InstitutionDashboard() {
   const [year2, setYear2] = useState('');
   const [year3, setYear3] = useState('');
   const [totalDemanded, setTotalDemanded] = useState('');
+  const [cutoffSettings, setCutoffSettings] = useState({
+    cutoffDay: 'Friday',
+    cutoffTime: '14:00',
+    notice: '',
+    enabled: true
+  });
   const [earliestAllowedDate, setEarliestAllowedDate] = useState(() => getEarliestAllowedDateForANO());
   const [demandDate, setDemandDate] = useState(() => getEarliestAllowedDateForANO());
   const [demandTime, setDemandTime] = useState('08:00');
@@ -110,15 +116,32 @@ export default function InstitutionDashboard() {
   // Periodically refresh cutoff info banner & earliest date
   useEffect(() => {
     const timer = setInterval(() => {
-      setCutoffInfo(getCutoffInfoBanner());
-      setEarliestAllowedDate(getEarliestAllowedDateForANO());
+      setCutoffInfo(getCutoffInfoBanner(new Date(), cutoffSettings));
+      setEarliestAllowedDate(getEarliestAllowedDateForANO(new Date(), cutoffSettings));
     }, 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [cutoffSettings]);
+
+  // Real-time listener for unit cutoff changes
+  useEffect(() => {
+    if (events?.CUTOFF_SETTINGS_UPDATED) {
+      const u = events.CUTOFF_SETTINGS_UPDATED;
+      const newSettings = {
+        cutoffDay: u.demand_cutoff_day || 'Friday',
+        cutoffTime: u.demand_cutoff_time || '14:00',
+        notice: u.demand_cutoff_notice || '',
+        enabled: u.demand_cutoff_enabled !== undefined ? Boolean(u.demand_cutoff_enabled) : true
+      };
+      setCutoffSettings(newSettings);
+      setCutoffInfo(getCutoffInfoBanner(new Date(), newSettings));
+      const earliest = getEarliestAllowedDateForANO(new Date(), newSettings);
+      setEarliestAllowedDate(earliest);
+    }
+  }, [events?.CUTOFF_SETTINGS_UPDATED]);
 
   const handleDateChange = (val) => {
     setDemandDate(val);
-    const check = validateDemandCutoff(val);
+    const check = validateDemandCutoff(val, new Date(), cutoffSettings);
     if (!check.valid) {
       setCutoffWarning(check.error);
     } else {
@@ -194,6 +217,17 @@ export default function InstitutionDashboard() {
         setInstDetails(inst);
         setVenue(inst.complete_address || inst.institution_name || '');
         
+        // Extract Unit cut-off configuration
+        const cDay = inst.demand_cutoff_day || 'Friday';
+        const cTime = inst.demand_cutoff_time || '14:00';
+        const cNotice = inst.demand_cutoff_notice || '';
+        const cEnabled = inst.demand_cutoff_enabled !== undefined ? Boolean(inst.demand_cutoff_enabled) : true;
+        const newSettings = { cutoffDay: cDay, cutoffTime: cTime, notice: cNotice, enabled: cEnabled };
+        setCutoffSettings(newSettings);
+        setCutoffInfo(getCutoffInfoBanner(new Date(), newSettings));
+        const earliest = getEarliestAllowedDateForANO(new Date(), newSettings);
+        setEarliestAllowedDate(earliest);
+
         // Auto-fetch 1st, 2nd, and 3rd year strengths directly from vacancy
         const y1 = inst.strength_1st_year !== undefined && inst.strength_1st_year !== null ? inst.strength_1st_year : 0;
         const y2 = inst.strength_2nd_year !== undefined && inst.strength_2nd_year !== null ? inst.strength_2nd_year : 0;
@@ -205,8 +239,11 @@ export default function InstitutionDashboard() {
 
         // Auto-populate based on FIRST demand (default)
         if (inst.first_demand_day) {
-          setDemandDate(getNextDate(inst.first_demand_day));
+          const nextDayDate = getNextDate(inst.first_demand_day);
+          setDemandDate(nextDayDate < earliest ? earliest : nextDayDate);
           setDemandTime(inst.first_demand_time || '08:00');
+        } else {
+          setDemandDate(earliest);
         }
       }
 
@@ -352,7 +389,7 @@ export default function InstitutionDashboard() {
     }
 
     // Weekly Cut-Off Enforcement for ANOs
-    const cutoffCheck = validateDemandCutoff(demandDate);
+    const cutoffCheck = validateDemandCutoff(demandDate, new Date(), cutoffSettings);
     if (!cutoffCheck.valid) {
       setError(cutoffCheck.error);
       setCutoffWarning(cutoffCheck.error);
@@ -647,12 +684,17 @@ export default function InstitutionDashboard() {
                 WEEKLY CUT-OFF NOTICE
               </span>
               <span className="font-mono text-[9px] bg-amber-200/70 text-amber-950 font-bold px-1.5 py-0.2 rounded border border-amber-300">
-                Friday @ 14:00 Hrs
+                {cutoffInfo.badgeText || `${cutoffSettings.cutoffDay} @ ${cutoffSettings.cutoffTime} Hrs`}
               </span>
             </div>
             <p className="leading-tight text-amber-900/90 font-medium">
-              Demands for Mon–Sat must be placed on or before preceding <strong>Friday by 14:00 hrs</strong>. Instant / same-week demands are not accepted because Unit HQ office is closed.
+              {cutoffInfo.ruleText}
             </p>
+            {cutoffSettings.notice && cutoffSettings.notice.trim() && (
+              <div className="p-1.5 bg-white/90 rounded border border-amber-300/80 text-[9px] text-amber-950 font-bold leading-tight">
+                📢 {cutoffSettings.notice.trim()}
+              </div>
+            )}
             <div className="pt-1 border-t border-amber-200/70 flex items-center justify-between text-[9px] text-amber-800 font-semibold">
               <span>System Time:</span>
               <span className="font-mono font-bold text-amber-950">{cutoffInfo.currentFormatted}</span>

@@ -4,17 +4,51 @@
  * Rules:
  * 1. Demands operate on a weekly cycle (Monday to Saturday).
  * 2. Cut-off deadline for placing demands for ANY day in a delivery week (Mon-Sat)
- *    is the preceding FRIDAY AT 14:00 HRS (2:00 PM) IST.
+ *    is configurable by Unit HQ in App Manager (default: Friday @ 14:00 hrs IST).
  * 3. Instant / same-week demands are NOT accepted for ANOs.
  * 4. Only UNIT HQ / ADMIN can place demands anytime without cut-off restriction.
+ * 5. If cut-off is disabled by Unit (enabled === false / 0), demands can be placed anytime.
  */
+
+export const DAY_NAME_TO_INDEX = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6
+};
+
+export const DAY_INDEX_TO_NAME = [
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+];
 
 export function getISTDate(dateObj = new Date()) {
   const istStr = dateObj.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
   return new Date(istStr);
 }
 
-export function validateDemandCutoff(demandDateStr, currentDate = new Date()) {
+export function parseTimeComponents(timeStr = '14:00') {
+  const parts = String(timeStr || '14:00').split(':');
+  const hours = parseInt(parts[0], 10) || 14;
+  const minutes = parseInt(parts[1], 10) || 0;
+  return { hours, minutes };
+}
+
+export function validateDemandCutoff(demandDateStr, currentDate = new Date(), options = {}) {
+  const {
+    cutoffDay = 'Friday',
+    cutoffTime = '14:00',
+    enabled = true,
+    notice = ''
+  } = options;
+
+  // If disabled by Unit HQ
+  if (enabled === false || enabled === 0 || enabled === '0') {
+    return { valid: true, bypassed: true };
+  }
+
   if (!demandDateStr) {
     return { valid: false, error: 'Please select a demand date.' };
   }
@@ -39,71 +73,117 @@ export function validateDemandCutoff(demandDateStr, currentDate = new Date()) {
   const daysFromMonday = dayOfWeek - 1;
   const mondayUTC = new Date(Date.UTC(tYear, tMonth - 1, tDay - daysFromMonday, 0, 0, 0));
 
-  // Preceding Friday is Monday - 3 days
-  const precedingFridayUTC = new Date(mondayUTC.getTime() - (3 * 24 * 60 * 60 * 1000));
-  const friYear = precedingFridayUTC.getUTCFullYear();
-  const friMonth = precedingFridayUTC.getUTCMonth();
-  const friDate = precedingFridayUTC.getUTCDate();
+  // Determine cutoff day index
+  const normCutoffDayName = String(cutoffDay || 'Friday').trim().toLowerCase();
+  const cutoffDayIdx = DAY_NAME_TO_INDEX[normCutoffDayName] !== undefined
+    ? DAY_NAME_TO_INDEX[normCutoffDayName]
+    : 5;
+  const canonicalCutoffDay = DAY_INDEX_TO_NAME[cutoffDayIdx];
 
-  // Cut-off is preceding Friday at 14:00:00 IST (08:30:00 UTC)
-  const cutoffTimeMs = Date.UTC(friYear, friMonth, friDate, 8, 30, 0, 0);
+  // Days before Monday
+  let daysBeforeMonday = (1 - cutoffDayIdx + 7) % 7;
+  if (daysBeforeMonday === 0) daysBeforeMonday = 7;
+
+  // Preceding cutoff UTC
+  const precedingCutoffUTC = new Date(mondayUTC.getTime() - (daysBeforeMonday * 24 * 60 * 60 * 1000));
+  const cYear = precedingCutoffUTC.getUTCFullYear();
+  const cMonth = precedingCutoffUTC.getUTCMonth();
+  const cDate = precedingCutoffUTC.getUTCDate();
+
+  // Cut-off is in IST
+  const { hours: cHours, minutes: cMinutes } = parseTimeComponents(cutoffTime);
+  const cutoffDateStr = `${cYear}-${String(cMonth + 1).padStart(2, '0')}-${String(cDate).padStart(2, '0')}`;
+  const cutoffISO = `${cutoffDateStr}T${String(cHours).padStart(2, '0')}:${String(cMinutes).padStart(2, '0')}:00+05:30`;
+  const cutoffTimeMs = new Date(cutoffISO).getTime();
+
   const nowMs = currentDate.getTime();
 
-  const friDayStr = String(friDate).padStart(2, '0');
-  const friMonthStr = String(friMonth + 1).padStart(2, '0');
-  const friFormatted = `${friDayStr}/${friMonthStr}/${friYear}`;
-
-  const currentIST = getISTDate(currentDate);
-  const curDay = String(currentIST.getDate()).padStart(2, '0');
-  const curMonth = String(currentIST.getMonth() + 1).padStart(2, '0');
-  const curYear = currentIST.getFullYear();
-  let curHours = currentIST.getHours();
-  const curMins = String(currentIST.getMinutes()).padStart(2, '0');
-  const curAmPm = curHours >= 12 ? 'PM' : 'AM';
-  curHours = curHours % 12 || 12;
-  const curFormatted = `${curDay}/${curMonth}/${curYear} at ${String(curHours).padStart(2, '0')}:${curMins} ${curAmPm} IST`;
+  const cDayStr = String(cDate).padStart(2, '0');
+  const cMonthStr = String(cMonth + 1).padStart(2, '0');
+  const cutoffFormatted = `${canonicalCutoffDay}, ${cDayStr}/${cMonthStr}/${cYear} at ${String(cHours).padStart(2, '0')}:${String(cMinutes).padStart(2, '0')} hrs`;
 
   if (nowMs > cutoffTimeMs) {
+    let msg = `Cut-off deadline passed! Demands for ${demandDateStr} (Week starting ${mondayUTC.toISOString().split('T')[0]}) closed on ${cutoffFormatted}. Instant / same-week demands cannot be accepted as Unit HQ office is closed. Please select an eligible future date or contact Unit HQ for emergency requirements.`;
+    if (notice && notice.trim()) {
+      msg += ` Unit Notice: ${notice.trim()}`;
+    }
     return {
       valid: false,
       cutoffPassed: true,
-      cutoffFriday: friFormatted,
-      currentTimeFormatted: curFormatted,
-      error: `Cut-off deadline passed! Demands for ${demandDateStr} (Week starting ${mondayUTC.toISOString().split('T')[0]}) closed on Friday, ${friFormatted} at 14:00 hrs (2:00 PM). Instant / same-week demands cannot be accepted as Unit HQ office is closed. Please select an eligible future date or contact Unit HQ for emergency requirements.`
+      cutoffDay: canonicalCutoffDay,
+      cutoffTime,
+      cutoffDateFormatted: cutoffFormatted,
+      error: msg
     };
   }
 
-  return { valid: true, cutoffFriday: friFormatted, currentTimeFormatted: curFormatted };
+  return { valid: true, cutoffDay: canonicalCutoffDay, cutoffTime, cutoffDateFormatted: cutoffFormatted };
 }
 
-export function getEarliestAllowedDateForANO(currentDate = new Date()) {
+export function getEarliestAllowedDateForANO(currentDate = new Date(), options = {}) {
+  const {
+    cutoffDay = 'Friday',
+    cutoffTime = '14:00',
+    enabled = true
+  } = options;
+
   const ist = getISTDate(currentDate);
-  const day = ist.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
-  const hours = ist.getHours();
-  const minutes = ist.getMinutes();
 
-  let daysUntilNextMonday = ((1 - day + 7) % 7);
-  if (daysUntilNextMonday === 0) daysUntilNextMonday = 7; // If today is Monday, next Monday is +7 days
-
-  let cutoffPassedForNextWeek = false;
-  if (day === 5 && (hours > 14 || (hours === 14 && minutes > 0))) {
-    cutoffPassedForNextWeek = true;
-  } else if (day === 6 || day === 0) {
-    cutoffPassedForNextWeek = true;
+  if (enabled === false || enabled === 0 || enabled === '0') {
+    const tomorrow = new Date(ist.getTime() + 24 * 60 * 60 * 1000);
+    const y = tomorrow.getFullYear();
+    const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const d = String(tomorrow.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 
-  if (cutoffPassedForNextWeek) {
-    daysUntilNextMonday += 7;
+  const curDay = ist.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+  // Days until next Monday
+  let daysUntilNextMonday = ((1 - curDay + 7) % 7);
+  if (daysUntilNextMonday === 0) daysUntilNextMonday = 7;
+
+  // Next Monday date in IST
+  const nextMondayDate = new Date(ist.getTime() + daysUntilNextMonday * 24 * 60 * 60 * 1000);
+
+  // Determine cutoff day index
+  const normCutoffDayName = String(cutoffDay || 'Friday').trim().toLowerCase();
+  const cutoffDayIdx = DAY_NAME_TO_INDEX[normCutoffDayName] !== undefined
+    ? DAY_NAME_TO_INDEX[normCutoffDayName]
+    : 5;
+
+  let daysBeforeMonday = (1 - cutoffDayIdx + 7) % 7;
+  if (daysBeforeMonday === 0) daysBeforeMonday = 7;
+
+  // Cut-off for next week's Monday
+  const cutoffDateForNextWeek = new Date(nextMondayDate.getTime() - (daysBeforeMonday * 24 * 60 * 60 * 1000));
+  const cYear = cutoffDateForNextWeek.getFullYear();
+  const cMonth = cutoffDateForNextWeek.getMonth() + 1;
+  const cDate = cutoffDateForNextWeek.getDate();
+
+  const { hours: cHours, minutes: cMinutes } = parseTimeComponents(cutoffTime);
+  const cutoffISO = `${cYear}-${String(cMonth).padStart(2, '0')}-${String(cDate).padStart(2, '0')}T${String(cHours).padStart(2, '0')}:${String(cMinutes).padStart(2, '0')}:00+05:30`;
+  const cutoffTimeMs = new Date(cutoffISO).getTime();
+
+  let targetMonday = nextMondayDate;
+  if (currentDate.getTime() > cutoffTimeMs) {
+    targetMonday = new Date(nextMondayDate.getTime() + 7 * 24 * 60 * 60 * 1000);
   }
 
-  const earliestMonday = new Date(ist.getTime() + daysUntilNextMonday * 24 * 60 * 60 * 1000);
-  const y = earliestMonday.getFullYear();
-  const m = String(earliestMonday.getMonth() + 1).padStart(2, '0');
-  const d = String(earliestMonday.getDate()).padStart(2, '0');
+  const y = targetMonday.getFullYear();
+  const m = String(targetMonday.getMonth() + 1).padStart(2, '0');
+  const d = String(targetMonday.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
-export function getCutoffInfoBanner(currentDate = new Date()) {
+export function getCutoffInfoBanner(currentDate = new Date(), options = {}) {
+  const {
+    cutoffDay = 'Friday',
+    cutoffTime = '14:00',
+    enabled = true,
+    notice = ''
+  } = options;
+
   const ist = getISTDate(currentDate);
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const dayName = dayNames[ist.getDay()];
@@ -117,20 +197,20 @@ export function getCutoffInfoBanner(currentDate = new Date()) {
   curHours = curHours % 12 || 12;
 
   const currentFormatted = `${dayName}, ${curDay}/${curMonth}/${curYear} ${String(curHours).padStart(2, '0')}:${curMins} ${curAmPm} IST`;
-  const earliestDate = getEarliestAllowedDateForANO(currentDate);
+  const earliestDate = getEarliestAllowedDateForANO(currentDate, options);
 
-  // Next upcoming Friday 14:00 cut-off calculation
-  const day = ist.getDay();
-  let daysToFriday = (5 - day + 7) % 7;
-  if (daysToFriday === 0 && (ist.getHours() > 14 || (ist.getHours() === 14 && ist.getMinutes() > 0))) {
-    daysToFriday = 7; // today is Friday after 14:00, next cutoff is next Friday
-  }
-  const nextFriday = new Date(ist.getTime() + daysToFriday * 24 * 60 * 60 * 1000);
-  const nextFriFormatted = `${String(nextFriday.getDate()).padStart(2, '0')}/${String(nextFriday.getMonth() + 1).padStart(2, '0')}/${nextFriday.getFullYear()}`;
+  const badgeText = enabled ? `${cutoffDay} @ ${cutoffTime} Hrs` : 'Bypassed by Unit';
+  const defaultRuleText = `Demands for Mon–Sat must be placed on or before preceding ${cutoffDay} by ${cutoffTime} hrs. Instant / same-week demands are not accepted because Unit HQ office is closed.`;
+  const ruleText = notice && notice.trim() ? `${defaultRuleText} (Notice: ${notice.trim()})` : defaultRuleText;
 
   return {
     currentFormatted,
     earliestDate,
-    nextFridayCutoff: `${nextFriFormatted} at 14:00 hrs (2:00 PM)`
+    cutoffDay,
+    cutoffTime,
+    enabled,
+    notice,
+    badgeText,
+    ruleText
   };
 }

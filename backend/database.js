@@ -135,7 +135,13 @@ async function upgradeInventorySchema(db) {
     "ALTER TABLE institutions ADD COLUMN second_demand_time VARCHAR(20) DEFAULT '08:00'",
 
     // demands fulfillment mode expansion
-    "ALTER TABLE demands ADD COLUMN delivery_mode VARCHAR(50) DEFAULT 'DRIVER'"
+    "ALTER TABLE demands ADD COLUMN delivery_mode VARCHAR(50) DEFAULT 'DRIVER'",
+
+    // units demand cut-off schedule configuration
+    "ALTER TABLE units ADD COLUMN demand_cutoff_day VARCHAR(20) DEFAULT 'Friday'",
+    "ALTER TABLE units ADD COLUMN demand_cutoff_time VARCHAR(20) DEFAULT '14:00'",
+    "ALTER TABLE units ADD COLUMN demand_cutoff_notice TEXT NULL",
+    "ALTER TABLE units ADD COLUMN demand_cutoff_enabled TINYINT DEFAULT 1"
   ];
 
   for (const sql of alterStatements) {
@@ -179,6 +185,10 @@ async function initializeSchema(db) {
       auth_classes_1 INT DEFAULT 40,
       auth_classes_2 INT DEFAULT 35,
       auth_classes_3 INT DEFAULT 35,
+      demand_cutoff_day VARCHAR(20) DEFAULT 'Friday',
+      demand_cutoff_time VARCHAR(20) DEFAULT '14:00',
+      demand_cutoff_notice TEXT NULL,
+      demand_cutoff_enabled TINYINT DEFAULT 1,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 

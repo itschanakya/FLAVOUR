@@ -12,10 +12,16 @@ export default function RaiseDemandPage() {
   const location = useLocation();
   const editDemand = location.state?.editDemand || null;
 
-  const earliestAllowedDate = getEarliestAllowedDateForANO();
+  const [cutoffSettings, setCutoffSettings] = useState({
+    cutoffDay: 'Friday',
+    cutoffTime: '14:00',
+    notice: '',
+    enabled: true
+  });
+  const [earliestAllowedDate, setEarliestAllowedDate] = useState(() => getEarliestAllowedDateForANO());
   const [institution, setInstitution] = useState(null);
   const [catalog, setCatalog] = useState([]);
-  const [demandDate, setDemandDate] = useState(editDemand ? editDemand.demand_date.split('T')[0] : earliestAllowedDate);
+  const [demandDate, setDemandDate] = useState(editDemand ? editDemand.demand_date.split('T')[0] : getEarliestAllowedDateForANO());
   const [purpose, setPurpose] = useState(editDemand ? editDemand.purpose : 'Institutional Drill Parade Refreshments');
 
   const [selectedItems, setSelectedItems] = useState([
@@ -28,9 +34,18 @@ export default function RaiseDemandPage() {
   const [cutoffWarning, setCutoffWarning] = useState('');
   const [cutoffInfo, setCutoffInfo] = useState(() => getCutoffInfoBanner());
 
+  // Periodically refresh cutoff info banner & earliest date
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCutoffInfo(getCutoffInfoBanner(new Date(), cutoffSettings));
+      setEarliestAllowedDate(getEarliestAllowedDateForANO(new Date(), cutoffSettings));
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [cutoffSettings]);
+
   const handleDateChange = (val) => {
     setDemandDate(val);
-    const check = validateDemandCutoff(val);
+    const check = validateDemandCutoff(val, new Date(), cutoffSettings);
     if (!check.valid) {
       setCutoffWarning(check.error);
     } else {
@@ -53,6 +68,18 @@ export default function RaiseDemandPage() {
       if (instData && instData.length > 0) {
         currentInst = instData[0];
         setInstitution(currentInst);
+        const cDay = currentInst.demand_cutoff_day || 'Friday';
+        const cTime = currentInst.demand_cutoff_time || '14:00';
+        const cNotice = currentInst.demand_cutoff_notice || '';
+        const cEnabled = currentInst.demand_cutoff_enabled !== undefined ? Boolean(currentInst.demand_cutoff_enabled) : true;
+        const newSettings = { cutoffDay: cDay, cutoffTime: cTime, notice: cNotice, enabled: cEnabled };
+        setCutoffSettings(newSettings);
+        setCutoffInfo(getCutoffInfoBanner(new Date(), newSettings));
+        const earliest = getEarliestAllowedDateForANO(new Date(), newSettings);
+        setEarliestAllowedDate(earliest);
+        if (!editDemand) {
+          setDemandDate(earliest);
+        }
       }
 
       // 2. Fetch catalog items
@@ -183,7 +210,7 @@ export default function RaiseDemandPage() {
     }
 
     // Weekly Cut-Off Enforcement for ANOs
-    const cutoffCheck = validateDemandCutoff(demandDate);
+    const cutoffCheck = validateDemandCutoff(demandDate, new Date(), cutoffSettings);
     if (!cutoffCheck.valid) {
       setError(cutoffCheck.error);
       setCutoffWarning(cutoffCheck.error);
@@ -335,12 +362,17 @@ export default function RaiseDemandPage() {
             WEEKLY REFRESHMENT DEMAND CUT-OFF DEADLINE
           </span>
           <span className="font-mono text-[11px] bg-amber-200/80 text-amber-950 font-black px-2 py-0.5 rounded-md border border-amber-300">
-            Friday @ 14:00 Hrs
+            {cutoffInfo.badgeText || `${cutoffSettings.cutoffDay} @ ${cutoffSettings.cutoffTime} Hrs`}
           </span>
         </div>
         <p className="leading-relaxed text-amber-900/90 font-medium">
-          Demands for Monday through Saturday must be placed on or before the preceding <strong>Friday by 14:00 hrs (2:00 PM)</strong>. Instant / same-week demands are not accepted because Unit HQ office is closed.
+          {cutoffInfo.ruleText}
         </p>
+        {cutoffSettings.notice && cutoffSettings.notice.trim() && (
+          <div className="p-2 bg-white/90 rounded-lg border border-amber-300/80 text-xs text-amber-950 font-bold leading-relaxed">
+            📢 {cutoffSettings.notice.trim()}
+          </div>
+        )}
         <div className="pt-2 border-t border-amber-200/80 flex items-center justify-between gap-2 text-xs">
           <span className="text-amber-800">System Time:</span>
           <strong className="font-mono font-bold text-amber-950">{cutoffInfo.currentFormatted}</strong>

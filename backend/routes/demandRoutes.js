@@ -40,6 +40,38 @@ async function generateDemandNumber(db) {
 
 const { uploadReceipt, uploadBill, getFileUrl } = require('../config/upload');
 
+// GET /api/demands/cutoff-settings - Get active demand cut-off schedule for user's unit
+router.get('/cutoff-settings', authenticateToken, async (req, res) => {
+  try {
+    const db = await getDB();
+    let unitId = req.user.unit_id;
+    if (!unitId && req.user.institution_id) {
+      const inst = await db.get('SELECT unit_id FROM institutions WHERE id = ?', [req.user.institution_id]);
+      if (inst) unitId = inst.unit_id;
+    }
+    if (!unitId) {
+      const firstUnit = await db.get('SELECT id FROM units ORDER BY id ASC LIMIT 1');
+      unitId = firstUnit ? firstUnit.id : 1;
+    }
+
+    const unit = await db.get(
+      'SELECT demand_cutoff_day, demand_cutoff_time, demand_cutoff_notice, demand_cutoff_enabled FROM units WHERE id = ?',
+      [unitId]
+    );
+
+    return res.json({
+      unit_id: unitId,
+      cutoffDay: unit?.demand_cutoff_day || 'Friday',
+      cutoffTime: unit?.demand_cutoff_time || '14:00',
+      notice: unit?.demand_cutoff_notice || '',
+      enabled: unit?.demand_cutoff_enabled !== undefined ? Boolean(unit.demand_cutoff_enabled) : true
+    });
+  } catch (error) {
+    console.error('Fetch cutoff-settings error:', error);
+    res.status(500).json({ error: 'Failed to retrieve cutoff settings.' });
+  }
+});
+
 // GET /api/demands - List demands with role-based scoping and filtering
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -396,15 +428,6 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
       return res.status(400).json({ error: 'Demand date, purpose, and at least one item are required.' });
     }
 
-    // Weekly Cut-off Enforcement for ANO / Institution users
-    // Only UNIT and ADMIN roles have emergency exemption to place demands anytime.
-    if (req.user.role === 'INSTITUTION') {
-      const cutoffCheck = validateDemandCutoff(demand_date);
-      if (!cutoffCheck.valid) {
-        return res.status(400).json({ error: cutoffCheck.error });
-      }
-    }
-
     const isUnitUser = isUnitOrAdmin;
     const instId = isUnitUser ? parseInt(requestedInstId, 10) : req.user.institution_id;
     if (!instId) {
@@ -418,6 +441,24 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
     }
     if (req.user.role === 'UNIT' && inst.unit_id !== unitId) {
       return res.status(403).json({ error: 'Selected institution does not belong to your Unit.' });
+    }
+
+    // Weekly Cut-off Enforcement for ANO / Institution users
+    // Only UNIT and ADMIN roles have emergency exemption to place demands anytime.
+    if (req.user.role === 'INSTITUTION') {
+      const targetUnit = await db.get(
+        'SELECT demand_cutoff_day, demand_cutoff_time, demand_cutoff_notice, demand_cutoff_enabled FROM units WHERE id = ?',
+        [inst.unit_id]
+      );
+      const cutoffCheck = validateDemandCutoff(demand_date, new Date(), {
+        cutoffDay: targetUnit?.demand_cutoff_day || 'Friday',
+        cutoffTime: targetUnit?.demand_cutoff_time || '14:00',
+        notice: targetUnit?.demand_cutoff_notice || '',
+        enabled: targetUnit?.demand_cutoff_enabled !== undefined ? Boolean(targetUnit.demand_cutoff_enabled) : true
+      });
+      if (!cutoffCheck.valid) {
+        return res.status(400).json({ error: cutoffCheck.error });
+      }
     }
 
     // 2. Validate Year Group quantities against Sanctioned Strength (Server-Side Enforcement)

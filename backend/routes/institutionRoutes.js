@@ -11,6 +11,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const db = await getDB();
     let query = `
       SELECT i.*, u.unit_name, u.unit_code, u.ncc_group,
+        u.demand_cutoff_day, u.demand_cutoff_time, u.demand_cutoff_notice, u.demand_cutoff_enabled,
         usr.email as ano_email,
         usr.login_id as login_id
       FROM institutions i
