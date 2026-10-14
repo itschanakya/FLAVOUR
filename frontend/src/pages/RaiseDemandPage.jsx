@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -37,11 +37,40 @@ export default function RaiseDemandPage() {
   const [cutoffInfo, setCutoffInfo] = useState(() => getCutoffInfoBanner());
 
   // Periodically refresh cutoff info banner & earliest date
+  // Dedicated Cut-Off Settings Fetcher with cache-busting
+  const fetchCutoffSettings = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/demands/cutoff-settings?t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const newSettings = {
+          cutoffDay: data.cutoffDay || 'Friday',
+          cutoffTime: data.cutoffTime || '14:00',
+          notice: data.notice || '',
+          enabled: data.enabled !== undefined ? Boolean(data.enabled) : true
+        };
+        setCutoffSettings(newSettings);
+        setCutoffInfo(getCutoffInfoBanner(new Date(), newSettings));
+        const earliest = getEarliestAllowedDateForANO(new Date(), newSettings);
+        setEarliestAllowedDate(earliest);
+        if (!editDemand) {
+          setDemandDate(prev => prev < earliest ? earliest : prev);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching cutoff settings:', err);
+    }
+  }, [token, editDemand]);
+
+  // Periodically refresh cutoff info banner & earliest date
   useEffect(() => {
     const timer = setInterval(() => {
       setCutoffInfo(getCutoffInfoBanner(new Date(), cutoffSettings));
       setEarliestAllowedDate(getEarliestAllowedDateForANO(new Date(), cutoffSettings));
-    }, 60000);
+    }, 30000);
     return () => clearInterval(timer);
   }, [cutoffSettings]);
 
@@ -49,20 +78,22 @@ export default function RaiseDemandPage() {
   useEffect(() => {
     const handleCutoffUpdate = (detail) => {
       const u = detail || events?.CUTOFF_SETTINGS_UPDATED;
-      if (!u) return;
-      const newSettings = {
-        cutoffDay: u.demand_cutoff_day || 'Friday',
-        cutoffTime: u.demand_cutoff_time || '14:00',
-        notice: u.demand_cutoff_notice || '',
-        enabled: u.demand_cutoff_enabled !== undefined ? Boolean(u.demand_cutoff_enabled) : true
-      };
-      setCutoffSettings(newSettings);
-      setCutoffInfo(getCutoffInfoBanner(new Date(), newSettings));
-      const earliest = getEarliestAllowedDateForANO(new Date(), newSettings);
-      setEarliestAllowedDate(earliest);
-      if (!editDemand) {
-        setDemandDate(prev => prev < earliest ? earliest : prev);
+      if (u) {
+        const newSettings = {
+          cutoffDay: u.demand_cutoff_day || u.cutoffDay || 'Friday',
+          cutoffTime: u.demand_cutoff_time || u.cutoffTime || '14:00',
+          notice: u.demand_cutoff_notice !== undefined ? u.demand_cutoff_notice : (u.notice || ''),
+          enabled: u.demand_cutoff_enabled !== undefined ? Boolean(u.demand_cutoff_enabled) : (u.enabled !== undefined ? Boolean(u.enabled) : true)
+        };
+        setCutoffSettings(newSettings);
+        setCutoffInfo(getCutoffInfoBanner(new Date(), newSettings));
+        const earliest = getEarliestAllowedDateForANO(new Date(), newSettings);
+        setEarliestAllowedDate(earliest);
+        if (!editDemand) {
+          setDemandDate(prev => prev < earliest ? earliest : prev);
+        }
       }
+      fetchCutoffSettings();
     };
 
     if (events?.CUTOFF_SETTINGS_UPDATED) {
@@ -71,8 +102,21 @@ export default function RaiseDemandPage() {
 
     const onCustomEvent = (e) => handleCutoffUpdate(e.detail);
     window.addEventListener('cutoff-settings-changed', onCustomEvent);
-    return () => window.removeEventListener('cutoff-settings-changed', onCustomEvent);
-  }, [events?.CUTOFF_SETTINGS_UPDATED, editDemand]);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCutoffSettings();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onVisibilityChange);
+
+    return () => {
+      window.removeEventListener('cutoff-settings-changed', onCustomEvent);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onVisibilityChange);
+    };
+  }, [events?.CUTOFF_SETTINGS_UPDATED, editDemand, fetchCutoffSettings]);
 
   const handleDateChange = (val) => {
     setDemandDate(val);
@@ -86,13 +130,14 @@ export default function RaiseDemandPage() {
 
   useEffect(() => {
     fetchFormData();
-  }, []);
+    fetchCutoffSettings();
+  }, [fetchCutoffSettings]);
 
   const fetchFormData = async () => {
     try {
       // 1. Fetch institution details for vacancy bounds
       let currentInst = null;
-      const instRes = await fetch('/api/institutions', {
+      const instRes = await fetch(`/api/institutions?t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const instData = await instRes.json();

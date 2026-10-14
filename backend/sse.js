@@ -55,17 +55,20 @@ function broadcastToRole(role, eventType, data) {
 
 function broadcastToAll(eventType, data) {
   const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+  let count = 0;
   clients.forEach((userClients) => {
     userClients.forEach(c => {
       try {
         if (!c.res.destroyed && !c.res.writableEnded) {
           c.res.write(payload);
+          count++;
         }
       } catch (err) {
         console.error('SSE all write error:', err);
       }
     });
   });
+  console.log(`[SSE BROADCAST] ${eventType} delivered to ${count} active stream client(s)`);
 }
 
 module.exports = {
