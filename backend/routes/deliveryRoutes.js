@@ -525,6 +525,79 @@ router.post('/status', authenticateToken, authorizeRoles('ADMIN'), async (req, r
   }
 });
 
+// POST /api/delivery/reset - Reset delivery assignment and status back to initial state (PENDING / READY_FOR_DISPATCH)
+router.post('/reset', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { demandId, demand_number } = req.body;
+    if (!demandId && !demand_number) {
+      return res.status(400).json({ error: 'demandId or demand_number is required' });
+    }
+
+    const db = await getDB();
+    const demand = await db.get(
+      demandId ? 'SELECT * FROM demands WHERE id = ?' : 'SELECT * FROM demands WHERE demand_number = ?',
+      [demandId || demand_number]
+    );
+
+    if (!demand) {
+      return res.status(404).json({ error: 'Demand not found' });
+    }
+
+    await db.run(
+      `UPDATE demands
+       SET status = 'READY_FOR_DISPATCH',
+           delivery_status = 'PENDING',
+           delivery_mode = 'DRIVER',
+           delivery_partner_id = NULL,
+           delivery_partner_name = NULL,
+           delivery_partner_phone = NULL,
+           delivery_partner_vehicle = NULL,
+           dispatched_at = NULL,
+           delivered_at = NULL,
+           delivery_notes = '',
+           delivery_rejection_reason = NULL,
+           start_km_reading = NULL,
+           closing_km_reading = NULL,
+           total_km = NULL,
+           delivery_receipt_url = NULL,
+           delivery_sequence = 0
+       WHERE id = ?`,
+      [demand.id]
+    );
+
+    // Activity log
+    try {
+      await db.run(
+        'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
+        [demand.id, req.user.id || 1, 'STATUS_CHANGE', demand.delivery_status || 'DELIVERED', 'PENDING', 'Reverted delivery. Partner assignment removed and delivery reset to initial state.']
+      );
+    } catch (e) {}
+
+    // Audit log
+    try {
+      await db.run(
+        'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
+        ['DEMAND', demand.id, 'DELIVERY_RESET', req.user.id || 1, `Reverted delivery for ${demand.demand_number || demand.id}. Reset to initial state.`]
+      );
+    } catch (e) {}
+
+    // Real-time broadcast
+    broadcastToAll('DEMAND_UPDATED', {
+      id: demand.id,
+      status: 'READY_FOR_DISPATCH',
+      delivery_status: 'PENDING',
+      delivery_mode: 'DRIVER',
+      delivery_partner_name: null,
+      timestamp: Date.now()
+    });
+
+    res.json({ message: `Successfully reset delivery for demand ${demand.demand_number || demand.id}` });
+  } catch (error) {
+    console.error('Error resetting delivery:', error);
+    res.status(500).json({ error: 'Failed to reset delivery' });
+  }
+});
+
 // ==========================================
 // DELIVERY DRIVER MOBILE PORTAL ENDPOINTS
 // ==========================================

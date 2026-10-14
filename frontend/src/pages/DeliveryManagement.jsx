@@ -7,7 +7,7 @@ import {
   CheckCircle2, AlertTriangle, Users, Package, Search,
   Printer, Plus, RefreshCw, X, ArrowUpRight, ExternalLink,
   ShieldCheck, Filter, ChevronRight, UserCheck, MessageCircle, ChevronDown,
-  Building2, Layers, FileCheck, Gauge, LayoutGrid, LayoutList
+  Building2, Layers, FileCheck, Gauge, LayoutGrid, LayoutList, RotateCcw
 } from 'lucide-react';
 
 export default function DeliveryManagement() {
@@ -1059,6 +1059,62 @@ _National Cadet Corps - Supply & Logistics Portal_`;
     }
   };
 
+  // Revert / Reset Delivery and Mode Assignment back to Initial State (Ready for Dispatch / Pending)
+  const handleResetDelivery = async (demand) => {
+    if (!demand) return;
+    const confirmReset = window.confirm(
+      `Are you sure you want to revert Demand ${demand.demand_number}?\n\nThis will remove any driver/porter assignment and reset its delivery status back to initial "Ready for Dispatch" (Pending) state.`
+    );
+    if (!confirmReset) return;
+
+    // Optimistically update UI
+    setDemands(prev =>
+      prev.map(d =>
+        d.id === demand.id
+          ? {
+              ...d,
+              status: 'READY_FOR_DISPATCH',
+              delivery_status: 'PENDING',
+              delivery_mode: 'DRIVER',
+              delivery_partner_id: null,
+              delivery_partner_name: null,
+              delivery_partner_phone: null,
+              delivery_partner_vehicle: null,
+              dispatched_at: null,
+              delivered_at: null,
+              delivery_notes: '',
+              start_km_reading: null,
+              closing_km_reading: null,
+              total_km: null
+            }
+          : d
+      )
+    );
+    if (selectedDemandForSummary?.id === demand.id) {
+      setSelectedDemandForSummary(null);
+    }
+    if (selectedDemandForAssign?.id === demand.id) {
+      setAssignModalOpen(false);
+    }
+
+    try {
+      const res = await fetch('/api/delivery/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ demandId: demand.id, demand_number: demand.demand_number })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reset delivery');
+      fetchDeliveryData();
+    } catch (err) {
+      alert(err.message || 'Error resetting delivery');
+      fetchDeliveryData();
+    }
+  };
+
   // Add New Delivery Partner
   const handleCreatePartner = async (e) => {
     e.preventDefault();
@@ -1971,6 +2027,16 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                     <div className="flex items-center justify-end gap-2">
                                       <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200" title="Maps Navigation"><Navigation className="w-4 h-4" /></a>
                                       <button onClick={(e) => { e.stopPropagation(); handleSendWhatsAppAlert(dem); }} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200" title="WhatsApp Alert"><MessageCircle className="w-4 h-4" /></button>
+                                      {(dem.delivery_status !== 'PENDING' || dem.delivery_partner_name) && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); handleResetDelivery(dem); }}
+                                          className="p-1.5 rounded-lg bg-slate-50 text-slate-500 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 hover:border-rose-200 transition-colors"
+                                          title="Revert / Reset Delivery & Partner Assignment"
+                                        >
+                                          <RotateCcw className="w-4 h-4" />
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -2275,9 +2341,19 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                   </button>
                 </>
               ) : selectedDemandForSummary.delivery_status === 'DELIVERED' ? (
-                <span className="py-2 px-3 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-default border border-emerald-200 ml-auto">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Delivered & Completed
-                </span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => handleResetDelivery(selectedDemandForSummary)}
+                    className="py-2 px-3 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs rounded-xl border border-amber-200 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
+                    title="Revert accidental delivery back to Ready for Dispatch"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-700" /> Revert Delivery
+                  </button>
+                  <span className="py-2 px-3 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-default border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Delivered & Completed
+                  </span>
+                </div>
               ) : selectedDemandForSummary.delivery_status === 'REJECTED' ? (
                 <span className="py-2 px-3 bg-rose-50 text-rose-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-default border border-rose-200 ml-auto">
                   <X className="w-3.5 h-3.5" /> Delivery Rejected
@@ -2528,6 +2604,16 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                {selectedDemandForAssign && (selectedDemandForAssign.delivery_partner_name || selectedDemandForAssign.delivery_status !== 'PENDING') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetDelivery(selectedDemandForAssign)}
+                    className="mr-auto px-3 py-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl flex items-center gap-1.5 transition-all"
+                    title="Remove assignment and revert delivery back to initial state"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-rose-600" /> Revert / Clear Assignment
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setAssignModalOpen(false)}
