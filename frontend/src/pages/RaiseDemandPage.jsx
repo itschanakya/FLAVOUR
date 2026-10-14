@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSSE } from '../context/SSEContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Trash2, ShieldAlert, CheckCircle2, AlertCircle, AlertTriangle, ArrowLeft, ClipboardList, PlusCircle, Package } from 'lucide-react';
 import StandardPacketViewer from '../components/StandardPacketViewer';
@@ -8,6 +9,7 @@ import { validateDemandCutoff, getEarliestAllowedDateForANO, getCutoffInfoBanner
 
 export default function RaiseDemandPage() {
   const { token } = useAuth();
+  const { events } = useSSE();
   const navigate = useNavigate();
   const location = useLocation();
   const editDemand = location.state?.editDemand || null;
@@ -42,6 +44,35 @@ export default function RaiseDemandPage() {
     }, 60000);
     return () => clearInterval(timer);
   }, [cutoffSettings]);
+
+  // Real-time listener for unit cutoff changes
+  useEffect(() => {
+    const handleCutoffUpdate = (detail) => {
+      const u = detail || events?.CUTOFF_SETTINGS_UPDATED;
+      if (!u) return;
+      const newSettings = {
+        cutoffDay: u.demand_cutoff_day || 'Friday',
+        cutoffTime: u.demand_cutoff_time || '14:00',
+        notice: u.demand_cutoff_notice || '',
+        enabled: u.demand_cutoff_enabled !== undefined ? Boolean(u.demand_cutoff_enabled) : true
+      };
+      setCutoffSettings(newSettings);
+      setCutoffInfo(getCutoffInfoBanner(new Date(), newSettings));
+      const earliest = getEarliestAllowedDateForANO(new Date(), newSettings);
+      setEarliestAllowedDate(earliest);
+      if (!editDemand) {
+        setDemandDate(prev => prev < earliest ? earliest : prev);
+      }
+    };
+
+    if (events?.CUTOFF_SETTINGS_UPDATED) {
+      handleCutoffUpdate(events.CUTOFF_SETTINGS_UPDATED);
+    }
+
+    const onCustomEvent = (e) => handleCutoffUpdate(e.detail);
+    window.addEventListener('cutoff-settings-changed', onCustomEvent);
+    return () => window.removeEventListener('cutoff-settings-changed', onCustomEvent);
+  }, [events?.CUTOFF_SETTINGS_UPDATED, editDemand]);
 
   const handleDateChange = (val) => {
     setDemandDate(val);

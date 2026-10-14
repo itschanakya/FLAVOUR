@@ -124,8 +124,9 @@ export default function InstitutionDashboard() {
 
   // Real-time listener for unit cutoff changes
   useEffect(() => {
-    if (events?.CUTOFF_SETTINGS_UPDATED) {
-      const u = events.CUTOFF_SETTINGS_UPDATED;
+    const handleCutoffUpdate = (detail) => {
+      const u = detail || events?.CUTOFF_SETTINGS_UPDATED;
+      if (!u) return;
       const newSettings = {
         cutoffDay: u.demand_cutoff_day || 'Friday',
         cutoffTime: u.demand_cutoff_time || '14:00',
@@ -136,7 +137,15 @@ export default function InstitutionDashboard() {
       setCutoffInfo(getCutoffInfoBanner(new Date(), newSettings));
       const earliest = getEarliestAllowedDateForANO(new Date(), newSettings);
       setEarliestAllowedDate(earliest);
+    };
+
+    if (events?.CUTOFF_SETTINGS_UPDATED) {
+      handleCutoffUpdate(events.CUTOFF_SETTINGS_UPDATED);
     }
+
+    const onCustomEvent = (e) => handleCutoffUpdate(e.detail);
+    window.addEventListener('cutoff-settings-changed', onCustomEvent);
+    return () => window.removeEventListener('cutoff-settings-changed', onCustomEvent);
   }, [events?.CUTOFF_SETTINGS_UPDATED]);
 
   const handleDateChange = (val) => {

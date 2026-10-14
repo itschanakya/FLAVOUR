@@ -683,6 +683,25 @@ export default function AppSettings() {
       }
       if (!res.ok) throw new Error(data?.error || 'Failed to update cut-off settings');
       
+      // Instant cross-tab and local window dispatch
+      try {
+        const payload = data?.settings || {
+          unit_id: unitId,
+          demand_cutoff_day: unitCutoffForm.demand_cutoff_day,
+          demand_cutoff_time: unitCutoffForm.demand_cutoff_time,
+          demand_cutoff_notice: unitCutoffForm.demand_cutoff_notice,
+          demand_cutoff_enabled: Boolean(unitCutoffForm.demand_cutoff_enabled)
+        };
+        window.dispatchEvent(new CustomEvent('cutoff-settings-changed', { detail: payload }));
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const ch = new BroadcastChannel('ncc_demands_sync');
+          ch.postMessage({ type: 'CUTOFF_SETTINGS_UPDATED', payload });
+          ch.close();
+        }
+      } catch (bcErr) {
+        console.warn('Cross-tab broadcast warning:', bcErr);
+      }
+
       setSaveSuccess(true);
       await fetchUnits();
       setTimeout(() => setSaveSuccess(false), 3000);

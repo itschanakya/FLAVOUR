@@ -22,6 +22,7 @@ export function SSEProvider({ children }) {
   const [events, setEvents] = useState({
     DEMAND_UPDATED: null,
     NEW_NOTIFICATION: null,
+    CUTOFF_SETTINGS_UPDATED: null,
     timestamp: 0,
   });
 
@@ -33,6 +34,10 @@ export function SSEProvider({ children }) {
         const payload = { ...event.data.payload, _ts: Date.now() };
         setEvents(prev => ({ ...prev, DEMAND_UPDATED: payload, timestamp: Date.now() }));
         window.dispatchEvent(new CustomEvent('demand-status-changed', { detail: payload }));
+      } else if (event.data?.type === 'CUTOFF_SETTINGS_UPDATED') {
+        const payload = { ...event.data.payload, _ts: Date.now() };
+        setEvents(prev => ({ ...prev, CUTOFF_SETTINGS_UPDATED: payload, timestamp: Date.now() }));
+        window.dispatchEvent(new CustomEvent('cutoff-settings-changed', { detail: payload }));
       }
     };
     channel.addEventListener('message', handleChannelMessage);
@@ -81,6 +86,22 @@ export function SSEProvider({ children }) {
             window.dispatchEvent(new CustomEvent('notification-received', { detail: data }));
           } catch (err) {
             console.error('Error parsing NEW_NOTIFICATION:', err);
+          }
+        });
+
+        eventSource.addEventListener('CUTOFF_SETTINGS_UPDATED', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            const payload = { ...data, _ts: Date.now() };
+            setEvents(prev => ({ ...prev, CUTOFF_SETTINGS_UPDATED: payload, timestamp: Date.now() }));
+            window.dispatchEvent(new CustomEvent('cutoff-settings-changed', { detail: payload }));
+            if (channel) {
+              try {
+                channel.postMessage({ type: 'CUTOFF_SETTINGS_UPDATED', payload });
+              } catch (e) {}
+            }
+          } catch (err) {
+            console.error('Error parsing CUTOFF_SETTINGS_UPDATED:', err);
           }
         });
 
