@@ -4,6 +4,7 @@ const router = express.Router();
 const { getDB } = require('../database');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const { broadcastToUser, broadcastToRole, broadcastToAll } = require('../sse');
+const { validateDemandCutoff } = require('../utils/demandCutoff');
 
 // Helper to generate unique demand number (e.g., DEM-2026-023)
 async function generateDemandNumber(db) {
@@ -393,6 +394,15 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
     // =========================================================================
     if (!demand_date || !purpose || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Demand date, purpose, and at least one item are required.' });
+    }
+
+    // Weekly Cut-off Enforcement for ANO / Institution users
+    // Only UNIT and ADMIN roles have emergency exemption to place demands anytime.
+    if (req.user.role === 'INSTITUTION') {
+      const cutoffCheck = validateDemandCutoff(demand_date);
+      if (!cutoffCheck.valid) {
+        return res.status(400).json({ error: cutoffCheck.error });
+      }
     }
 
     const isUnitUser = isUnitOrAdmin;
@@ -1363,6 +1373,14 @@ router.put('/:id', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADM
           if (totalByYear['1st Year'] > inst.strength_1st_year) return res.status(400).json({ error: `1st Year quantity exceeds limit (${inst.strength_1st_year}).` });
           if (totalByYear['2nd Year'] > inst.strength_2nd_year) return res.status(400).json({ error: `2nd Year quantity exceeds limit (${inst.strength_2nd_year}).` });
           if (totalByYear['3rd Year'] > inst.strength_3rd_year) return res.status(400).json({ error: `3rd Year quantity exceeds limit (${inst.strength_3rd_year}).` });
+        }
+      }
+
+      // Weekly Cut-off Enforcement for ANO / Institution users
+      if (req.user.role === 'INSTITUTION' && demand_date && demand_date !== demand.demand_date) {
+        const cutoffCheck = validateDemandCutoff(demand_date);
+        if (!cutoffCheck.valid) {
+          return res.status(400).json({ error: cutoffCheck.error });
         }
       }
 

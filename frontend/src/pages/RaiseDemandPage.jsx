@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Trash2, ShieldAlert, CheckCircle2, AlertCircle, ArrowLeft, ClipboardList, PlusCircle, Package } from 'lucide-react';
+import { Plus, Trash2, ShieldAlert, CheckCircle2, AlertCircle, AlertTriangle, ArrowLeft, ClipboardList, PlusCircle, Package } from 'lucide-react';
 import StandardPacketViewer from '../components/StandardPacketViewer';
 import CustomDateInput from '../components/CustomDateInput';
+import { validateDemandCutoff, getEarliestAllowedDateForANO, getCutoffInfoBanner } from '../utils/demandCutoff';
 
 export default function RaiseDemandPage() {
   const { token } = useAuth();
@@ -11,9 +12,10 @@ export default function RaiseDemandPage() {
   const location = useLocation();
   const editDemand = location.state?.editDemand || null;
 
+  const earliestAllowedDate = getEarliestAllowedDateForANO();
   const [institution, setInstitution] = useState(null);
   const [catalog, setCatalog] = useState([]);
-  const [demandDate, setDemandDate] = useState(editDemand ? editDemand.demand_date.split('T')[0] : new Date().toISOString().split('T')[0]);
+  const [demandDate, setDemandDate] = useState(editDemand ? editDemand.demand_date.split('T')[0] : earliestAllowedDate);
   const [purpose, setPurpose] = useState(editDemand ? editDemand.purpose : 'Institutional Drill Parade Refreshments');
 
   const [selectedItems, setSelectedItems] = useState([
@@ -23,6 +25,18 @@ export default function RaiseDemandPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [cutoffWarning, setCutoffWarning] = useState('');
+  const [cutoffInfo, setCutoffInfo] = useState(() => getCutoffInfoBanner());
+
+  const handleDateChange = (val) => {
+    setDemandDate(val);
+    const check = validateDemandCutoff(val);
+    if (!check.valid) {
+      setCutoffWarning(check.error);
+    } else {
+      setCutoffWarning('');
+    }
+  };
 
   useEffect(() => {
     fetchFormData();
@@ -168,6 +182,15 @@ export default function RaiseDemandPage() {
       return;
     }
 
+    // Weekly Cut-Off Enforcement for ANOs
+    const cutoffCheck = validateDemandCutoff(demandDate);
+    if (!cutoffCheck.valid) {
+      setError(cutoffCheck.error);
+      setCutoffWarning(cutoffCheck.error);
+      alert(cutoffCheck.error);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
@@ -304,6 +327,26 @@ export default function RaiseDemandPage() {
       {/* Standard Refreshment Packet Specification (₹75) with Batch Expiry */}
       <StandardPacketViewer defaultOpen={true} />
 
+      {/* Weekly Cut-off Notice Banner */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-xs text-amber-950 space-y-2 shadow-xs">
+        <div className="flex items-center justify-between font-black">
+          <span className="flex items-center gap-1.5 text-amber-900">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            WEEKLY REFRESHMENT DEMAND CUT-OFF DEADLINE
+          </span>
+          <span className="font-mono text-[11px] bg-amber-200/80 text-amber-950 font-black px-2 py-0.5 rounded-md border border-amber-300">
+            Friday @ 14:00 Hrs
+          </span>
+        </div>
+        <p className="leading-relaxed text-amber-900/90 font-medium">
+          Demands for Monday through Saturday must be placed on or before the preceding <strong>Friday by 14:00 hrs (2:00 PM)</strong>. Instant / same-week demands are not accepted because Unit HQ office is closed.
+        </p>
+        <div className="pt-2 border-t border-amber-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="text-amber-800">System Time: <strong className="font-mono font-bold text-amber-950">{cutoffInfo.currentFormatted}</strong></span>
+          <span className="text-amber-800">Earliest Allowed Delivery Date: <strong className="font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-amber-200 shadow-2xs">{earliestAllowedDate.split('-').reverse().join('/')}</strong></span>
+        </div>
+      </div>
+
       {error && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-sm font-semibold">
           {error}
@@ -324,8 +367,15 @@ export default function RaiseDemandPage() {
             </div>
             <CustomDateInput
               value={demandDate}
-              onChange={(isoVal) => setDemandDate(isoVal)}
+              min={earliestAllowedDate}
+              onChange={handleDateChange}
             />
+            {cutoffWarning && (
+              <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 flex items-start gap-1.5 leading-tight shadow-2xs">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{cutoffWarning}</span>
+              </div>
+            )}
           </div>
 
           <div>

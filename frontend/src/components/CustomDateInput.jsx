@@ -16,7 +16,9 @@ export default function CustomDateInput({
   className = '',
   required = false,
   id,
-  compact = false
+  compact = false,
+  min,
+  max
 }) {
   const hiddenDateRef = useRef(null);
 
@@ -141,6 +143,8 @@ export default function CustomDateInput({
       <input
         ref={hiddenDateRef}
         type="date"
+        min={min}
+        max={max}
         value={value || ''}
         onChange={(e) => {
           if (e.target.value) {

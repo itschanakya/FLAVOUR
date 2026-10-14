@@ -20,13 +20,16 @@ import {
   CheckCircle2,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { IndianRupee } from 'lucide-react';
 import DemandDetailSidePanel from '../components/DemandDetailSidePanel';
 import CustomDateInput from '../components/CustomDateInput';
 import StatusBadge from '../components/StatusBadge';
 import { useSSE } from '../context/SSEContext';
+import { validateDemandCutoff, getEarliestAllowedDateForANO, getCutoffInfoBanner } from '../utils/demandCutoff';
 
 const formatDMY = (dateStr) => {
   if (!dateStr) return '-';
@@ -95,11 +98,33 @@ export default function InstitutionDashboard() {
   const [year2, setYear2] = useState('');
   const [year3, setYear3] = useState('');
   const [totalDemanded, setTotalDemanded] = useState('');
-  const [demandDate, setDemandDate] = useState(new Date().toISOString().split('T')[0]);
+  const [earliestAllowedDate, setEarliestAllowedDate] = useState(() => getEarliestAllowedDateForANO());
+  const [demandDate, setDemandDate] = useState(() => getEarliestAllowedDateForANO());
   const [demandTime, setDemandTime] = useState('08:00');
   const [venue, setVenue] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [cutoffWarning, setCutoffWarning] = useState('');
+  const [cutoffInfo, setCutoffInfo] = useState(() => getCutoffInfoBanner());
+
+  // Periodically refresh cutoff info banner & earliest date
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCutoffInfo(getCutoffInfoBanner());
+      setEarliestAllowedDate(getEarliestAllowedDateForANO());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleDateChange = (val) => {
+    setDemandDate(val);
+    const check = validateDemandCutoff(val);
+    if (!check.valid) {
+      setCutoffWarning(check.error);
+    } else {
+      setCutoffWarning('');
+    }
+  };
 
   const fetchDemandsHistory = useCallback(async () => {
     if (!token) return;
@@ -326,6 +351,15 @@ export default function InstitutionDashboard() {
       return;
     }
 
+    // Weekly Cut-Off Enforcement for ANOs
+    const cutoffCheck = validateDemandCutoff(demandDate);
+    if (!cutoffCheck.valid) {
+      setError(cutoffCheck.error);
+      setCutoffWarning(cutoffCheck.error);
+      alert(cutoffCheck.error);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const items = [];
@@ -443,6 +477,13 @@ export default function InstitutionDashboard() {
   const handleUpdateDemand = async (e) => {
     e.preventDefault();
     if (!editDemandData) return;
+
+    // Weekly Cut-Off Enforcement for ANOs
+    const cutoffCheck = validateDemandCutoff(editDemandData.demand_date);
+    if (!cutoffCheck.valid) {
+      alert(cutoffCheck.error);
+      return;
+    }
     
     const totalQty = (parseInt(editDemandData.y1) || 0) + (parseInt(editDemandData.y2) || 0) + (parseInt(editDemandData.y3) || 0);
     const items = [
@@ -598,6 +639,34 @@ export default function InstitutionDashboard() {
             <h2 className="text-xs sm:text-sm font-black tracking-wider text-slate-900 uppercase">NEW DEMAND ENTRY</h2>
           </div>
 
+          {/* Weekly Cut-off Notice Banner */}
+          <div className="mb-2 p-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 text-[10px] text-amber-900 space-y-1.5 shrink-0 shadow-2xs">
+            <div className="flex items-center justify-between font-black text-amber-900">
+              <span className="flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                WEEKLY CUT-OFF NOTICE
+              </span>
+              <span className="font-mono text-[9px] bg-amber-200/70 text-amber-950 font-bold px-1.5 py-0.2 rounded border border-amber-300">
+                Friday @ 14:00 Hrs
+              </span>
+            </div>
+            <p className="leading-tight text-amber-900/90 font-medium">
+              Demands for Mon–Sat must be placed on or before preceding <strong>Friday by 14:00 hrs</strong>. Instant / same-week demands are not accepted because Unit HQ office is closed.
+            </p>
+            <div className="pt-1 border-t border-amber-200/70 flex flex-col gap-0.5 text-[9px] text-amber-800">
+              <div className="flex justify-between font-semibold">
+                <span>System Time:</span>
+                <span className="font-mono font-bold text-amber-950">{cutoffInfo.currentFormatted}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span>Earliest Allowed Delivery:</span>
+                <span className="font-bold text-indigo-700 bg-white px-1.5 py-0.2 rounded border border-amber-200 shadow-2xs">
+                  {formatDMY(earliestAllowedDate)}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between gap-2.5">
             <div className="flex-1 flex flex-col justify-between gap-2">
               {/* Institution Search */}
@@ -644,8 +713,15 @@ export default function InstitutionDashboard() {
                   </div>
                   <CustomDateInput 
                     value={demandDate}
-                    onChange={(isoVal) => setDemandDate(isoVal)}
+                    min={earliestAllowedDate}
+                    onChange={handleDateChange}
                   />
+                  {cutoffWarning && (
+                    <div className="mt-1 p-1.5 bg-rose-50 border border-rose-200 rounded-lg text-[9px] font-bold text-rose-700 flex items-start gap-1 leading-tight shadow-2xs">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                      <span>{cutoffWarning}</span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
