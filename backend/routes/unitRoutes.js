@@ -103,6 +103,49 @@ router.post('/', authenticateToken, authorizeRoles('ADMIN'), async (req, res) =>
   }
 });
 
+// PUT /api/units/:id/cutoff - Dedicated route for Unit HQ to update demand cut-off schedule & notice
+router.put('/:id/cutoff', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req, res) => {
+  if (req.user.role === 'UNIT' && req.user.unit_id != req.params.id) {
+    return res.status(403).json({ error: 'Access denied. You can only edit your own unit.' });
+  }
+  try {
+    const { demand_cutoff_day, demand_cutoff_time, demand_cutoff_notice, demand_cutoff_enabled } = req.body;
+    const db = await getDB();
+    const existingUnit = await db.get('SELECT * FROM units WHERE id = ?', [req.params.id]);
+    if (!existingUnit) return res.status(404).json({ error: 'Unit not found.' });
+
+    const finalDay = demand_cutoff_day || existingUnit.demand_cutoff_day || 'Friday';
+    const finalTime = demand_cutoff_time || existingUnit.demand_cutoff_time || '14:00';
+    const finalNotice = demand_cutoff_notice !== undefined ? demand_cutoff_notice : existingUnit.demand_cutoff_notice;
+    const finalEnabled = demand_cutoff_enabled !== undefined ? (demand_cutoff_enabled ? 1 : 0) : (existingUnit.demand_cutoff_enabled !== null ? existingUnit.demand_cutoff_enabled : 1);
+
+    await db.run(
+      'UPDATE units SET demand_cutoff_day = ?, demand_cutoff_time = ?, demand_cutoff_notice = ?, demand_cutoff_enabled = ? WHERE id = ?',
+      [finalDay, finalTime, finalNotice, finalEnabled, req.params.id]
+    );
+
+    const payload = {
+      unit_id: req.params.id,
+      demand_cutoff_day: finalDay,
+      demand_cutoff_time: finalTime,
+      demand_cutoff_notice: finalNotice,
+      demand_cutoff_enabled: Boolean(finalEnabled)
+    };
+
+    broadcastToAll('CUTOFF_SETTINGS_UPDATED', payload);
+
+    await db.run(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
+      ['UNIT', req.params.id, 'CUTOFF_UPDATED', req.user.id, `Updated cutoff schedule to ${finalDay} @ ${finalTime}. Notice: ${finalNotice || 'None'}`]
+    );
+
+    res.json({ message: 'Demand cut-off settings updated successfully.', settings: payload });
+  } catch (error) {
+    console.error('Update cut-off error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update cut-off settings.' });
+  }
+});
+
 // PUT /api/units/:id - Admin updates unit details, or Unit updates their own details
 router.put('/:id', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req, res) => {
   if (req.user.role === 'UNIT' && req.user.unit_id != req.params.id) {
@@ -217,49 +260,6 @@ router.put('/:id', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (re
   } catch (error) {
     console.error('Update unit error:', error);
     res.status(500).json({ error: error.message || 'Failed to update unit.' });
-  }
-});
-
-// PUT /api/units/:id/cutoff - Dedicated route for Unit HQ to update demand cut-off schedule & notice
-router.put('/:id/cutoff', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req, res) => {
-  if (req.user.role === 'UNIT' && req.user.unit_id != req.params.id) {
-    return res.status(403).json({ error: 'Access denied. You can only edit your own unit.' });
-  }
-  try {
-    const { demand_cutoff_day, demand_cutoff_time, demand_cutoff_notice, demand_cutoff_enabled } = req.body;
-    const db = await getDB();
-    const existingUnit = await db.get('SELECT * FROM units WHERE id = ?', [req.params.id]);
-    if (!existingUnit) return res.status(404).json({ error: 'Unit not found.' });
-
-    const finalDay = demand_cutoff_day || existingUnit.demand_cutoff_day || 'Friday';
-    const finalTime = demand_cutoff_time || existingUnit.demand_cutoff_time || '14:00';
-    const finalNotice = demand_cutoff_notice !== undefined ? demand_cutoff_notice : existingUnit.demand_cutoff_notice;
-    const finalEnabled = demand_cutoff_enabled !== undefined ? (demand_cutoff_enabled ? 1 : 0) : (existingUnit.demand_cutoff_enabled !== null ? existingUnit.demand_cutoff_enabled : 1);
-
-    await db.run(
-      'UPDATE units SET demand_cutoff_day = ?, demand_cutoff_time = ?, demand_cutoff_notice = ?, demand_cutoff_enabled = ? WHERE id = ?',
-      [finalDay, finalTime, finalNotice, finalEnabled, req.params.id]
-    );
-
-    const payload = {
-      unit_id: req.params.id,
-      demand_cutoff_day: finalDay,
-      demand_cutoff_time: finalTime,
-      demand_cutoff_notice: finalNotice,
-      demand_cutoff_enabled: Boolean(finalEnabled)
-    };
-
-    broadcastToAll('CUTOFF_SETTINGS_UPDATED', payload);
-
-    await db.run(
-      'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
-      ['UNIT', req.params.id, 'CUTOFF_UPDATED', req.user.id, `Updated cutoff schedule to ${finalDay} @ ${finalTime}. Notice: ${finalNotice || 'None'}`]
-    );
-
-    res.json({ message: 'Demand cut-off settings updated successfully.', settings: payload });
-  } catch (error) {
-    console.error('Update cut-off error:', error);
-    res.status(500).json({ error: error.message || 'Failed to update cut-off settings.' });
   }
 });
 

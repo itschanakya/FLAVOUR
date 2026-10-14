@@ -617,8 +617,11 @@ export default function AppSettings() {
 
   const handleSaveUnitQuota = async (e) => {
     if (e) e.preventDefault();
-    if (unitsList.length === 0) return;
-    const unitId = unitsList[0].id;
+    const unitId = unitsList[0]?.id || user?.unit_id;
+    if (!unitId) {
+      setError('Unit ID not identified for this session.');
+      return;
+    }
     try {
       setSaving(true);
       setError('');
@@ -630,7 +633,14 @@ export default function AppSettings() {
         },
         body: JSON.stringify(unitQuotaForm)
       });
-      const data = await res.json();
+      const contentType = res.headers.get('content-type');
+      let data = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server error (${res.status})`);
+      }
       if (!res.ok) throw new Error(data.error || 'Failed to update quota');
       
       setSaveSuccess(true);
@@ -646,8 +656,11 @@ export default function AppSettings() {
   // Unit: Save Weekly Cut-off Settings
   const handleSaveUnitCutoff = async (e) => {
     if (e) e.preventDefault();
-    if (unitsList.length === 0) return;
-    const unitId = unitsList[0].id;
+    const unitId = unitsList[0]?.id || user?.unit_id;
+    if (!unitId) {
+      setError('Unit ID not identified for this session.');
+      return;
+    }
     try {
       setSaving(true);
       setError('');
@@ -660,7 +673,14 @@ export default function AppSettings() {
         },
         body: JSON.stringify(unitCutoffForm)
       });
-      const data = await res.json();
+      const contentType = res.headers.get('content-type');
+      let data = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server error (${res.status})`);
+      }
       if (!res.ok) throw new Error(data?.error || 'Failed to update cut-off settings');
       
       setSaveSuccess(true);
