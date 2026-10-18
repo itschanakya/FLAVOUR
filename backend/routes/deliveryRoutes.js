@@ -8,6 +8,7 @@ const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const { broadcastToAll } = require('../sse');
 
 const { uploadReceipt, getFileUrl } = require('../config/upload');
+const { chargeOffDemandStock, revertDemandStockChargeOff } = require('../utils/stockChargeOff');
 
 // GET /api/delivery/demands - List demands ready/scheduled for physical delivery
 router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
@@ -474,6 +475,15 @@ router.post('/status', authenticateToken, authorizeRoles('ADMIN'), async (req, r
 
     await db.run(query, params);
 
+    // Charge off inventory stock if delivered
+    if (deliveryStatus === 'DELIVERED') {
+      try {
+        await chargeOffDemandStock(db, demandId, req.user?.id, 'Delivery Handover (Admin)');
+      } catch (stkErr) {
+        console.error('Error charging off stock on delivery:', stkErr);
+      }
+    }
+
     // Human-readable message
     const stageLabels = {
       PENDING: 'Supply Depot / Warehouse Preparation',
@@ -564,6 +574,15 @@ router.post('/reset', authenticateToken, authorizeRoles('ADMIN'), async (req, re
        WHERE id = ?`,
       [demand.id]
     );
+
+    // If demand was already delivered and charged off, restore inventory stock
+    if (demand.stock_charged_off) {
+      try {
+        await revertDemandStockChargeOff(db, demand.id, req.user?.id, 'Delivery Reset / Revert');
+      } catch (revErr) {
+        console.error('Error reverting stock charge off on reset:', revErr);
+      }
+    }
 
     // Activity log
     try {
@@ -937,6 +956,15 @@ router.post('/driver/status', authenticateToken, authorizeRoles('DELIVERY', 'ADM
     params.push(demandId);
 
     await db.run(query, params);
+
+    // Charge off inventory stock if driver marks DELIVERED
+    if (status === 'DELIVERED') {
+      try {
+        await chargeOffDemandStock(db, demandId, req.user.role === 'DELIVERY' ? null : req.user.id, `Delivery Handover (Driver: ${req.user.name})`);
+      } catch (stkErr) {
+        console.error('Error charging off stock on driver delivery:', stkErr);
+      }
+    }
 
     // Dynamic activity log
     let logMsg = `Driver ${req.user.name}: Delivery stage updated to ${status}`;

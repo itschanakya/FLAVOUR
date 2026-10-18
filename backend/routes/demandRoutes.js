@@ -729,29 +729,31 @@ router.post('/:id/review', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), a
   }
 });
 
-// POST /api/demands/:id/accept - ADMIN accepts an APPROVED demand
+// POST /api/demands/:id/accept - ADMIN accepts an APPROVED demand (immediately routes to Fleet Delivery)
 router.post('/:id/accept', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const demandId = req.params.id;
     const db = await getDB();
     const demand = await db.get('SELECT * FROM demands WHERE id = ? AND is_deleted = 0', [demandId]);
 
-    if (demand.status === 'ACCEPTED') {
-      return res.json({ message: 'Demand is already accepted.', status: 'ACCEPTED' });
+    if (!demand) return res.status(404).json({ error: 'Demand not found.' });
+
+    if (demand.status === 'READY_FOR_DISPATCH' || demand.status === 'ACCEPTED') {
+      return res.json({ message: 'Demand is already accepted and in Fleet Delivery.', status: 'READY_FOR_DISPATCH' });
     }
     if (demand.status !== 'APPROVED') return res.status(400).json({ error: `Only APPROVED demands can be accepted. Current status: ${demand.status}` });
 
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
     await db.run(
-      `UPDATE demands SET status = 'ACCEPTED', accepted_by = ?, accepted_at = ? WHERE id = ?`,
+      `UPDATE demands SET status = 'READY_FOR_DISPATCH', delivery_status = COALESCE(delivery_status, 'PENDING'), accepted_by = ?, accepted_at = ? WHERE id = ?`,
       [req.user.id, now, demandId]
     );
 
     // Timeline Activity Log
     await db.run(
       'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
-      [demandId, req.user.id, 'STATUS_CHANGE', 'APPROVED', 'ACCEPTED', 'Demand accepted by Vendor/Admin.']
+      [demandId, req.user.id, 'STATUS_CHANGE', 'APPROVED', 'READY_FOR_DISPATCH', 'Demand accepted and routed directly to Fleet Delivery.']
     );
 
     const updatedDemand = await db.get('SELECT * FROM demands WHERE id = ?', [demandId]);
@@ -762,11 +764,11 @@ router.post('/:id/accept', authenticateToken, authorizeRoles('ADMIN'), async (re
     broadcastToRole('UNIT', 'DEMAND_UPDATED', eventPayload);
     broadcastToRole('ADMIN', 'DEMAND_UPDATED', eventPayload);
 
-    const msg = `Your demand ${demand.demand_number} was accepted by the vendor.`;
+    const msg = `Your demand ${demand.demand_number} was accepted and sent to fleet delivery.`;
     await db.run('INSERT INTO notifications (user_id, title, message, link_url) VALUES (?, ?, ?, ?)', [demand.raised_by, 'Demand Update', msg, '/my-demands']);
     broadcastToUser(demand.raised_by, 'NEW_NOTIFICATION', { count: 1 });
 
-    res.json({ message: 'Demand successfully marked as ACCEPTED.', status: 'ACCEPTED' });
+    res.json({ message: 'Demand successfully accepted and routed to Fleet Delivery.', status: 'READY_FOR_DISPATCH' });
   } catch (error) {
     console.error('Accept demand error:', error);
     res.status(500).json({ error: 'Failed to accept demand.' });

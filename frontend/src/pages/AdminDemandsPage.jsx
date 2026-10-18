@@ -146,10 +146,10 @@ export default function AdminDemandsPage() {
   };
 
   const handleAccept = async (demandId) => {
-    if (!window.confirm('Accept this demand for fulfillment? It will move to Supply Point for packing and dispatch.')) return;
+    if (!window.confirm('Accept this demand for fulfillment? It will move directly to Fleet Delivery for assignment and dispatch.')) return;
     
     // Optimistic UI Update
-    setDemands(prev => prev.map(d => d.id === demandId ? { ...d, status: 'ACCEPTED' } : d));
+    setDemands(prev => prev.map(d => d.id === demandId ? { ...d, status: 'READY_FOR_DISPATCH', delivery_status: 'PENDING' } : d));
 
     try {
       const res = await fetch(`/api/demands/${demandId}/accept`, {
@@ -208,10 +208,10 @@ export default function AdminDemandsPage() {
 
   const handleBulkAccept = async () => {
     if (selectedDemandIds.size === 0) return;
-    if (!window.confirm(`Accept ${selectedDemandIds.size} demands for fulfillment?`)) return;
+    if (!window.confirm(`Accept ${selectedDemandIds.size} demands for fulfillment? They will move directly to Fleet Delivery.`)) return;
     
     // Optimistic UI Update
-    setDemands(prev => prev.map(d => selectedDemandIds.has(d.id) ? { ...d, status: 'ACCEPTED' } : d));
+    setDemands(prev => prev.map(d => selectedDemandIds.has(d.id) ? { ...d, status: 'READY_FOR_DISPATCH', delivery_status: 'PENDING' } : d));
     setIsBulkLoading(true);
 
     try {
@@ -1011,7 +1011,7 @@ export default function AdminDemandsPage() {
                               <button
                                 onClick={() => handleAccept(dem.id)}
                                 className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer"
-                                title="Accept demand: Will reflect in Supply Point for dispatch"
+                                title="Accept demand: Will move directly to Fleet Delivery for dispatch"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Accept
                               </button>
@@ -1022,9 +1022,13 @@ export default function AdminDemandsPage() {
                                 <X className="w-3.5 h-3.5" /> Reject
                               </button>
                             </div>
-                          ) : dem.status === 'ACCEPTED' ? (
+                          ) : ['ACCEPTED', 'READY_FOR_DISPATCH', 'PREPARING'].includes(dem.status) ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 text-cyan-800 font-bold text-xs rounded-lg border border-cyan-200" title="Demand is active in Fleet Delivery">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600" /> In Fleet Delivery
+                            </span>
+                          ) : dem.status === 'DELIVERED' || dem.status === 'FULFILLED' ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-200">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Accepted
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Delivered
                             </span>
                           ) : dem.status === 'REJECTED' ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-700 font-bold text-xs rounded-lg border border-rose-200">

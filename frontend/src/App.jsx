@@ -77,7 +77,7 @@ export default function App() {
                   <Route path="/catalog" element={<Navigate to="/settings?tab=inventory" replace />} />
                   <Route path="/inventory" element={<Navigate to="/settings?tab=inventory" replace />} />
                   <Route path="/stock" element={<ProtectedRoute allowedRoles={['ADMIN']}><InventoryPage /></ProtectedRoute>} />
-                  <Route path="/approved-demands" element={<ProtectedRoute><ApprovedDemandsView /></ProtectedRoute>} />
+                  <Route path="/approved-demands" element={<Navigate to="/delivery" replace />} />
                   <Route path="/delivery" element={<ProtectedRoute><DeliveryManagement /></ProtectedRoute>} />
                   <Route path="/admin/delivery-tracking" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDeliveryTracking /></ProtectedRoute>} />
                   <Route path="/documentation" element={<ProtectedRoute><DocumentationPage /></ProtectedRoute>} />
