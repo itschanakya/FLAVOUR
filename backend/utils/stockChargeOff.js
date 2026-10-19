@@ -66,8 +66,8 @@ async function chargeOffDemandStock(db, demandId, userId, noteReason = 'Delivery
       await db.run(
         `INSERT INTO item_stock_logs (
           item_id, log_type, change_type, previous_stock, quantity, balance_after,
-          unit_price, total_amount, expiry_date, notes, created_by
-        ) VALUES (?, 'DISPATCH_CHARGE_OFF', 'DISPATCH_CHARGE_OFF', ?, ?, ?, ?, ?, ?, ?, ?)`,
+          unit_price, total_amount, reference_no, expiry_date, notes, created_by
+        ) VALUES (?, 'DISPATCH_CHARGE_OFF', 'DISPATCH_CHARGE_OFF', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           dItem.item_id,
           currentStock,
@@ -75,6 +75,7 @@ async function chargeOffDemandStock(db, demandId, userId, noteReason = 'Delivery
           newStock,
           dItem.unit_price || 0,
           (dItem.unit_price || 0) * requiredQty,
+          demand.demand_number,
           dItem.expiry_date || null,
           `${noteReason}: Demand ${demand.demand_number} (${requiredQty} ${dItem.unit_of_measure || 'units'})`,
           userId || null
@@ -105,8 +106,8 @@ async function chargeOffDemandStock(db, demandId, userId, noteReason = 'Delivery
       await db.run(
         `INSERT INTO item_stock_logs (
           item_id, log_type, change_type, previous_stock, quantity, balance_after,
-          unit_price, total_amount, expiry_date, notes, created_by
-        ) VALUES (?, 'DISPATCH_CHARGE_OFF', 'DISPATCH_CHARGE_OFF', ?, ?, ?, ?, ?, ?, ?, ?)`,
+          unit_price, total_amount, reference_no, expiry_date, notes, created_by
+        ) VALUES (?, 'DISPATCH_CHARGE_OFF', 'DISPATCH_CHARGE_OFF', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           mItem.item_id,
           currentStock,
@@ -114,6 +115,7 @@ async function chargeOffDemandStock(db, demandId, userId, noteReason = 'Delivery
           newStock,
           currentItem.unit_price || 0,
           (currentItem.unit_price || 0) * requiredQty,
+          demand.demand_number,
           currentItem.expiry_date || null,
           `${noteReason}: Demand ${demand.demand_number} (${totalPackets} pkts × ${mItem.qty_per_packet} = ${requiredQty} ${currentItem.unit_of_measure || 'units'})`,
           userId || null

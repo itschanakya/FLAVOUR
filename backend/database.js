@@ -89,6 +89,8 @@ async function upgradeInventorySchema(db) {
     try { await db.run('CREATE INDEX idx_status ON demands (status)'); } catch (e) {}
     try { await db.run('CREATE INDEX idx_unit_id ON demands (unit_id)'); } catch (e) {}
     try { await db.run('CREATE INDEX idx_delivery_status ON demands (delivery_status)'); } catch (e) {}
+    try { await db.run('CREATE INDEX idx_demand_items_demand ON demand_items (demand_id)'); } catch (e) {}
+    try { await db.run('CREATE INDEX idx_demand_activity_demand ON demand_activity (demand_id)'); } catch (e) {}
   };
   await addIndexes();
 
@@ -160,6 +162,16 @@ async function upgradeInventorySchema(db) {
   // Sync received_units with total_units for completed indents if 0
   try {
     await db.run("UPDATE stock_demand_indents SET received_units = total_units WHERE status = 'TAKEN_ON_CHARGE' AND (received_units IS NULL OR received_units = 0)");
+  } catch (e) { }
+
+  // Backfill demand reference_no in item_stock_logs if missing
+  try {
+    await db.run(`
+      UPDATE item_stock_logs sl
+      JOIN demands d ON sl.notes LIKE CONCAT('%', d.demand_number, '%')
+      SET sl.reference_no = d.demand_number
+      WHERE (sl.reference_no IS NULL OR sl.reference_no = '')
+    `);
   } catch (e) { }
 }
 

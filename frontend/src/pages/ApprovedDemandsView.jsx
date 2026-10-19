@@ -425,14 +425,14 @@ export default function ApprovedDemandsView() {
     
     setIsBulkLoading(true);
     try {
-      const promises = sendIds.map(id =>
-        fetch(`/api/demands/${id}/ready-for-dispatch`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
-      );
-      await Promise.all(promises);
-      fetchDemands();
+      const res = await fetch('/api/demands/bulk-ready-for-dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids: sendIds })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      fetchDemands(true);
       const next = new Set(selectedDemandIds);
       sendIds.forEach(id => next.delete(id));
       setSelectedDemandIds(next);

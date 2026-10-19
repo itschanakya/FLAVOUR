@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
@@ -71,8 +71,22 @@ export default function DeliveryManagement() {
     return () => clearInterval(timer);
   }, []);
 
-  const fetchDeliveryData = useCallback(async (silent = false) => {
+  const fetchDeliveryData = useCallback(async (silent = false, demandsOnly = false) => {
     if (!token) return;
+    if (demandsOnly) {
+      try {
+        const res = await fetch(`/api/delivery/demands?t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const demData = await res.json();
+          const arr = Array.isArray(demData) ? demData : [];
+          sessionStorage.setItem('delivery_demands_cache', JSON.stringify(arr));
+          setDemands(arr);
+        }
+      } catch (err) {
+        console.error('Error fetching delivery demands:', err);
+      }
+      return;
+    }
     if (!silent) {
       const cachedDem = sessionStorage.getItem('delivery_demands_cache');
       const cachedPart = sessionStorage.getItem('delivery_partners_cache');
@@ -127,18 +141,24 @@ export default function DeliveryManagement() {
     return () => clearInterval(interval);
   }, [fetchDeliveryData]);
 
-  // React to SSE demand updates & instant local cross-tab sync
-  useEffect(() => {
-    if (events?.DEMAND_UPDATED || events?.timestamp) {
-      fetchDeliveryData(true);
-    }
-  }, [events?.DEMAND_UPDATED, events?.timestamp, fetchDeliveryData]);
+  // React to SSE + window sync events: many events in a burst => ONE demands-only fetch
+  const syncTimer = useRef(null);
+  const scheduleSync = useCallback(() => {
+    clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => fetchDeliveryData(true, true), 200);
+  }, [fetchDeliveryData]);
 
   useEffect(() => {
-    const handleSync = () => fetchDeliveryData(true);
-    window.addEventListener('demand-status-changed', handleSync);
-    return () => window.removeEventListener('demand-status-changed', handleSync);
-  }, [fetchDeliveryData]);
+    if (events?.DEMAND_UPDATED || events?.timestamp) scheduleSync();
+  }, [events?.DEMAND_UPDATED, events?.timestamp, scheduleSync]);
+
+  useEffect(() => {
+    window.addEventListener('demand-status-changed', scheduleSync);
+    return () => {
+      window.removeEventListener('demand-status-changed', scheduleSync);
+      clearTimeout(syncTimer.current);
+    };
+  }, [scheduleSync]);
 
   // Available PIN Codes
   const availablePins = useMemo(() => {

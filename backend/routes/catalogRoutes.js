@@ -360,11 +360,19 @@ router.get('/all-stock-logs', authenticateToken, async (req, res) => {
     );
 
     const logs = await db.all(
-      `SELECT sl.*, ri.item_name, ri.unit_of_measure, ri.image_url, u.name as added_by_name
+      `SELECT sl.*, ri.item_name, ri.unit_of_measure, ri.image_url, u.name as added_by_name,
+              COALESCE(un.unit_name, un.unit_code, sdi.supplier_name, 'Central Warehouse Depot') as unit_name,
+              un.id as unit_id,
+              COALESCE(dem.demand_number, sl.reference_no) as resolved_demand_number,
+              COALESCE(dem.demand_date, DATE(sl.created_at)) as movement_date,
+              COALESCE(NULLIF(sl.total_amount, 0), (sl.quantity * COALESCE(NULLIF(sl.unit_price, 0), ri.unit_price, 0) * (1 + COALESCE(NULLIF(sl.gst_rate, 0), ri.default_gst_rate, 5.0) / 100))) as calculated_total_amount
        FROM item_stock_logs sl
        LEFT JOIN refreshment_items ri ON sl.item_id = ri.id
        LEFT JOIN users u ON sl.created_by = u.id
-       ORDER BY sl.created_at DESC LIMIT 300`
+       LEFT JOIN demands dem ON (sl.reference_no = dem.demand_number OR (sl.reference_no IS NULL AND sl.notes LIKE CONCAT('%', dem.demand_number, '%')))
+       LEFT JOIN units un ON dem.unit_id = un.id
+       LEFT JOIN stock_demand_indents sdi ON (sl.indent_id = sdi.id OR (sl.indent_id IS NULL AND sl.reference_no = sdi.indent_number))
+       ORDER BY sl.created_at DESC LIMIT 3000`
     );
 
     const itemSummaries = await db.all(

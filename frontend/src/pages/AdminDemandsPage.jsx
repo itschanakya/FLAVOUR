@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import { Link } from 'react-router-dom';
@@ -79,14 +79,39 @@ export default function AdminDemandsPage() {
     fetchDemandsData();
   }, []);
 
+  // Instant patch from SSE payload + ONE coalesced lightweight refetch (demands/summary only)
+  const refetchTimer = useRef(null);
   useEffect(() => {
-    if (events?.DEMAND_UPDATED) {
-      fetchDemandsData(true);
+    const ev = events?.DEMAND_UPDATED;
+    if (!ev) return;
+    if (Array.isArray(ev.ids) && ev.status) {
+      const idSet = new Set(ev.ids);
+      setDemands(prev => prev.map(d => idSet.has(d.id)
+        ? { ...d, status: ev.status, delivery_status: ev.delivery_status || d.delivery_status }
+        : d));
     }
+    clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(() => fetchDemandsData(true, true), 250);
+    return () => clearTimeout(refetchTimer.current);
   }, [events?.DEMAND_UPDATED]);
 
-  const fetchDemandsData = async (silent = false) => {
+  const fetchDemandsData = async (silent = false, lightweight = false) => {
     try {
+      if (lightweight) {
+        const ts = Date.now();
+        const [sumRes, demRes] = await Promise.all([
+          fetch(`/api/reports/summary?t=${ts}`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`/api/demands?t=${ts}`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        if (sumRes.ok) setSummary(await sumRes.json());
+        if (demRes.ok) {
+          const demData = await demRes.json();
+          const filtered = Array.isArray(demData) ? demData.filter(d => ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED'].includes(d.status)) : [];
+          sessionStorage.setItem('admin_demands_cache', JSON.stringify(filtered));
+          setDemands(filtered);
+        }
+        return;
+      }
       if (!silent) {
         const cachedDem = sessionStorage.getItem('admin_demands_cache');
         const cachedSum = sessionStorage.getItem('admin_summary_cache');
@@ -215,14 +240,14 @@ export default function AdminDemandsPage() {
     setIsBulkLoading(true);
 
     try {
-      const promises = Array.from(selectedDemandIds).map(id =>
-        fetch(`/api/demands/${id}/accept`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        }).then(res => res.json().then(data => { if (!res.ok) throw new Error(data.error); return data; }))
-      );
-      await Promise.all(promises);
-      fetchDemandsData(true);
+      const res = await fetch('/api/demands/bulk-accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids: Array.from(selectedDemandIds) })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      fetchDemandsData(true, true);
       setSelectedDemandIds(new Set());
       window.dispatchEvent(new Event('demand-status-changed'));
     } catch (err) {

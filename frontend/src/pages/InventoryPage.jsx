@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import TricolorSpinner from '../components/TricolorSpinner';
 import {
@@ -35,8 +35,13 @@ import {
   ArrowRight,
   Search,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  BarChart3,
+  Building2,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export const getItemPhoto = (itemName, customImageUrl) => {
   if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.trim() !== '') {
@@ -556,6 +561,200 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [historySidebarSearch, setHistorySidebarSearch] = useState('');
   const [expiredSubFilter, setExpiredSubFilter] = useState('ALL'); // 'ALL' | 'EXPIRED' | 'EXPIRING_SOON' | 'VALID'
+  const [showMovementSummary, setShowMovementSummary] = useState(false);
+  const [summaryViewMode, setSummaryViewMode] = useState('UNIT'); // 'UNIT' | 'DATE'
+
+  const formatDDMMYYYY = (isoDateStr) => {
+    if (!isoDateStr) return '—';
+    const cleaned = String(isoDateStr).split('T')[0];
+    const parts = cleaned.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return isoDateStr;
+  };
+
+  const movementSummaryData = useMemo(() => {
+    if (!showMovementSummary || historyTypeFilter === 'ALL') {
+      return null;
+    }
+
+    const logs = (allStockData.logs || []).filter(l => {
+      if (historyItemFilter !== 'ALL' && l.item_id.toString() !== historyItemFilter) return false;
+      if (historyTypeFilter === 'STOCK_IN') {
+        return l.change_type === 'STOCK_IN' || l.log_type === 'STOCK_IN';
+      }
+      if (historyTypeFilter === 'STOCK_OUT') {
+        return l.change_type === 'STOCK_OUT' || (l.log_type !== 'STOCK_IN' && l.log_type !== 'WASTAGE' && l.log_type !== 'EXPIRED');
+      }
+      return false;
+    });
+
+    const unitMap = {};
+    const dateMap = {};
+    let grandUnits = 0;
+    let grandAmount = 0;
+
+    logs.forEach(l => {
+      // For Outflow, Target Units must be the NCC Unit that raised the demand
+      let unitKey = l.unit_name;
+      if (!unitKey || unitKey === 'Central Warehouse Depot') {
+        if (historyTypeFilter === 'STOCK_OUT') {
+          unitKey = '2 DELHI ARTY BTY NCC';
+        } else {
+          unitKey = 'Central Warehouse Depot';
+        }
+      }
+
+      const rawDate = l.movement_date || l.created_at;
+      const dateKey = rawDate ? String(rawDate).split('T')[0] : 'Unknown Date';
+      const qty = Number(l.quantity) || 0;
+      
+      // Calculate true valuation with fallback to item price
+      let val = Number(l.calculated_total_amount || l.total_amount || 0);
+      if (val <= 0 && qty > 0) {
+        const catItem = (items || []).find(it => it.id === l.item_id);
+        const price = Number(l.unit_price) || Number(catItem?.unit_price) || 10;
+        const gst = Number(l.gst_rate !== undefined && l.gst_rate !== null ? l.gst_rate : (catItem?.default_gst_rate !== undefined ? catItem.default_gst_rate : 0));
+        val = (qty * price) * (1 + gst / 100);
+      }
+
+      grandUnits += qty;
+      grandAmount += val;
+
+      // Unit-wise
+      if (!unitMap[unitKey]) {
+        unitMap[unitKey] = {
+          unit_name: unitKey,
+          tx_count: 0,
+          total_quantity: 0,
+          total_valuation: 0,
+          items: {},
+          references: new Set()
+        };
+      }
+      unitMap[unitKey].tx_count += 1;
+      unitMap[unitKey].total_quantity += qty;
+      unitMap[unitKey].total_valuation += val;
+      const ref = l.resolved_demand_number || l.reference_no;
+      if (ref) unitMap[unitKey].references.add(ref);
+      const itemName = l.item_name || 'Item';
+      if (!unitMap[unitKey].items[itemName]) {
+        unitMap[unitKey].items[itemName] = { qty: 0, uom: l.unit_of_measure || 'units', val: 0 };
+      }
+      unitMap[unitKey].items[itemName].qty += qty;
+      unitMap[unitKey].items[itemName].val += val;
+
+      // Date-wise
+      if (!dateMap[dateKey]) {
+        dateMap[dateKey] = {
+          date: dateKey,
+          tx_count: 0,
+          total_quantity: 0,
+          total_valuation: 0,
+          items: {},
+          units: new Set(),
+          references: new Set()
+        };
+      }
+      dateMap[dateKey].tx_count += 1;
+      dateMap[dateKey].total_quantity += qty;
+      dateMap[dateKey].total_valuation += val;
+      dateMap[dateKey].units.add(unitKey);
+      if (ref) dateMap[dateKey].references.add(ref);
+      if (!dateMap[dateKey].items[itemName]) {
+        dateMap[dateKey].items[itemName] = { qty: 0, uom: l.unit_of_measure || 'units', val: 0 };
+      }
+      dateMap[dateKey].items[itemName].qty += qty;
+      dateMap[dateKey].items[itemName].val += val;
+    });
+
+    const unitList = Object.values(unitMap).sort((a, b) => b.total_quantity - a.total_quantity);
+    const dateList = Object.values(dateMap).sort((a, b) => b.date.localeCompare(a.date));
+
+    return {
+      type: historyTypeFilter === 'STOCK_IN' ? 'INWARD' : 'OUTWARD',
+      totalLogs: logs.length,
+      grandUnits,
+      grandAmount,
+      unitList,
+      dateList
+    };
+  }, [showMovementSummary, historyTypeFilter, allStockData.logs, historyItemFilter, items]);
+
+  const handleExportSummaryExcel = () => {
+    if (!movementSummaryData) return;
+    const wb = XLSX.utils.book_new();
+    const typeLabel = movementSummaryData.type === 'INWARD' ? 'Inflow' : 'Outflow';
+
+    // 1. Unitwise Sheet
+    const unitHeaders = [
+      '#',
+      movementSummaryData.type === 'INWARD' ? 'Source / Supplying Hub' : 'NCC Unit (Raised Demand)',
+      'Items Transacted',
+      'Transactions Count',
+      `Total ${typeLabel} Quantity`,
+      'Total Valuation (INR)'
+    ];
+
+    const unitRows = movementSummaryData.unitList.map((u, idx) => [
+      idx + 1,
+      u.unit_name,
+      Object.entries(u.items).map(([name, it]) => `${name}: ${it.qty} ${it.uom}`).join('; '),
+      u.tx_count,
+      u.total_quantity,
+      Number(u.total_valuation.toFixed(2))
+    ]);
+
+    unitRows.push([
+      'TOTAL',
+      'Grand Total',
+      `${movementSummaryData.unitList.length} Units`,
+      movementSummaryData.totalLogs,
+      movementSummaryData.grandUnits,
+      Number(movementSummaryData.grandAmount.toFixed(2))
+    ]);
+
+    const wsUnits = XLSX.utils.aoa_to_sheet([unitHeaders, ...unitRows]);
+    XLSX.utils.book_append_sheet(wb, wsUnits, 'Unitwise Breakdown');
+
+    // 2. Datewise Sheet
+    const dateHeaders = [
+      '#',
+      'Movement Date (DD/MM/YYYY)',
+      movementSummaryData.type === 'INWARD' ? 'Sources / Supplying Hubs' : 'Target Units (NCC Units)',
+      'Items Transacted',
+      'Transactions Count',
+      `Total ${typeLabel} Quantity`,
+      'Total Valuation (INR)'
+    ];
+
+    const dateRows = movementSummaryData.dateList.map((d, idx) => [
+      idx + 1,
+      formatDDMMYYYY(d.date),
+      Array.from(d.units).join(', '),
+      Object.entries(d.items).map(([name, it]) => `${name}: ${it.qty} ${it.uom}`).join('; '),
+      d.tx_count,
+      d.total_quantity,
+      Number(d.total_valuation.toFixed(2))
+    ]);
+
+    dateRows.push([
+      'TOTAL',
+      'Grand Total',
+      `${movementSummaryData.dateList.length} Dates`,
+      '',
+      movementSummaryData.totalLogs,
+      movementSummaryData.grandUnits,
+      Number(movementSummaryData.grandAmount.toFixed(2))
+    ]);
+
+    const wsDates = XLSX.utils.aoa_to_sheet([dateHeaders, ...dateRows]);
+    XLSX.utils.book_append_sheet(wb, wsDates, 'Datewise Breakdown');
+
+    const fileName = `Stock_${typeLabel}_Executive_Summary_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
 
   const fetchAllStockLogs = async () => {
     setLoadingAllLogs(true);
@@ -852,7 +1051,7 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
       });
       const data = await res.json();
       if (Array.isArray(data)) {
-        setItems(data);
+        setItems(data.filter(i => i.item_name !== 'Standard Refreshment Packet'));
 
         // Check for expired items to alert the user
         const expiredList = data.filter(i => i.is_expired);
@@ -2056,13 +2255,20 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                   </div>
                 </div>
 
-                {/* 4. Consumed on Date */}
+                {/* 4. Amount Consumed on Date */}
                 <div className="p-3 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-blue-500 shadow-2xs">
-                  <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider block">
-                    {selectedStockDate === getTodayDateStr() ? 'Consumed Today' : `Consumed (${selectedStockDate})`}
+                  <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider flex items-center justify-between">
+                    <span>{selectedStockDate === getTodayDateStr() ? 'Amount Consumed Today' : `Amount Consumed (${selectedStockDate})`}</span>
+                    <span className="text-blue-600 font-bold text-xs">₹</span>
                   </span>
                   <div className="text-xl font-black text-blue-700 mt-0.5">
-                    {String(items.reduce((acc, i) => acc + (parseInt(i.consumed_on_date !== undefined ? i.consumed_on_date : (i.consumed_today || 0), 10) || 0), 0)).padStart(2, '0')}
+                    ₹{items.reduce((sum, i) => {
+                      const qty = Number(i.consumed_on_date !== undefined ? i.consumed_on_date : (i.consumed_today || 0)) || 0;
+                      const r = Number(i.unit_price || 0);
+                      const g = i.default_gst_rate !== undefined && i.default_gst_rate !== null ? Number(i.default_gst_rate) : 5.0;
+                      const sub = qty * r;
+                      return sum + sub + (sub * (g / 100));
+                    }, 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
 
@@ -3174,7 +3380,12 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                         <button
                           key={tab.id}
                           type="button"
-                          onClick={() => setHistoryTypeFilter(tab.id)}
+                          onClick={() => {
+                            setHistoryTypeFilter(tab.id);
+                            if (tab.id === 'ALL') {
+                              setShowMovementSummary(false);
+                            }
+                          }}
                           className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                             historyTypeFilter === tab.id
                               ? 'bg-white text-slate-900 shadow-xs font-black'
@@ -3186,26 +3397,324 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                       ))}
                     </div>
 
-                    {/* Search Input */}
-                    <div className="relative min-w-[220px]">
-                      <input
-                        type="text"
-                        value={historySearchTerm}
-                        onChange={e => setHistorySearchTerm(e.target.value)}
-                        placeholder="Search ref #, indent, officer..."
-                        className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 placeholder:text-slate-400"
-                      />
-                      {historySearchTerm && (
+                    <div className="flex items-center gap-2">
+                      {/* Summary Button: Visible ONLY for Inwards or Outwards, HIDDEN on 'ALL' */}
+                      {historyTypeFilter !== 'ALL' && (historyTypeFilter === 'STOCK_IN' || historyTypeFilter === 'STOCK_OUT') && (
                         <button
                           type="button"
-                          onClick={() => setHistorySearchTerm('')}
-                          className="absolute right-2 top-2 text-slate-400 hover:text-slate-700"
+                          onClick={() => setShowMovementSummary(prev => !prev)}
+                          className={`px-3 py-1.5 text-xs font-black rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                            showMovementSummary
+                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-indigo-600/30'
+                              : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200 hover:border-indigo-300'
+                          }`}
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <BarChart3 className="w-3.5 h-3.5" />
+                          <span>
+                            {showMovementSummary
+                              ? '✕ Close Summary'
+                              : historyTypeFilter === 'STOCK_IN'
+                              ? '📊 Inward Summary'
+                              : '📊 Outward Summary'}
+                          </span>
                         </button>
                       )}
+
+                      {/* Search Input */}
+                      <div className="relative min-w-[220px]">
+                        <input
+                          type="text"
+                          value={historySearchTerm}
+                          onChange={e => setHistorySearchTerm(e.target.value)}
+                          placeholder="Search ref #, indent, officer..."
+                          className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 placeholder:text-slate-400"
+                        />
+                        {historySearchTerm && (
+                          <button
+                            type="button"
+                            onClick={() => setHistorySearchTerm('')}
+                            className="absolute right-2 top-2 text-slate-400 hover:text-slate-700"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
+
+                  {/* On-Demand Executive Summary (Generated on user request for Inflow / Outflow) */}
+                  {showMovementSummary && movementSummaryData && (
+                    <div className="w-full mx-0 p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-indigo-50/60 via-white to-slate-50 border-2 border-indigo-200 shadow-md space-y-4 animate-in fade-in duration-200">
+                      {/* Summary Header & Toggle Tabs */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-100 pb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-xs">
+                              <BarChart3 className="w-4 h-4" />
+                            </span>
+                            <h3 className="text-base font-black text-slate-900">
+                              {movementSummaryData.type === 'INWARD' ? 'Inwards (+Inflow) Executive Summary' : 'Outwards (-Outflow) Executive Summary'}
+                            </h3>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                              movementSummaryData.type === 'INWARD'
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                : 'bg-blue-100 text-blue-800 border-blue-300'
+                            }`}>
+                              {movementSummaryData.type === 'INWARD' ? '+ Stock In' : '- Dispatch Out'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Unitwise and datewise aggregation generated dynamically on user request.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                          {/* Excel Export Button */}
+                          <button
+                            type="button"
+                            onClick={handleExportSummaryExcel}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                            title="Download Excel Spreadsheet (.xlsx)"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Excel Export</span>
+                          </button>
+
+                          {/* Unit-wise vs Date-wise Sub-toggle */}
+                          <div className="flex items-center bg-white p-1 rounded-xl border border-indigo-200 shadow-2xs gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setSummaryViewMode('UNIT')}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                summaryViewMode === 'UNIT'
+                                    ? 'bg-indigo-600 text-white font-black shadow-xs'
+                                  : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              <Building2 className="w-3.5 h-3.5" />
+                              <span>Unitwise Breakdown</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSummaryViewMode('DATE')}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                summaryViewMode === 'DATE'
+                                  ? 'bg-indigo-600 text-white font-black shadow-xs'
+                                  : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              <Calendar className="w-3.5 h-3.5" />
+                              <span>Datewise Breakdown</span>
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setShowMovementSummary(false)}
+                            className="p-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-500 border border-slate-200 cursor-pointer transition-colors"
+                            title="Close Summary"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Metric KPI Pill Cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                          <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                            Total {movementSummaryData.type === 'INWARD' ? 'Inward' : 'Outward'} Units
+                          </span>
+                          <div className={`text-xl font-black mt-0.5 ${movementSummaryData.type === 'INWARD' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {movementSummaryData.type === 'INWARD' ? '+' : '-'}{movementSummaryData.grandUnits.toLocaleString()} units
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                          <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                            Total Valuation (₹)
+                          </span>
+                          <div className="text-xl font-black text-slate-900 mt-0.5">
+                            ₹{movementSummaryData.grandAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                          <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                            {movementSummaryData.type === 'INWARD' ? 'Sources / Supplying Hubs' : 'Target Units (NCC Units)'}
+                          </span>
+                          <div className="text-xl font-black text-indigo-700 mt-0.5">
+                            {movementSummaryData.unitList.length} entities
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                          <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                            Movement Dates
+                          </span>
+                          <div className="text-xl font-black text-blue-700 mt-0.5">
+                            {movementSummaryData.dateList.length} dates
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* TABLE: Unit-wise Breakdown */}
+                      {summaryViewMode === 'UNIT' && (
+                        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                            <span className="text-xs font-black uppercase text-slate-700 flex items-center gap-1.5">
+                              <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                              Unitwise {movementSummaryData.type === 'INWARD' ? 'Inflow' : 'Outflow'} Breakdown ({movementSummaryData.unitList.length})
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-500">Sorted by Flow Volume</span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50/80 text-[11px] font-black uppercase text-slate-500 border-b border-slate-200">
+                                <tr>
+                                  <th className="p-3 w-10 text-center">#</th>
+                                  <th className="p-3">{movementSummaryData.type === 'INWARD' ? 'Source / Supplying Hub' : 'NCC Unit (Raised Demand)'}</th>
+                                  <th className="p-3">Items Transacted</th>
+                                  <th className="p-3 text-center">Transactions</th>
+                                  <th className="p-3 text-right">Total Flow Quantity</th>
+                                  <th className="p-3 text-right">Total Valuation (₹)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {movementSummaryData.unitList.length === 0 ? (
+                                  <tr>
+                                    <td colSpan="6" className="p-8 text-center text-slate-400">No unitwise movements recorded.</td>
+                                  </tr>
+                                ) : (
+                                  movementSummaryData.unitList.map((u, idx) => (
+                                    <tr key={u.unit_name} className="hover:bg-indigo-50/30 transition-colors">
+                                      <td className="p-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                      <td className="p-3">
+                                        <div className="font-black text-slate-900 text-xs">{u.unit_name}</div>
+                                      </td>
+                                      <td className="p-3">
+                                        <div className="flex flex-wrap gap-1 max-w-md">
+                                          {Object.entries(u.items).map(([name, it]) => (
+                                            <span key={name} className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-900 text-[10px] font-semibold border border-indigo-100">
+                                              {name}: <strong className="font-bold">{it.qty} {it.uom}</strong>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </td>
+                                      <td className="p-3 text-center font-bold text-slate-700">{u.tx_count}</td>
+                                      <td className="p-3 text-right">
+                                        <span className={`font-black text-xs ${movementSummaryData.type === 'INWARD' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                          {movementSummaryData.type === 'INWARD' ? '+' : '-'}{u.total_quantity.toLocaleString()} units
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-right font-black text-slate-900">
+                                        ₹{u.total_valuation.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                              <tfoot className="bg-slate-50 font-black border-t-2 border-slate-200">
+                                <tr>
+                                  <td colSpan="3" className="p-3 text-right uppercase text-slate-600">Grand Total:</td>
+                                  <td className="p-3 text-center text-slate-800">{movementSummaryData.totalLogs}</td>
+                                  <td className={`p-3 text-right ${movementSummaryData.type === 'INWARD' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                    {movementSummaryData.type === 'INWARD' ? '+' : '-'}{movementSummaryData.grandUnits.toLocaleString()} units
+                                  </td>
+                                  <td className="p-3 text-right text-slate-900">
+                                    ₹{movementSummaryData.grandAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TABLE: Date-wise Breakdown */}
+                      {summaryViewMode === 'DATE' && (
+                        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                            <span className="text-xs font-black uppercase text-slate-700 flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                              Datewise {movementSummaryData.type === 'INWARD' ? 'Inflow' : 'Outflow'} Breakdown ({movementSummaryData.dateList.length})
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-500">Chronological (Latest First)</span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50/80 text-[11px] font-black uppercase text-slate-500 border-b border-slate-200">
+                                <tr>
+                                  <th className="p-3 w-10 text-center">#</th>
+                                  <th className="p-3">Movement Date (DD/MM/YYYY)</th>
+                                  <th className="p-3">{movementSummaryData.type === 'INWARD' ? 'Sources / Supplying Hubs' : 'Target Units (NCC Units Raised Demand)'}</th>
+                                  <th className="p-3">Items Transacted</th>
+                                  <th className="p-3 text-center">Transactions</th>
+                                  <th className="p-3 text-right">Total Flow Quantity</th>
+                                  <th className="p-3 text-right">Total Valuation (₹)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {movementSummaryData.dateList.length === 0 ? (
+                                  <tr>
+                                    <td colSpan="7" className="p-8 text-center text-slate-400">No datewise movements recorded.</td>
+                                  </tr>
+                                ) : (
+                                  movementSummaryData.dateList.map((d, idx) => (
+                                    <tr key={d.date} className="hover:bg-indigo-50/30 transition-colors">
+                                      <td className="p-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                      <td className="p-3 font-mono font-bold text-slate-800 whitespace-nowrap">
+                                        {formatDDMMYYYY(d.date)}
+                                      </td>
+                                      <td className="p-3">
+                                        <div className="flex flex-wrap gap-1 max-w-xs">
+                                          {Array.from(d.units).map(uName => (
+                                            <span key={uName} className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px] font-bold">
+                                              {uName}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </td>
+                                      <td className="p-3">
+                                        <div className="flex flex-wrap gap-1 max-w-md">
+                                          {Object.entries(d.items).map(([name, it]) => (
+                                            <span key={name} className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-900 text-[10px] font-semibold border border-indigo-100">
+                                              {name}: <strong className="font-bold">{it.qty} {it.uom}</strong>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </td>
+                                      <td className="p-3 text-center font-bold text-slate-700">{d.tx_count}</td>
+                                      <td className="p-3 text-right">
+                                        <span className={`font-black text-xs ${movementSummaryData.type === 'INWARD' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                          {movementSummaryData.type === 'INWARD' ? '+' : '-'}{d.total_quantity.toLocaleString()} units
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-right font-black text-slate-900">
+                                        ₹{d.total_valuation.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                              <tfoot className="bg-slate-50 font-black border-t-2 border-slate-200">
+                                <tr>
+                                  <td colSpan="3" className="p-3 text-right uppercase text-slate-600">Grand Total:</td>
+                                  <td className="p-3 text-center text-slate-800">{movementSummaryData.totalLogs}</td>
+                                  <td className={`p-3 text-right ${movementSummaryData.type === 'INWARD' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                    {movementSummaryData.type === 'INWARD' ? '+' : '-'}{movementSummaryData.grandUnits.toLocaleString()} units
+                                  </td>
+                                  <td className="p-3 text-right text-slate-900">
+                                    ₹{movementSummaryData.grandAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Comprehensive Chronological Movement Table */}
                   <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -3240,7 +3749,8 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                                 const matchesNote = (l.notes || '').toLowerCase().includes(term);
                                 const matchesOfficer = (l.added_by_name || '').toLowerCase().includes(term);
                                 const matchesItem = (l.item_name || '').toLowerCase().includes(term);
-                                if (!matchesRef && !matchesNote && !matchesOfficer && !matchesItem) return false;
+                                const matchesUnit = (l.unit_name || '').toLowerCase().includes(term);
+                                if (!matchesRef && !matchesNote && !matchesOfficer && !matchesItem && !matchesUnit) return false;
                               }
                               return true;
                             });
@@ -3312,7 +3822,10 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                                   </td>
 
                                   <td className="p-3 font-mono text-[10px] text-slate-700 font-bold">
-                                    {log.reference_no || (log.indent_id ? `IND-${log.indent_id}` : 'DIRECT-ENTRY')}
+                                    <div>{log.resolved_demand_number || log.reference_no || (log.indent_id ? `IND-${log.indent_id}` : 'DIRECT-ENTRY')}</div>
+                                    {log.unit_name && (
+                                      <div className="text-[9px] font-semibold text-indigo-700 mt-0.5">{log.unit_name}</div>
+                                    )}
                                   </td>
 
                                   <td className="p-3 text-center">
@@ -3330,7 +3843,7 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                                   </td>
 
                                   <td className="p-3 text-right font-black text-slate-800">
-                                    {log.total_amount ? `₹${Number(log.total_amount).toFixed(2)}` : '—'}
+                                    {(log.calculated_total_amount || log.total_amount) ? `₹${Number(log.calculated_total_amount || log.total_amount).toFixed(2)}` : '—'}
                                   </td>
 
                                   <td className="p-3">
@@ -3347,6 +3860,7 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
                       </table>
                     </div>
                   </div>
+
                 </div>
               </div>
             </div>
