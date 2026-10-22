@@ -27,7 +27,8 @@ import {
   ChevronRight,
   ChevronDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Printer
 } from 'lucide-react';
 
 const formatDMY = (dateStr) => {
@@ -469,6 +470,107 @@ export default function AdminDemandsPage() {
     if (idx === -1) next = dir > 0 ? 0 : dateChips.length - 1;
     else next = Math.min(dateChips.length - 1, Math.max(0, idx + dir));
     setDateFilter(dateChips[next].key);
+  };
+
+  const handlePrintDate = (dateKey, items) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to print demands.');
+      return;
+    }
+    const totalPackets = items.reduce((s, d) => s + pktsOf(d), 0);
+    const totalAmount = items.reduce((s, d) => s + Number(d.total_amount || 0), 0);
+    const dateFormatted = formatDMY(dateKey);
+    const dayName = weekdayOf(dateKey);
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Refreshment Demands - ${dateFormatted}</title>
+          <style>
+            body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; padding: 24px; color: #0f172a; margin: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
+            th { background-color: #f1f5f9; font-weight: 700; color: #1e293b; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+            .title { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+            .subtitle { font-size: 13px; color: #475569; margin-top: 4px; font-weight: 600; }
+            .meta { text-align: right; font-size: 13px; line-height: 1.5; color: #334155; }
+            .meta strong { color: #0f172a; font-weight: 700; }
+            .num { text-align: right; font-variant-numeric: tabular-nums; }
+            .total-row { font-weight: 700; background-color: #e2e8f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @media print {
+              @page { margin: 12mm; }
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="title">Refreshment Demands</h1>
+              <div class="subtitle">Date: <strong>${dateFormatted}${dayName ? ` (${dayName})` : ''}</strong></div>
+            </div>
+            <div class="meta">
+              <div>Total Demands: <strong>${items.length}</strong></div>
+              <div>Total Packets: <strong>${totalPackets.toLocaleString('en-IN')}</strong></div>
+              <div>Total Amount: <strong>₹${totalAmount.toLocaleString('en-IN')}</strong></div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 5%">S.No.</th>
+                <th style="width: 15%">Demand Ref</th>
+                <th style="width: 20%">NCC Unit</th>
+                <th style="width: 8%">Type</th>
+                <th style="width: 25%">Institution / Unit Name</th>
+                <th style="width: 8%" class="num">Packets</th>
+                <th style="width: 10%" class="num">Amount (₹)</th>
+                <th style="width: 9%">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((dem, index) => {
+                const institute = dem.demand_type === 'UNIT_DIRECT' ? (dem.unit_code || dem.unit_name || '—') : (dem.institution_name || '—');
+                const typeStr = dem.demand_type === 'UNIT_DIRECT' ? 'UNIT' : 'INSTITUTE';
+                const packets = pktsOf(dem);
+                const amount = Number(dem.total_amount || 0);
+                const status = dem.status || '—';
+                return `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td style="font-family: monospace; font-weight: 700;">${dem.demand_number || '—'}</td>
+                    <td>${dem.unit_name || '—'}</td>
+                    <td>${typeStr}</td>
+                    <td>${institute}</td>
+                    <td class="num font-bold">${packets.toLocaleString('en-IN')}</td>
+                    <td class="num">₹${amount.toLocaleString('en-IN')}</td>
+                    <td>${status}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="5" style="text-align: right; padding-right: 12px;">Total:</td>
+                <td class="num">${totalPackets.toLocaleString('en-IN')}</td>
+                <td class="num">₹${totalAmount.toLocaleString('en-IN')}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
   };
 
   const selectedUnit = onboardUnits.find(u => String(u.id) === String(selectedUnitId));
@@ -985,6 +1087,18 @@ export default function AdminDemandsPage() {
                             <span className="font-extrabold text-slate-800 text-xs">{formatDMY(g.key)} · {weekdayOf(g.key)}</span>
                             {badge && <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${badge.cls}`}>{badge.label}</span>}
                             <span className="text-[11px] font-bold text-slate-500">{g.items.length} demand{g.items.length > 1 ? 's' : ''} · {gPkts.toLocaleString('en-IN')} packets · ₹{gAmt.toLocaleString('en-IN')}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrintDate(g.key, g.items);
+                              }}
+                              className="ml-auto p-1.5 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-blue-600 transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                              title="Print demands for this date"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span className="text-[10px] font-bold uppercase tracking-wider">Print</span>
+                            </button>
                           </div>
                         </td>
                       </tr>
