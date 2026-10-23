@@ -992,41 +992,6 @@ export default function RefreshmentReports() {
               </button>
             )}
           </div>
-
-          {/* Row 3: Ultra-Compact Horizontal Stats Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 text-xs">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-blue-100 bg-blue-50/40">
-              <History size={16} className="text-blue-600 shrink-0" />
-              <div>
-                <div className="text-[9px] font-black uppercase text-blue-500 tracking-wider">Total Demands</div>
-                <div className="text-sm font-black text-blue-950 leading-none">{totalDemandsCount}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-emerald-100 bg-emerald-50/40">
-              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-              <div>
-                <div className="text-[9px] font-black uppercase text-emerald-500 tracking-wider">Total Packets</div>
-                <div className="text-sm font-black text-emerald-950 leading-none">{totalPacketsCount.toLocaleString()}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-indigo-100 bg-indigo-50/40">
-              <IndianRupee size={16} className="text-indigo-600 shrink-0" />
-              <div>
-                <div className="text-[9px] font-black uppercase text-indigo-500 tracking-wider">Total Value</div>
-                <div className="text-sm font-black text-indigo-950 leading-none">₹{formatAmount(totalCostAmount)}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-purple-100 bg-purple-50/40">
-              <School size={16} className="text-purple-600 shrink-0" />
-              <div>
-                <div className="text-[9px] font-black uppercase text-purple-500 tracking-wider">Total Units</div>
-                <div className="text-sm font-black text-purple-950 leading-none">{groupedSections.length}</div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Report Sections */}
