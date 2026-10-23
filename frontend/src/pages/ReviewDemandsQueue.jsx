@@ -490,7 +490,7 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
                   <td className="py-3.5 px-4">
                     <div className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors max-w-[320px] whitespace-normal break-words leading-snug" title={dem.institution_name}>
                       {dem.demand_type === 'UNIT_DIRECT' || !dem.institution_name || /^\d+$/.test(String(dem.institution_name).trim())
-                        ? (dem.unit_code || dem.unit_name || '2 DAB NCC')
+                        ? (dem.unit_code || dem.unit_name || 'UNIT HQ')
                         : dem.institution_name}
                     </div>
                     <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 max-w-[320px] break-words">

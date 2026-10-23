@@ -20,6 +20,7 @@ export default function UnitDashboard() {
   const { events } = useSSE();
   const [demands, setDemands] = useState([]);
   const [institutionsCount, setInstitutionsCount] = useState(0);
+  const [unitInfo, setUnitInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [chartView, setChartView] = useState('institute'); // 'institute' | 'weekly' | 'monthly'
 
@@ -40,6 +41,15 @@ export default function UnitDashboard() {
       });
       const instData = await instRes.json();
       setInstitutionsCount(Array.isArray(instData) ? instData.length : 0);
+
+      // 3. Fetch exact unit details to guarantee accurate unit_code and jurisdiction info
+      const unitRes = await fetch(`/api/units?t=${timestamp}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const unitData = await unitRes.json();
+      if (Array.isArray(unitData) && unitData.length > 0) {
+        setUnitInfo(unitData[0]);
+      }
 
     } catch (err) {
       console.error('Error fetching unit dashboard data:', err);
@@ -270,12 +280,12 @@ export default function UnitDashboard() {
             NCC Unit HQ Jurisdiction
           </span>
           <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-            {user?.unit_name || 'NCC Battalion HQ'}
+            {unitInfo?.unit_name || user?.unit_name || 'NCC Battalion HQ'}
           </h2>
           <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-500 mt-1 font-medium">
-            <span>Code: <strong className="text-slate-800 font-mono">{user?.unit_code || '2 DAB NCC'}</strong></span>
+            <span>Code: <strong className="text-slate-800 font-mono">{unitInfo?.unit_code || user?.unit_code || 'NCC UNIT'}</strong></span>
             <span>•</span>
-            <span>Managing <strong className="text-blue-600 font-bold">{institutionsCount} Institutions</strong></span>
+            <span>Managing <strong className="text-blue-600 font-bold">{unitInfo?.institution_count !== undefined ? unitInfo.institution_count : institutionsCount} Institutions</strong></span>
             <span>•</span>
             <span>Total Demands Placed: <strong className="text-slate-800 font-bold">{stats.totalDemands}</strong></span>
           </div>

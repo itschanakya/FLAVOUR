@@ -230,16 +230,10 @@
     margin: 10mm 12mm 12mm 12mm !important;
   }
   
-  * {
-    outline: none !important;
+  body, table, tr, td, th {
     box-shadow: none !important;
     text-shadow: none !important;
-    animation: none !important;
-    transition: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     filter: none !important;
-    -webkit-filter: none !important;
   }
 
   html, body, #root {
@@ -260,8 +254,8 @@
     color: #000000 !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
     -webkit-font-smoothing: antialiased;
-    -webkit-print-color-adjust: economy !important;
-    print-color-adjust: economy !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   
   .print-heading {
@@ -273,13 +267,9 @@
   
   table {
     width: 100% !important;
-    border-collapse: separate !important;
-    border-spacing: 0 !important;
+    border-collapse: collapse !important;
     font-size: 8pt !important;
     margin: 0 !important;
-    border: 0 solid #000000 !important;
-    border-top-width: 1px !important;
-    border-left-width: 1px !important;
   }
 
   /* Layout wrappers: plain block flow prints much faster */

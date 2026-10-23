@@ -81,8 +81,8 @@ router.get('/', authenticateToken, async (req, res) => {
     let baseQuery = `
       SELECT d.*, 
         CASE 
-          WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name, '2 DAB NCC')
-          WHEN i.institution_name IS NULL OR i.institution_name = '1' OR i.institution_name REGEXP '^[0-9]+$' THEN COALESCE(u.unit_code, u.unit_name, '2 DAB NCC')
+          WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name, 'UNIT HQ')
+          WHEN i.institution_name IS NULL OR i.institution_name = '1' OR i.institution_name REGEXP '^[0-9]+$' THEN COALESCE(u.unit_code, u.unit_name, 'UNIT HQ')
           ELSE i.institution_name 
         END as institution_name,
         CASE 

@@ -210,11 +210,15 @@ router.post('/verify-otp', async (req, res) => {
 
     // Issue Token (Same logic as before)
     let unit_name = null;
+    let unit_code = null;
     let institution_name = null;
 
     if (user.unit_id) {
-      const unit = await db.get('SELECT unit_name FROM units WHERE id = ?', [user.unit_id]);
-      if (unit) unit_name = unit.unit_name;
+      const unit = await db.get('SELECT unit_name, unit_code FROM units WHERE id = ?', [user.unit_id]);
+      if (unit) {
+        unit_name = unit.unit_name;
+        unit_code = unit.unit_code;
+      }
     }
 
     if (user.institution_id) {
@@ -231,6 +235,7 @@ router.post('/verify-otp', async (req, res) => {
       unit_id: user.unit_id,
       institution_id: user.institution_id,
       unit_name,
+      unit_code,
       institution_name
     };
 
@@ -250,7 +255,47 @@ router.post('/verify-otp', async (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', authenticateToken, async (req, res) => {
-  res.json({ user: req.user });
+  try {
+    const db = await getDB();
+    const user = await db.get('SELECT id, name, email, login_id, role, unit_id, institution_id FROM users WHERE id = ?', [req.user.id]);
+    if (!user) return res.json({ user: req.user });
+
+    let unit_name = null;
+    let unit_code = null;
+    let institution_name = null;
+
+    if (user.unit_id) {
+      const unit = await db.get('SELECT unit_name, unit_code FROM units WHERE id = ?', [user.unit_id]);
+      if (unit) {
+        unit_name = unit.unit_name;
+        unit_code = unit.unit_code;
+      }
+    }
+
+    if (user.institution_id) {
+      const inst = await db.get('SELECT institution_name FROM institutions WHERE id = ?', [user.institution_id]);
+      if (inst) institution_name = inst.institution_name;
+    }
+
+    const fullUser = {
+      ...req.user,
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      login_id: user.login_id || user.email,
+      role: user.role,
+      unit_id: user.unit_id,
+      institution_id: user.institution_id,
+      unit_name: unit_name || req.user.unit_name,
+      unit_code: unit_code || req.user.unit_code,
+      institution_name: institution_name || req.user.institution_name
+    };
+
+    res.json({ user: fullUser });
+  } catch (error) {
+    console.error('Fetch me error:', error);
+    res.json({ user: req.user });
+  }
 });
 
 // GET /api/auth/credentials

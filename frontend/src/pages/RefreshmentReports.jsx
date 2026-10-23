@@ -47,7 +47,13 @@ const StatCard = ({ icon, label, value, color, sub }) => (
 export default function RefreshmentReports() {
   const { user, token } = useAuth();
   
-  const [activeTab, setActiveTab] = useState('weekly'); // weekly | audit | annual | bill
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get('tab');
+      if (p) return p;
+    } catch (e) {}
+    return 'unitwise_monthly'; // Default to unitwise monthly summary
+  }); // weekly | unitwise_monthly | audit | annual | bill
   const [demands, setDemands] = useState([]);
   const [institutions, setInstitutions] = useState([]);
   const [units, setUnits] = useState([]);
@@ -93,10 +99,24 @@ export default function RefreshmentReports() {
     const sizeClass = paperSize === 'Legal' ? 'print-legal' : 'print-a4';
     
     body.classList.add(printClass, sizeClass);
-    setTimeout(() => { window.print(); }, 10);
+
+    // Inject direct root @page style so Chrome/Edge applies Landscape to 100% of pages (never flips to portrait)
+    const existingStyle = document.getElementById('dynamic-print-page-style');
+    if (existingStyle) existingStyle.remove();
+
+    const style = document.createElement('style');
+    style.id = 'dynamic-print-page-style';
+    const paperName = paperSize === 'Legal' ? 'legal' : 'A4';
+    const orientation = isLandscape ? 'landscape' : 'portrait';
+    style.textContent = `@page { size: ${paperName} ${orientation} !important; margin: 10mm 12mm 12mm 12mm !important; }`;
+    document.head.appendChild(style);
+
+    setTimeout(() => { window.print(); }, 15);
     
     const handleAfterPrint = () => {
       body.classList.remove(printClass, sizeClass);
+      const injected = document.getElementById('dynamic-print-page-style');
+      if (injected) injected.remove();
       window.removeEventListener('afterprint', handleAfterPrint);
     };
     window.addEventListener('afterprint', handleAfterPrint);
@@ -1259,6 +1279,512 @@ export default function RefreshmentReports() {
     );
   };
 
+  const UnitwiseMonthlySummaryView = () => {
+    const isUnitRole = user?.role === 'UNIT';
+
+    // Current month in YYYY-MM
+    const [selectedMonth, setSelectedMonth] = useState(getLocalYearMonth());
+
+    // Unit filter: Admin can select any unit or 'All'; Unit role is scoped to their unit
+    const [unitFilter, setUnitFilter] = useState(() => {
+      if (isUnitRole && user?.unit_name) return user.unit_name;
+      return 'All';
+    });
+
+    // Institution filter
+    const [instFilter, setInstFilter] = useState('All');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const institutionsMap = useMemo(() => {
+      const map = {};
+      (institutions || []).forEach(i => {
+        if (i && i.id) map[i.id] = i;
+      });
+      return map;
+    }, [institutions]);
+
+    // Available distinct NCC units
+    const availableUnits = useMemo(() => {
+      const unitNames = new Set();
+      (units || []).forEach(u => { if (u.unit_name) unitNames.add(u.unit_name); });
+      (demands || []).forEach(d => { if (d.unit_name) unitNames.add(d.unit_name); });
+      return Array.from(unitNames).sort();
+    }, [units, demands]);
+
+    // Available institutions under currently selected unit
+    const availableInstitutions = useMemo(() => {
+      return (institutions || []).filter(inst => {
+        if (unitFilter === 'All') return true;
+        const instUnit = inst.unit_name || (units.find(u => u.id === inst.unit_id)?.unit_name);
+        return instUnit === unitFilter;
+      }).sort((a, b) => (a.institution_name || '').localeCompare(b.institution_name || ''));
+    }, [institutions, units, unitFilter]);
+
+    // Auto-reset institution filter if not in available list
+    useEffect(() => {
+      if (instFilter !== 'All') {
+        const exists = availableInstitutions.some(i => String(i.id) === String(instFilter) || i.institution_name === instFilter);
+        if (!exists) setInstFilter('All');
+      }
+    }, [unitFilter, availableInstitutions, instFilter]);
+
+    // Generates list of selectable months ONLY for which demand data actually exists in table
+    const monthOptions = useMemo(() => {
+      const monthSet = new Set();
+
+      (demands || []).forEach(d => {
+        if (d.demand_date && d.status !== 'CANCELLED') {
+          // If unit is filtered, prioritize months that belong to that unit
+          if (unitFilter !== 'All' && d.unit_name && d.unit_name !== unitFilter) {
+            return;
+          }
+          const ym = String(d.demand_date).slice(0, 7);
+          if (/^\d{4}-\d{2}$/.test(ym)) {
+            monthSet.add(ym);
+          }
+        }
+      });
+
+      // If no demands matched for unit, fallback to any month available in all demands
+      if (monthSet.size === 0) {
+        (demands || []).forEach(d => {
+          if (d.demand_date && d.status !== 'CANCELLED') {
+            const ym = String(d.demand_date).slice(0, 7);
+            if (/^\d{4}-\d{2}$/.test(ym)) monthSet.add(ym);
+          }
+        });
+      }
+
+      // If still empty (e.g. fresh database without demands), show current month
+      if (monthSet.size === 0) {
+        monthSet.add(getLocalYearMonth());
+      }
+
+      // Sort descending (latest first)
+      const sorted = Array.from(monthSet).sort().reverse();
+
+      return sorted.map(ym => {
+        const [yStr, mStr] = ym.split('-');
+        const dateObj = new Date(parseInt(yStr, 10), parseInt(mStr, 10) - 1, 1);
+        const label = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); // e.g. "October 2026"
+        return { value: ym, label };
+      });
+    }, [demands, unitFilter]);
+
+    // Automatically synchronize selectedMonth so it always points to an available month with data
+    useEffect(() => {
+      if (monthOptions.length > 0) {
+        const hasCurrent = monthOptions.some(m => m.value === selectedMonth);
+        if (!hasCurrent) {
+          setSelectedMonth(monthOptions[0].value);
+        }
+      }
+    }, [monthOptions, selectedMonth]);
+
+    // Filter demands for selected month, unit, institution, group and search
+    const filteredDemands = useMemo(() => {
+      return (demands || []).filter(d => {
+        if (!d.demand_date) return false;
+
+        // Month filter (YYYY-MM)
+        const dMonth = String(d.demand_date).slice(0, 7);
+        if (selectedMonth && dMonth !== selectedMonth) return false;
+
+        // Group filter
+        if (selectedGroup !== 'All' && d.ncc_group !== selectedGroup) return false;
+
+        // Unit filter
+        if (unitFilter !== 'All' && d.unit_name !== unitFilter) return false;
+
+        // Institution filter
+        if (instFilter !== 'All') {
+          if (String(d.institution_id) !== String(instFilter) && d.institution_name !== instFilter) return false;
+        }
+
+        // Exclude cancelled
+        if (d.status === 'CANCELLED') return false;
+
+        // Search query
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          const mInst = (d.institution_name || '').toLowerCase().includes(q);
+          const mAddr = (d.complete_address || d.google_location || '').toLowerCase().includes(q);
+          const mRef = (d.demand_number || '').toLowerCase().includes(q);
+          const mUnit = (d.unit_name || '').toLowerCase().includes(q);
+          const mInv = (d.invoice_no || '').toLowerCase().includes(q);
+          if (!mInst && !mAddr && !mRef && !mUnit && !mInv) return false;
+        }
+
+        return true;
+      });
+    }, [demands, selectedMonth, selectedGroup, unitFilter, instFilter, searchQuery]);
+
+    // Group filtered demands by Institution
+    const groupedByInstitution = useMemo(() => {
+      const groups = {};
+
+      filteredDemands.forEach(d => {
+        const key = d.institution_name || (d.institution_id ? `Inst_${d.institution_id}` : 'Unknown Institution');
+        const instData = institutionsMap[d.institution_id] || {};
+        const addressStr = d.complete_address || instData.complete_address || d.google_location || instData.google_location || 'Delhi Cantonment, New Delhi';
+
+        if (!groups[key]) {
+          groups[key] = {
+            id: d.institution_id,
+            name: d.institution_name || 'Unknown Institution',
+            address: addressStr,
+            ano: d.ano_cto_name || instData.ano_cto_name || '-',
+            unit_name: d.unit_name || instData.unit_name || '-',
+            demands: []
+          };
+        }
+        groups[key].demands.push(d);
+      });
+
+      // Sort demands chronologically within each institution by demand_date ASC
+      Object.values(groups).forEach(g => {
+        g.demands.sort((a, b) => new Date(a.demand_date) - new Date(b.demand_date));
+      });
+
+      // Sort institutions alphabetically
+      return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
+    }, [filteredDemands, institutionsMap]);
+
+    const totalDemandsCount = filteredDemands.length;
+    const totalPacketsCount = filteredDemands.reduce((s, d) => s + (Number(d.total_quantity) || Number(d.quantity) || 0), 0);
+    const totalCostAmount = filteredDemands.reduce((s, d) => s + (Number(d.total_amount) || 0), 0);
+    const totalInstitutionsCount = groupedByInstitution.length;
+
+    // Excel Export with Merged Institution Cells
+    const exportToExcel = () => {
+      const exportData = [];
+      const merges = [];
+      let currentRow = 1; // Row 0 is header
+
+      groupedByInstitution.forEach(inst => {
+        const demandCount = inst.demands.length;
+        const startRow = currentRow;
+
+        inst.demands.forEach(d => {
+          const rate = d.avg_unit_price || (d.total_amount && d.total_quantity ? (d.total_amount / d.total_quantity) : 75.00);
+
+          exportData.push({
+            'S.NO': currentRow,
+            'INSTITUTION WITH ADDRESS': `${inst.name}${inst.address ? ', ' + inst.address : ''}`,
+            'DATE OF SUPPLY': formatDDMMYYYY(d.demand_date),
+            'DEMAND REF': d.demand_number || '',
+            'UNIT': d.unit_name || inst.unit_name || '',
+            'PLACE OF SUPPLY': 'DELHI',
+            'INVOICE DATE': formatDDMMYYYY(d.invoice_date),
+            'INVOICE NO': d.invoice_no || '',
+            'ITEM': 'Refreshment Packet',
+            'QTY': Number(d.total_quantity || d.quantity || 0),
+            'RATE INCL GST': rate,
+            'AMOUNT': Number(d.total_amount || 0)
+          });
+          currentRow++;
+        });
+
+        if (demandCount > 1) {
+          // Merge column 1 (INSTITUTION WITH ADDRESS) from startRow to currentRow - 1
+          merges.push({
+            s: { r: startRow, c: 1 },
+            e: { r: currentRow - 1, c: 1 }
+          });
+        }
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      if (merges.length > 0) {
+        worksheet['!merges'] = merges;
+      }
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Unitwise Monthly Summary');
+      const safeUnitStr = unitFilter === 'All' ? 'All_Units' : unitFilter.replace(/[^a-zA-Z0-9]/g, '_');
+      XLSX.writeFile(workbook, `Unitwise_Monthly_Summary_${selectedMonth}_${safeUnitStr}.xlsx`);
+    };
+
+    const monthDateObj = selectedMonth ? new Date(selectedMonth + '-01') : new Date();
+    const monthDisplayStr = monthDateObj.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }).toUpperCase();
+    const activeUnitHeader = unitFilter === 'All' ? 'ALL UNITS' : unitFilter.toUpperCase();
+
+    let serialCounter = 1;
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500 w-full">
+        {/* Filters and Control Panel (Hidden during print) */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm print:hidden space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black">
+                <Building2 size={18} />
+              </div>
+              <div>
+                <h3 className="font-black text-sm tracking-tight text-slate-900 uppercase">
+                  Unitwise Monthly Summary
+                </h3>
+                <p className="text-[11px] text-slate-500 font-bold">
+                  Institution-grouped monthly demands with merged institution rows & monthly summary invoices
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={exportToExcel}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md shadow-emerald-600/25 border border-emerald-400/40 flex items-center gap-1.5 cursor-pointer"
+              >
+                <FileSpreadsheet size={15} className="text-emerald-200 shrink-0" />
+                <span>Export Excel (.xlsx)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="px-4 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-400 text-white font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md shadow-blue-600/25 border border-blue-400/40 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer size={15} className="text-sky-200 shrink-0" />
+                <span>Print Report</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Bar: Month, Unit, Institution, Search */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            {/* 1. Month Picker (Formatted like "May 2026") */}
+            <div>
+              <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Select Month
+              </label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-xs cursor-pointer"
+              >
+                {monthOptions.map(m => (
+                  <option key={m.value} value={m.value}>
+                    📅 {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. Unit Filter */}
+            <div>
+              <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
+                NCC Unit
+              </label>
+              <select
+                value={unitFilter}
+                onChange={(e) => setUnitFilter(e.target.value)}
+                disabled={isUnitRole}
+                className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-xs ${isUnitRole ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                {!isUnitRole && <option value="All">🏢 All NCC Units ({availableUnits.length})</option>}
+                {availableUnits.map(unit => (
+                  <option key={unit} value={unit}>{unit}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Institution Filter */}
+            <div>
+              <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Filter Institution
+              </label>
+              <select
+                value={instFilter}
+                onChange={(e) => setInstFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-xs cursor-pointer"
+              >
+                <option value="All">🏫 All Institutions ({availableInstitutions.length})</option>
+                {availableInstitutions.map(inst => (
+                  <option key={inst.id} value={inst.id}>{inst.institution_name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 4. Search Filter */}
+            <div>
+              <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Search
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search School, Ref, Inv No..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-500 shadow-xs"
+                />
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Report Canvas & Printable Container */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm print:shadow-none print:border-none print:bg-white print:overflow-visible print:w-full">
+          {/* Print Page Header */}
+          <PrintHeader
+            title={`MONTHLY REFRESHMENT SUMMARY - UNIT : ${activeUnitHeader}`}
+            period={`MONTH : ${monthDisplayStr}`}
+            extraMeta={`TOTAL INSTITUTIONS: ${totalInstitutionsCount} • TOTAL DEMANDS: ${totalDemandsCount}`}
+          />
+
+          {/* Table Container */}
+          <div className="overflow-x-auto print:overflow-visible print:w-full">
+            <table className="w-full text-left border-collapse print:min-w-full print:border print:border-black">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-[11px] font-black uppercase text-slate-600">
+                  <th className="px-3 py-3.5 text-center print:text-black w-10 border border-slate-200 print:border-black">S.NO</th>
+                  <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black min-w-[240px]">INSTITUTION WITH ADDRESS</th>
+                  <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black whitespace-nowrap text-center">DATE OF SUPPLY</th>
+                  <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black whitespace-nowrap text-center">DEMAND REF</th>
+                  <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black whitespace-nowrap text-center">UNIT</th>
+                  <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black whitespace-nowrap">PLACE OF SUPPLY</th>
+                  <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black whitespace-nowrap min-w-[120px]">INVOICE DATE</th>
+                  <th className="px-3 py-3.5 text-center print:text-black border border-slate-200 print:border-black whitespace-nowrap min-w-[120px]">INVOICE NO</th>
+                  <th className="px-3 py-3.5 print:text-black border border-slate-200 print:border-black whitespace-nowrap">ITEM</th>
+                  <th className="px-3 py-3.5 text-center print:text-black text-emerald-600 border border-slate-200 print:border-black">QTY</th>
+                  <th className="px-3 py-3.5 text-right print:text-black text-slate-700 border border-slate-200 print:border-black">RATE INCL GST</th>
+                  <th className="px-3 py-3.5 text-right print:text-black text-emerald-600 border border-slate-200 print:border-black">AMOUNT</th>
+                </tr>
+              </thead>
+                {groupedByInstitution.length === 0 ? (
+                  <tbody className="divide-y divide-slate-100 print:divide-black text-xs">
+                    <tr>
+                      <td colSpan={12} className="p-12 text-center text-slate-400 font-medium border border-slate-200">
+                        No demand records found for the selected Unit and Month ({monthDisplayStr}).
+                      </td>
+                    </tr>
+                  </tbody>
+                ) : (
+                  groupedByInstitution.map((inst, instIdx) => {
+                    const demandCount = inst.demands.length;
+
+                    return (
+                      <tbody
+                        key={inst.id || `${inst.name}-${instIdx}`}
+                        className="divide-y divide-slate-100 print:divide-black text-xs print:break-inside-avoid"
+                        style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                      >
+                        {inst.demands.map((row, dIdx) => {
+                          const isFirstRowOfInst = dIdx === 0;
+                          const currentSerial = serialCounter++;
+                          const rate = row.avg_unit_price || (row.total_amount && row.total_quantity ? (row.total_amount / row.total_quantity) : 75.00);
+
+                          return (
+                            <tr key={row.id || `${inst.id}-${dIdx}`} className="hover:bg-slate-50/70 print:bg-white transition-colors">
+                              {/* S.NO */}
+                              <td className="px-3 py-3 text-slate-500 font-bold text-center print:text-black border border-slate-200 print:border-black">
+                                {currentSerial}
+                              </td>
+
+                              {/* INSTITUTION WITH ADDRESS - MERGED ACROSS ALL DEMANDS OF THIS INSTITUTION */}
+                              {isFirstRowOfInst && (
+                                <td
+                                  rowSpan={demandCount}
+                                  className="px-3.5 py-3 text-xs text-slate-900 border border-slate-200 print:border-black align-top bg-white print:bg-white min-w-[240px]"
+                                >
+                                  <div className="font-bold text-slate-900 uppercase text-xs tracking-tight">{inst.name}</div>
+                                  {inst.address && (
+                                    <div className="text-xs text-slate-600 font-normal leading-snug mt-1">
+                                      {inst.address}
+                                    </div>
+                                  )}
+                                  {inst.ano && inst.ano !== '-' && (
+                                    <div className="text-xs text-blue-700 print:text-black font-semibold mt-1 flex items-center gap-1 leading-snug">
+                                      <span>ANO/CTO:</span> <span>{inst.ano}</span>
+                                    </div>
+                                  )}
+                                </td>
+                              )}
+
+                              {/* DATE OF SUPPLY */}
+                              <td className="px-3 py-3 font-medium text-slate-700 print:text-black text-center whitespace-nowrap border border-slate-200 print:border-black">
+                                {formatDDMMYYYY(row.demand_date)}
+                              </td>
+
+                              {/* DEMAND REF */}
+                              <td className="px-3 py-3 font-mono font-medium text-blue-700 print:text-black text-center whitespace-nowrap border border-slate-200 print:border-black">
+                                {row.demand_number || '-'}
+                              </td>
+
+                              {/* UNIT */}
+                              <td className="px-3 py-3 text-slate-700 print:text-black text-center whitespace-nowrap border border-slate-200 print:border-black">
+                                {row.unit_name || inst.unit_name || '-'}
+                              </td>
+
+                              {/* PLACE OF SUPPLY */}
+                              <td className="px-3 py-3 text-center font-medium text-slate-700 border border-slate-200 print:border-black">
+                                DELHI
+                              </td>
+
+                              {/* INVOICE DATE - Fetched directly from Monthly Summary record */}
+                              <td className="px-3 py-3 text-center border border-slate-200 print:border-black min-w-[120px] font-mono text-slate-700 whitespace-nowrap">
+                                {formatDDMMYYYY(row.invoice_date) || '-'}
+                              </td>
+
+                              {/* INVOICE NO - Fetched directly from Monthly Summary record */}
+                              <td className="px-3 py-3 text-center border border-slate-200 print:border-black min-w-[120px] font-mono font-bold text-blue-700 whitespace-nowrap">
+                                {row.invoice_no || '-'}
+                              </td>
+
+                              {/* ITEM */}
+                              <td className="px-3 py-3 text-slate-700 print:text-black whitespace-nowrap border border-slate-200 print:border-black">
+                                Refreshment Packet
+                              </td>
+
+                              {/* QTY */}
+                              <td className="px-3 py-3 text-center font-bold text-slate-900 print:text-black border border-slate-200 print:border-black">
+                                {Number(row.total_quantity || row.quantity || 0)}
+                              </td>
+
+                              {/* RATE INCL GST */}
+                              <td className="px-3 py-3 text-right font-normal text-slate-700 print:text-black border border-slate-200 print:border-black">
+                                ₹{formatAmount(rate)}
+                              </td>
+
+                              {/* AMOUNT */}
+                              <td className="px-3 py-3 text-right font-bold text-emerald-600 print:text-black border border-slate-200 print:border-black">
+                                ₹{formatAmount(row.total_amount)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    );
+                  })
+                )}
+
+              {/* Grand Total Footer (No Subtotals between Institutions as requested) */}
+              {groupedByInstitution.length > 0 && (
+                <tfoot className="bg-slate-50 border-t-2 border-slate-300 print:bg-slate-100 print:border-black font-bold">
+                  <tr className="text-xs">
+                    <td colSpan={9} className="px-4 py-3.5 text-right uppercase tracking-wider text-slate-800 print:text-black border border-slate-200 print:border-black">
+                      GRAND TOTAL ({groupedByInstitution.length} Institutions • {totalDemandsCount} Demands)
+                    </td>
+                    <td className="px-3 py-3.5 text-center text-sm font-black text-emerald-700 print:text-black border border-slate-200 print:border-black">
+                      {totalPacketsCount.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-3.5 text-right text-xs font-normal text-slate-500 border border-slate-200 print:border-black">
+                      -
+                    </td>
+                    <td className="px-3 py-3.5 text-right text-sm font-black text-emerald-700 print:text-black border border-slate-200 print:border-black">
+                      ₹{formatAmount(totalCostAmount)}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const AnnualSummaryView = () => {
     const [search, setSearch] = useState('');
     const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
@@ -1746,9 +2272,10 @@ export default function RefreshmentReports() {
           )}
         </div>
 
-        <div className="flex bg-white border border-slate-200 rounded-xl p-1 mb-2">
+        <div className="flex bg-white border border-slate-200 rounded-xl p-1 mb-2 overflow-x-auto no-scrollbar gap-1">
           {[
             { id: 'weekly', label: 'Weekly Summary Matrix' },
+            { id: 'unitwise_monthly', label: 'Unitwise Monthly Summary' },
             { id: 'audit', label: 'Monthly Summary' },
             { id: 'annual', label: 'Annual Quota Summary' },
             { id: 'bill', label: 'Bill Tracking & Payments' }
@@ -1756,7 +2283,7 @@ export default function RefreshmentReports() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${
+              className={`flex-1 py-2 px-3 text-xs font-black uppercase tracking-wider rounded-lg transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === tab.id ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
@@ -1767,6 +2294,7 @@ export default function RefreshmentReports() {
       </div>
 
       {activeTab === 'weekly' && <WeeklySummaryView />}
+      {activeTab === 'unitwise_monthly' && <UnitwiseMonthlySummaryView />}
       {activeTab === 'audit' && <AuditTrailView />}
       {activeTab === 'annual' && <AnnualSummaryView />}
       {activeTab === 'bill' && <BillTrackerView />}
