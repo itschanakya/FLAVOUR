@@ -1751,8 +1751,14 @@ export default function RefreshmentReports() {
   };
 
   const AnnualSummaryView = () => {
+    const isUnitRole = user?.role === 'UNIT';
     const [search, setSearch] = useState('');
     const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
+    const [unitFilter, setUnitFilter] = useState(() => {
+      if (isUnitRole && user?.unit_name) return user.unit_name;
+      return 'All';
+    });
+    const [instFilter, setInstFilter] = useState('All');
     
     const safeDemands = Array.isArray(demands) ? demands : [];
     const safeInstitutions = Array.isArray(institutions) ? institutions : [];
@@ -1770,8 +1776,51 @@ export default function RefreshmentReports() {
       setYearFilter(availableYears[0]);
     }
 
+    // Available NCC Units
+    const availableUnits = useMemo(() => {
+      const unitNames = new Set();
+      (units || []).forEach(u => { if (u.unit_name) unitNames.add(u.unit_name); });
+      (safeInstitutions || []).forEach(inst => {
+        const uName = inst.unit_name || units.find(u => u.id === inst.unit_id)?.unit_name;
+        if (uName) unitNames.add(uName);
+      });
+      return Array.from(unitNames).sort();
+    }, [units, safeInstitutions]);
+
+    // Available Institutions under current Unit filter
+    const availableInstitutions = useMemo(() => {
+      return (safeInstitutions || []).filter(inst => {
+        if (unitFilter === 'All') return true;
+        const instUnit = inst.unit_name || (units.find(u => u.id === inst.unit_id)?.unit_name);
+        return instUnit === unitFilter;
+      }).sort((a, b) => (a.institution_name || '').localeCompare(b.institution_name || ''));
+    }, [safeInstitutions, units, unitFilter]);
+
+    // Auto-reset institution filter if not in available list
+    useEffect(() => {
+      if (instFilter !== 'All') {
+        const exists = availableInstitutions.some(i => String(i.id) === String(instFilter) || i.institution_name === instFilter);
+        if (!exists) setInstFilter('All');
+      }
+    }, [unitFilter, availableInstitutions, instFilter]);
+
     const schoolStats = useMemo(() => {
-      const filteredInstitutions = safeInstitutions.filter(i => selectedGroup === 'All' || i.ncc_group === selectedGroup);
+      const filteredInstitutions = safeInstitutions.filter(inst => {
+        if (selectedGroup !== 'All' && inst.ncc_group !== selectedGroup) return false;
+        
+        // Unit filter
+        if (unitFilter !== 'All') {
+          const instUnit = inst.unit_name || (units.find(u => u.id === inst.unit_id)?.unit_name);
+          if (instUnit !== unitFilter) return false;
+        }
+
+        // Institution filter
+        if (instFilter !== 'All') {
+          if (String(inst.id) !== String(instFilter) && inst.institution_name !== instFilter) return false;
+        }
+
+        return true;
+      });
       
       return filteredInstitutions.map(inst => {
         const s1 = inst.strength_1st_year || 0;
@@ -1833,7 +1882,7 @@ export default function RefreshmentReports() {
           utilizationPct, isOverQuota, totalAmount
         };
       }).sort((a, b) => a.institution_name.localeCompare(b.institution_name));
-    }, [safeInstitutions, safeDemands, yearFilter]);
+    }, [safeInstitutions, safeDemands, yearFilter, unitFilter, instFilter, selectedGroup, units]);
 
     const filtered = schoolStats.filter(s => 
       s.institution_name.toLowerCase().includes(search.toLowerCase()) || 
@@ -1848,41 +1897,111 @@ export default function RefreshmentReports() {
 
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
-        <PrintControls />
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-lg print:hidden">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h3 className="font-black text-lg text-slate-900 uppercase tracking-tight flex items-center gap-2">
-                <School size={20} className="text-blue-500" /> School Annual Refreshment Summary
-              </h3>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Quota Allocation: Configured Classes per Year (1 Packet/Cadet per Class)</p>
+        {/* Filters and Control Panel (Hidden during print) */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm print:hidden space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black">
+                <School size={18} />
+              </div>
+              <div>
+                <h3 className="font-black text-sm text-slate-900 uppercase tracking-tight">
+                  School Annual Refreshment Summary
+                </h3>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                  Quota Allocation: Configured Classes per Year (1 Packet/Cadet per Class)
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="text" placeholder="Search Institution, ANO..."
-                value={search} onChange={e => setSearch(e.target.value)}
-                className="bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-xs text-slate-800 outline-none w-64 focus:border-blue-500"
-              />
-              <select 
-                value={yearFilter} onChange={e => setYearFilter(e.target.value)}
-                className="bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-xs text-slate-800 outline-none font-bold"
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="px-4 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-400 text-white font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md shadow-blue-600/25 border border-blue-400/40 flex items-center gap-1.5 cursor-pointer"
               >
-                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                <Printer size={15} className="text-sky-200 shrink-0" />
+                <span>Print Report</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Bar: Unit, Institution, Year, Search */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            {/* 1. Unit Filter */}
+            <div>
+              <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
+                NCC Unit
+              </label>
+              <select
+                value={unitFilter}
+                onChange={(e) => setUnitFilter(e.target.value)}
+                disabled={isUnitRole}
+                className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-xs ${isUnitRole ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                {!isUnitRole && <option value="All">🏢 All NCC Units ({availableUnits.length})</option>}
+                {availableUnits.map(unit => (
+                  <option key={unit} value={unit}>{unit}</option>
+                ))}
               </select>
+            </div>
+
+            {/* 2. Institution Filter */}
+            <div>
+              <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Filter Institution
+              </label>
+              <select
+                value={instFilter}
+                onChange={(e) => setInstFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-xs cursor-pointer"
+              >
+                <option value="All">🏫 All Institutions ({availableInstitutions.length})</option>
+                {availableInstitutions.map(inst => (
+                  <option key={inst.id} value={inst.id}>{inst.institution_name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Year Filter */}
+            <div>
+              <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Select Year
+              </label>
+              <select 
+                value={yearFilter} 
+                onChange={e => setYearFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-xs cursor-pointer"
+              >
+                {availableYears.map(y => <option key={y} value={y}>📅 Year {y}</option>)}
+              </select>
+            </div>
+
+            {/* 4. Search Filter */}
+            <div>
+              <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Search
+              </label>
+              <div className="relative">
+                <input
+                  type="text" 
+                  placeholder="Search Institution, ANO..."
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-500 shadow-xs"
+                />
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 print:hidden">
-          <StatCard icon={<School size={20} />} label="Total Institutions" value={filtered.length} color="blue" />
-          <StatCard icon={<Users size={20} />} label="Total Vacancy" value={filteredVacancy} color="indigo" />
-          <StatCard icon={<Building2 size={20} />} label="Auth Packets" value={filteredAuthPackets.toLocaleString()} color="purple" />
-          <StatCard icon={<CheckCircle2 size={20} />} label="Packets Demanded" value={filteredPacketsDemanded.toLocaleString()} color="emerald" />
-          <StatCard icon={<TrendingUp size={20} />} label="Balance Packets" value={filteredBalancePackets.toLocaleString()} color="amber" sub={`Utilization: ${filteredUtilization}%`} />
-        </div>
-
         <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xl print:shadow-none print:border-none print:bg-white">
-          <PrintHeader title={`SCHOOL REFRESHMENT ANNUAL SUMMARY - YEAR ${yearFilter}`} period={`YEAR ${yearFilter}`} />
+          <PrintHeader 
+            title={`SCHOOL REFRESHMENT ANNUAL SUMMARY - YEAR ${yearFilter}${unitFilter !== 'All' ? ` - UNIT: ${unitFilter.toUpperCase()}` : ''}`} 
+            period={`YEAR ${yearFilter}`} 
+            extraMeta={`TOTAL INSTITUTIONS: ${filtered.length} • TOTAL VACANCY: ${filteredVacancy}`}
+          />
           <div className="overflow-x-auto print:overflow-visible">
             <table className="w-full text-left border-collapse min-w-[1200px] print:min-w-full">
               <thead className="sticky top-0 z-30">
