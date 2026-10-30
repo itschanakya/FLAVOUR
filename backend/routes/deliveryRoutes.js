@@ -30,6 +30,7 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         d.delivery_partner_name,
         d.delivery_partner_phone,
         d.delivery_partner_vehicle,
+        COALESCE(d.delivery_sequence, 0) as delivery_sequence,
         COALESCE(d.delivery_mode, 'DRIVER') as delivery_mode,
         COALESCE(d.delivery_status, 'PENDING') as delivery_status,
         d.dispatched_at,
@@ -413,20 +414,13 @@ router.post('/reorder', authenticateToken, authorizeRoles('ADMIN'), async (req, 
     }
 
     const db = await getDB();
-    await db.run('BEGIN TRANSACTION');
-    try {
-      for (const item of sequences) {
-        if (item.id !== undefined && item.delivery_sequence !== undefined) {
-          await db.run(
-            'UPDATE demands SET delivery_sequence = ? WHERE id = ?',
-            [item.delivery_sequence, item.id]
-          );
-        }
+    for (const item of sequences) {
+      if (item.id !== undefined && item.delivery_sequence !== undefined) {
+        await db.run(
+          'UPDATE demands SET delivery_sequence = ? WHERE id = ?',
+          [item.delivery_sequence, item.id]
+        );
       }
-      await db.run('COMMIT');
-    } catch (txErr) {
-      await db.run('ROLLBACK');
-      throw txErr;
     }
 
     // Trigger SSE for connected clients (driver and admin)
@@ -438,7 +432,7 @@ router.post('/reorder', authenticateToken, authorizeRoles('ADMIN'), async (req, 
     res.json({ message: 'Sequence updated successfully' });
   } catch (error) {
     console.error('Error reordering deliveries:', error);
-    res.status(500).json({ error: 'Failed to update sequence' });
+    res.status(500).json({ error: error.message || 'Failed to update sequence' });
   }
 });
 

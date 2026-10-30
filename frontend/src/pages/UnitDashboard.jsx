@@ -2,14 +2,14 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import { Link } from 'react-router-dom';
-import { 
-  Building2, School, Clock, CheckCircle2, ArrowUpRight, 
-  AlertCircle, IndianRupee, Layers, 
-  BarChart3, PieChart as PieChartIcon, 
+import {
+  Building2, School, Clock, CheckCircle2, ArrowUpRight,
+  AlertCircle, IndianRupee, Layers,
+  BarChart3, PieChart as PieChartIcon,
   PackageCheck, RefreshCw
 } from 'lucide-react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, LabelList
 } from 'recharts';
 
@@ -154,8 +154,8 @@ export default function UnitDashboard() {
     const instMap = {};
     demands.forEach(d => {
       const isUnit = d.demand_type === 'UNIT_DIRECT';
-      const name = isUnit 
-        ? `${d.unit_code || d.unit_name || 'Unit HQ'} (Direct Unit Demand)` 
+      const name = isUnit
+        ? `${d.unit_code || d.unit_name || 'Unit HQ'} (Direct Unit Demand)`
         : (d.institution_name || 'Affiliated Institution');
 
       if (!instMap[name]) {
@@ -207,7 +207,7 @@ export default function UnitDashboard() {
     return sorted.map(item => {
       const parts = item.date.split('-');
       const d = new Date(parts[0], Number(parts[1]) - 1, parts[2]);
-      const formatted = !isNaN(d.getTime()) 
+      const formatted = !isNaN(d.getTime())
         ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
         : item.date;
       return {
@@ -236,7 +236,7 @@ export default function UnitDashboard() {
     return sorted.map(item => {
       const parts = item.monthKey.split('-');
       const d = new Date(parts[0], Number(parts[1]) - 1, 1);
-      const formatted = !isNaN(d.getTime()) 
+      const formatted = !isNaN(d.getTime())
         ? d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
         : item.monthKey;
       return {
@@ -419,15 +419,15 @@ export default function UnitDashboard() {
             <div>
               <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-blue-600" />
-                {chartView === 'institute' 
-                  ? 'Institute-Wise Demand Breakdown' 
+                {chartView === 'institute'
+                  ? 'Institute-Wise Demand Breakdown'
                   : 'Demand Volume & Expenditure Trend'}
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {chartView === 'institute' 
-                  ? 'Total refreshment packets and expenditure demanded by each institution' 
-                  : chartView === 'weekly' 
-                    ? 'Daily/Weekly breakdown of packets demanded' 
+                {chartView === 'institute'
+                  ? 'Total refreshment packets and expenditure demanded by each institution'
+                  : chartView === 'weekly'
+                    ? 'Daily/Weekly breakdown of packets demanded'
                     : 'Monthly aggregated demand volume and expenditure'}
               </p>
             </div>
@@ -437,11 +437,10 @@ export default function UnitDashboard() {
               <button
                 type="button"
                 onClick={() => setChartView('institute')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                  chartView === 'institute' 
-                    ? 'bg-blue-600 text-white shadow-xs' 
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${chartView === 'institute'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 <School className="w-3.5 h-3.5" />
                 Institute Wise
@@ -449,22 +448,20 @@ export default function UnitDashboard() {
               <button
                 type="button"
                 onClick={() => setChartView('weekly')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  chartView === 'weekly' 
-                    ? 'bg-white text-blue-700 shadow-xs' 
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${chartView === 'weekly'
+                    ? 'bg-white text-blue-700 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 Weekly Trend
               </button>
               <button
                 type="button"
                 onClick={() => setChartView('monthly')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  chartView === 'monthly' 
-                    ? 'bg-white text-blue-700 shadow-xs' 
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${chartView === 'monthly'
+                    ? 'bg-white text-blue-700 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 Monthly Trend
               </button>
@@ -484,8 +481,8 @@ export default function UnitDashboard() {
                   margin={{ top: 10, right: 10, left: -10, bottom: 25 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis 
-                    dataKey="label" 
+                  <XAxis
+                    dataKey="label"
                     tick={({ x, y, payload }) => {
                       if (chartView !== 'institute') {
                         return (
@@ -496,7 +493,7 @@ export default function UnitDashboard() {
                           </g>
                         );
                       }
-                      
+
                       const words = payload.value.split(' ');
                       const lines = [];
                       let currentLine = '';
@@ -530,8 +527,8 @@ export default function UnitDashboard() {
                     tickLine={false}
                     interval={0}
                   />
-                  <YAxis 
-                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
+                  <YAxis
+                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -546,9 +543,8 @@ export default function UnitDashboard() {
                             </p>
                             {chartView === 'institute' && (
                               <div className="flex items-center gap-2">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                  data.isUnitDirect ? 'bg-purple-900/80 text-purple-300 border border-purple-700' : 'bg-blue-900/80 text-blue-300 border border-blue-700'
-                                }`}>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${data.isUnitDirect ? 'bg-purple-900/80 text-purple-300 border border-purple-700' : 'bg-blue-900/80 text-blue-300 border border-blue-700'
+                                  }`}>
                                   {data.isUnitDirect ? 'Unit Direct Demand' : 'Institution Demand'}
                                 </span>
                               </div>
@@ -578,19 +574,19 @@ export default function UnitDashboard() {
                       return null;
                     }}
                   />
-                  <Bar 
-                    dataKey="packets" 
-                    radius={[6, 6, 0, 0]} 
+                  <Bar
+                    dataKey="packets"
+                    radius={[6, 6, 0, 0]}
                     name="Packets Demanded"
                   >
                     <LabelList dataKey="packets" position="top" fill="#64748b" fontSize={10} fontWeight={800} />
                     {activeChartData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={chartView === 'institute' 
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={chartView === 'institute'
                           ? (entry.isUnitDirect ? '#8b5cf6' : '#2563eb')
                           : '#3b82f6'
-                        } 
+                        }
                       />
                     ))}
                   </Bar>
@@ -747,8 +743,8 @@ export default function UnitDashboard() {
                 </tr>
               ) : (
                 instituteChartData.map((inst, idx) => {
-                  const fulfillmentRate = inst.packets > 0 
-                    ? Math.round((inst.deliveredPackets / inst.packets) * 100) 
+                  const fulfillmentRate = inst.packets > 0
+                    ? Math.round((inst.deliveredPackets / inst.packets) * 100)
                     : 0;
                   return (
                     <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
@@ -791,14 +787,13 @@ export default function UnitDashboard() {
                           <span className="text-slate-400 text-[10px]">{inst.deliveredPackets}/{inst.packets} pkts</span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/60">
-                          <div 
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              fulfillmentRate === 100 
-                                ? 'bg-emerald-500' 
-                                : fulfillmentRate > 0 
-                                  ? 'bg-blue-600' 
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${fulfillmentRate === 100
+                                ? 'bg-emerald-500'
+                                : fulfillmentRate > 0
+                                  ? 'bg-blue-600'
                                   : 'bg-amber-400'
-                            }`}
+                              }`}
                             style={{ width: `${fulfillmentRate}%` }}
                           />
                         </div>

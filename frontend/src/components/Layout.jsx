@@ -158,7 +158,8 @@ export default function Layout({ children }) {
     ADMIN: [
       { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { path: '/demands', label: 'Demands', icon: ShoppingBag },
-      { path: '/delivery', label: 'Fleet Delivery', icon: Truck },
+      { path: '/delivery', label: 'Delivery', icon: Truck },
+      { path: '/distribution', label: 'Distribution', icon: ClipboardList },
       { path: '/admin/delivery-tracking', label: 'Live Tracking', icon: Navigation },
       { path: '/documentation', label: 'Documentation', icon: FileCheck },
       { path: '/reports', label: 'Reports & Analytics', icon: Layers },
@@ -189,7 +190,8 @@ export default function Layout({ children }) {
     ADMIN: [
       { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { path: '/demands', label: 'Demands', icon: ShoppingBag },
-      { path: '/delivery', label: 'Fleet', icon: Truck },
+      { path: '/delivery', label: 'Delivery', icon: Truck },
+      { path: '/distribution', label: 'Distrib.', icon: ClipboardList },
       { path: '/admin/delivery-tracking', label: 'Live', icon: Navigation },
       { path: '/stock', label: 'Stock', icon: Boxes },
       { path: '/reports', label: 'Reports', icon: Layers },

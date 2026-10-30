@@ -1455,18 +1455,6 @@ _National Cadet Corps - Supply & Logistics Portal_`;
             Stops Manifest ({filteredDemands.length})
           </button>
 
-          <button
-            type="button"
-            onClick={() => setViewMode('FLEET_LOADS')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-              viewMode === 'FLEET_LOADS'
-                ? 'bg-white text-blue-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Truck className="w-3.5 h-3.5" />
-            Fleet & Loads ({partnerLoads.length})
-          </button>
         </div>
 
         {/* Search and Filters */}

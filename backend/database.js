@@ -651,6 +651,7 @@ async function initializeSchema(db) {
     "ALTER TABLE demands ADD COLUMN demand_type VARCHAR(255) DEFAULT 'INSTITUTION'",
     "ALTER TABLE demands ADD COLUMN packet_type VARCHAR(255) DEFAULT 'REGULAR'",
     "ALTER TABLE demands ADD COLUMN custom_unit_rate REAL",
+    "ALTER TABLE demands ADD COLUMN delivery_sequence INTEGER DEFAULT 0",
     "ALTER TABLE demands ADD COLUMN delivery_venue TEXT"
   ];
   for (const query of deliveryCols) {
@@ -699,10 +700,6 @@ async function initializeSchema(db) {
     const defaultDriverHash = await bcrypt.hash('Driver@123', 10);
     const partnerCount = await db.get('SELECT COUNT(*) as count FROM delivery_partners');
     if (partnerCount && partnerCount.count === 0) {
-      await db.run(
-        `INSERT INTO delivery_partners (name, phone, vehicle_no, vehicle_type, vehicle_model, load_capacity_packets, max_travel_km, rate_per_km, assigned_pins, login_id, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        ['Rajesh Kumar', '9876543210', 'DL-01-AB-1234 (Eco Van)', 'ECO', 'Maruti Eeco Cargo Van', 750, 80, 10, '110010, 110021, 110022', '9876543210', defaultDriverHash]
-      );
       await db.run(
         `INSERT INTO delivery_partners (name, phone, vehicle_no, vehicle_type, vehicle_model, load_capacity_packets, max_travel_km, rate_per_km, assigned_pins, login_id, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ['Vikram Singh', '9876543211', 'DL-04-XY-5678 (Auto Carrier)', 'THREE_WHEELER', 'Piaggio Ape Auto Cargo', 450, 50, 8, '110001, 110002, 110003', '9876543211', defaultDriverHash]

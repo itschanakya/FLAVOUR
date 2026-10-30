@@ -26,6 +26,7 @@ const DeliveryManagement = React.lazy(() => import('./pages/DeliveryManagement')
 const DocumentationPage = React.lazy(() => import('./pages/DocumentationPage'));
 const DriverDeliverySummaryPage = React.lazy(() => import('./pages/DriverDeliverySummaryPage'));
 const UnitDemandPage = React.lazy(() => import('./pages/UnitDemandPage'));
+const Distribution = React.lazy(() => import('./pages/Distribution'));
 const AdminDeliveryTracking = React.lazy(() => import('./pages/AdminDeliveryTracking'));
 const AdminDemandsPage = React.lazy(() => import('./pages/AdminDemandsPage'));
 function SummaryRouter() {
@@ -79,6 +80,7 @@ export default function App() {
                   <Route path="/stock" element={<ProtectedRoute allowedRoles={['ADMIN']}><InventoryPage /></ProtectedRoute>} />
                   <Route path="/approved-demands" element={<Navigate to="/delivery" replace />} />
                   <Route path="/delivery" element={<ProtectedRoute><DeliveryManagement /></ProtectedRoute>} />
+                  <Route path="/distribution" element={<ProtectedRoute allowedRoles={['ADMIN']}><Distribution /></ProtectedRoute>} />
                   <Route path="/admin/delivery-tracking" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDeliveryTracking /></ProtectedRoute>} />
                   <Route path="/documentation" element={<ProtectedRoute><DocumentationPage /></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute><RefreshmentReports /></ProtectedRoute>} />

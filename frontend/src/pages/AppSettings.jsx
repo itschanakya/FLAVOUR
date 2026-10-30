@@ -1403,14 +1403,6 @@ export default function AppSettings() {
                                         {p.vehicle_no || 'N/A'}
                                       </span>
                                     </div>
-                                    <div className="flex items-center gap-1 text-[11px]">
-                                      <span className="px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold">
-                                        Capacity: {p.load_capacity_packets || 750} Pkts/Day
-                                      </span>
-                                      <span className="px-2 py-0.5 rounded-md bg-cyan-50 border border-cyan-200 text-cyan-700 font-bold">
-                                        {p.max_travel_km || 80} km
-                                      </span>
-                                    </div>
                                   </div>
                                 </td>
                                 <td className="p-4">
@@ -3136,94 +3128,22 @@ export default function AppSettings() {
                 </div>
               </div>
 
-              {/* Vehicle Preset & Model */}
+              {/* Add Vehicle */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Vehicle Preset Category</label>
+                  <label className="block text-slate-700 font-semibold mb-1">Add Vehicle *</label>
                   <select
-                    value={deliveryPartnerForm.vehicle_type || 'ECO'}
-                    onChange={(e) => handleAdminVehiclePresetChange(e.target.value)}
+                    required
+                    value={deliveryPartnerForm.vehicle_no || ''}
+                    onChange={(e) => setDeliveryPartnerForm({ ...deliveryPartnerForm, vehicle_no: e.target.value, vehicle_model: e.target.value })}
                     className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold focus:outline-none focus:border-cyan-500"
                   >
-                    {Object.entries(VEHICLE_PRESETS).map(([key, preset]) => (
-                      <option key={key} value={key}>
-                        {preset.name} ({preset.capacity} Pkts / {preset.maxKm} km)
-                      </option>
-                    ))}
+                    <option value="">Select Vehicle</option>
+                    <option value="CAR 1">CAR 1</option>
+                    <option value="CAR 2">CAR 2</option>
+                    <option value="CAR 3">CAR 3</option>
+                    {deliveryPartnerForm.vehicle_no && !['CAR 1','CAR 2','CAR 3'].includes(deliveryPartnerForm.vehicle_no) && (<option value={deliveryPartnerForm.vehicle_no}>{deliveryPartnerForm.vehicle_no}</option>)}
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Vehicle Model Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Maruti Eeco Cargo Van"
-                    value={deliveryPartnerForm.vehicle_model}
-                    onChange={(e) => setDeliveryPartnerForm({ ...deliveryPartnerForm, vehicle_model: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-cyan-500 font-bold"
-                  />
-                </div>
-              </div>
-
-              {/* Load Capacity & Max Travel Distance */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-semibold mb-1">
-                    One Load Capacity (Packets/Day) *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      required
-                      min="10"
-                      max="10000"
-                      placeholder="750"
-                      value={deliveryPartnerForm.load_capacity_packets}
-                      onChange={(e) => setDeliveryPartnerForm({ ...deliveryPartnerForm, load_capacity_packets: parseInt(e.target.value, 10) || 0 })}
-                      className="w-full p-2.5 pr-14 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-cyan-500 font-black"
-                    />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">
-                      Pkts/Day
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Maruti Eeco = 750 (15 Crates × 50 Pkts)</span>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-semibold mb-1">
-                    Max Travel Distance (km/Day) *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      required
-                      min="5"
-                      max="1000"
-                      placeholder="80"
-                      value={deliveryPartnerForm.max_travel_km}
-                      onChange={(e) => setDeliveryPartnerForm({ ...deliveryPartnerForm, max_travel_km: parseInt(e.target.value, 10) || 0 })}
-                      className="w-full p-2.5 pr-14 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-cyan-500 font-black"
-                    />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">
-                      km/Day
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Safe morning multi-stop route radius</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Vehicle Registration Number *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. DL-01-AB-1234"
-                    value={deliveryPartnerForm.vehicle_no}
-                    onChange={(e) => setDeliveryPartnerForm({ ...deliveryPartnerForm, vehicle_no: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-cyan-500 font-mono font-bold"
-                  />
                 </div>
 
                 <div>
