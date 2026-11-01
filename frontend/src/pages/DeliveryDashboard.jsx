@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import {
+  Gauge,
   Truck, MapPin, Navigation, Phone, MessageCircle, Calendar, Clock,
   CheckCircle2, XCircle, AlertTriangle, Package, Camera, Upload,
   FileText, FileCheck, DollarSign, ChevronDown, ChevronUp, RefreshCw,
@@ -30,6 +31,16 @@ export default function DeliveryDashboard() {
       setShowSummary(true);
     }
   }, [searchParams]);
+
+  // Odometer Prompt Modal with Skip Button
+  const [odoModal, setOdoModal] = useState({
+    open: false,
+    demandId: null,
+    newStatus: null,
+    title: '',
+    institutionName: '',
+    reading: ''
+  });
 
   // Modals
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -144,36 +155,43 @@ export default function DeliveryDashboard() {
     window.open(url, '_blank');
   };
 
-  // Update Status directly (OUT_FOR_DELIVERY, ARRIVED, DELIVERED)
-  const handleUpdateStatus = async (demandId, newStatus) => {
-    let start_odometer = null;
-    let delivery_odometer = null;
-
+  // Update Status directly with optional odometer dialog & Skip support
+  const handleUpdateStatus = (demandId, newStatus) => {
+    const dem = demands.find(d => d.id === demandId);
     if (newStatus === 'OUT_FOR_DELIVERY') {
-      const reading = window.prompt("Please enter the Starting Odometer (Speedometer) reading in km before leaving:");
-      if (reading === null) return; // User cancelled
-      if (!reading.trim() || isNaN(reading)) {
-        alert("Valid odometer reading is required to start the delivery.");
-        return;
-      }
-      start_odometer = reading.trim();
+      setOdoModal({
+        open: true,
+        demandId,
+        newStatus: 'OUT_FOR_DELIVERY',
+        title: 'Starting Odometer (Optional)',
+        institutionName: dem?.institution_name || '',
+        reading: ''
+      });
     } else if (newStatus === 'DELIVERED') {
-      const reading = window.prompt("Please enter the Ending Odometer (Speedometer) reading in km for this delivery:");
-      if (reading === null) return; // User cancelled
-      if (!reading.trim() || isNaN(reading)) {
-        alert("Valid odometer reading is required to complete the delivery.");
-        return;
-      }
-      delivery_odometer = reading.trim();
+      setOdoModal({
+        open: true,
+        demandId,
+        newStatus: 'DELIVERED',
+        title: 'Ending Odometer (Optional)',
+        institutionName: dem?.institution_name || '',
+        reading: ''
+      });
+    } else {
+      executeStatusUpdate(demandId, newStatus, null);
     }
+  };
 
+  const executeStatusUpdate = async (demandId, newStatus, odoValue = null) => {
     try {
       const payload = {
         demandId,
         status: newStatus
       };
-      if (start_odometer) payload.start_odometer = start_odometer;
-      if (delivery_odometer) payload.delivery_odometer = delivery_odometer;
+      if (newStatus === 'OUT_FOR_DELIVERY' && odoValue) {
+        payload.start_odometer = odoValue;
+      } else if (newStatus === 'DELIVERED' && odoValue) {
+        payload.delivery_odometer = odoValue;
+      }
 
       const res = await fetch('/api/delivery/driver/status', {
         method: 'POST',
@@ -189,13 +207,19 @@ export default function DeliveryDashboard() {
       // Optimistic update
       setDemands(prev => prev.map(d => {
         if (d.id === demandId) {
-          return { ...d, delivery_status: newStatus };
+          return {
+            ...d,
+            delivery_status: newStatus,
+            ...(newStatus === 'OUT_FOR_DELIVERY' && odoValue ? { start_km_reading: parseFloat(odoValue) } : {}),
+            ...(newStatus === 'DELIVERED' && odoValue ? { closing_km_reading: parseFloat(odoValue) } : {})
+          };
         }
         return d;
       }));
+      setOdoModal({ open: false, demandId: null, newStatus: null, title: '', institutionName: '', reading: '' });
       fetchDriverDemands();
     } catch (err) {
-      alert(err.message);
+      alert(err.message || 'Failed to update status');
     }
   };
 
@@ -1290,6 +1314,84 @@ export default function DeliveryDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL: Driver Odometer Reading with SKIP button */}
+      {odoModal.open && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                  <Gauge className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">{odoModal.title}</h3>
+                  <p className="text-[11px] font-bold text-slate-500 truncate max-w-[200px]">{odoModal.institutionName}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOdoModal({ ...odoModal, open: false })}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-slate-600 font-medium">
+                {odoModal.newStatus === 'DELIVERED'
+                  ? 'Enter final speedometer reading (KM) at institution or click Skip to complete delivery directly:'
+                  : 'Enter starting speedometer reading (KM) before departing or click Skip:'}
+              </p>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                  Speedometer KM Reading
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  autoFocus
+                  placeholder="e.g. 12450.5"
+                  value={odoModal.reading}
+                  onChange={(e) => setOdoModal({ ...odoModal, reading: e.target.value })}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-mono font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      executeStatusUpdate(odoModal.demandId, odoModal.newStatus, odoModal.reading.trim() || null);
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setOdoModal({ ...odoModal, open: false })}
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => executeStatusUpdate(odoModal.demandId, odoModal.newStatus, null)}
+                  className="flex-1 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-black text-xs transition-all shadow-xs"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => executeStatusUpdate(odoModal.demandId, odoModal.newStatus, odoModal.reading.trim() || null)}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md transition-all active:scale-95"
+                >
+                  {odoModal.newStatus === 'DELIVERED' ? 'Save & Deliver' : 'Save & Start'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

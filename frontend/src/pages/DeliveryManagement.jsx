@@ -935,6 +935,12 @@ _National Cadet Corps - Supply & Logistics Portal_`;
     }
   };
 
+  const handleSkipMissingKm = async () => {
+    const andSendWhatsApp = missingKmModal.andSendWhatsApp;
+    setMissingKmModal({ open: false, driverId: null, partnerName: '', suggestedKm: 0, startKmInput: '', andSendWhatsApp: false });
+    await executeDispatch(null, andSendWhatsApp);
+  };
+
   // Submit Assignment
   const handleSaveAssignment = async (e, andSendWhatsApp = false) => {
     if (e) e.preventDefault();
@@ -2807,12 +2813,21 @@ _National Cadet Corps - Supply & Logistics Portal_`;
 
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => setMissingKmModal({ ...missingKmModal, open: false })}
-                  className="flex-1 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                  className="px-3.5 py-2.5 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
+                  onClick={handleSkipMissingKm}
+                  className="flex-1 py-2.5 text-xs font-black text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition-all shadow-xs"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
                   onClick={handleMissingKmSubmit}
                   className="flex-1 py-2.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-xs transition-transform active:scale-95"
                 >
