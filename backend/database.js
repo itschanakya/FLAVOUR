@@ -173,6 +173,11 @@ async function upgradeInventorySchema(db) {
       WHERE (sl.reference_no IS NULL OR sl.reference_no = '')
     `);
   } catch (e) { }
+  // Ensure Standard Refreshment Packet has no expiry_date and sync price
+  try {
+    await db.run("UPDATE refreshment_items SET expiry_date = NULL WHERE item_name = 'Standard Refreshment Packet'");
+    await syncStandardPacketPrice(db);
+  } catch (e) { }
 }
 
 async function initializeSchema(db) {

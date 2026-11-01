@@ -271,7 +271,7 @@ export default function Distribution() {
           )}
         </div>
         {showDays && days.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+          <div className="flex items-center gap-2 overflow-x-auto pt-1 pb-3.5" style={{ scrollbarWidth: 'thin', scrollbarColor: '#94a3b8 #f1f5f9' }}>
             {days.map(dy => (
               <button
                 key={dy.date}
@@ -302,7 +302,7 @@ export default function Distribution() {
           const total = stops.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
           return (
             <div key={partner.key} className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-              <div className="px-3 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center gap-2 flex-nowrap overflow-x-auto">
+              <div className="px-3 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center gap-2 flex-nowrap overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
                   <Truck className="w-4 h-4" />
                 </div>
