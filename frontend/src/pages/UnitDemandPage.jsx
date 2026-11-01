@@ -702,16 +702,18 @@ export default function UnitDemandPage() {
 
   return (
     <div className="space-y-4 w-full mx-auto pb-8">
-      {/* Top Banner: Unit Code Slicer for Admin | Mode Selector + Jurisdiction for Unit */}
-      <div className="glass-card p-3 sm:p-4 border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="shrink-0">
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-            Refreshment Demand Console
-          </h1>
-        </div>
+      {/* Top Banner: Full-Width Unit Code Slicer for Admin | Mode Selector + Jurisdiction for Unit */}
+      <div className="glass-card p-2.5 sm:p-3 border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        {!isAdmin && (
+          <div className="shrink-0">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+              Refreshment Demand Console
+            </h1>
+          </div>
+        )}
 
         {isAdmin ? (
-          <div className="flex items-center gap-1.5 flex-wrap bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <div className="w-full flex items-center gap-1.5 flex-wrap bg-slate-100 p-1.5 rounded-xl border border-slate-200">
             {units.map(u => {
               const active = String(adminUnitId) === String(u.id);
               return (
@@ -728,13 +730,13 @@ export default function UnitDemandPage() {
                     setErrorMsg('');
                   }}
                   title={u.unit_name}
-                  className={`py-1.5 px-3.5 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+                  className={`flex-1 min-w-fit py-2 px-3 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
                     active
                       ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                      : 'bg-white/70 text-slate-700 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
-                  <Building2 className="w-3.5 h-3.5" />
+                  <Building2 className="w-3.5 h-3.5 shrink-0" />
                   <span>{u.unit_code || u.unit_name}</span>
                 </button>
               );
