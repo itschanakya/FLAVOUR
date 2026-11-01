@@ -64,16 +64,38 @@ export default function UnitDemandPage() {
   const location = useLocation();
   const editDemandState = location.state?.editDemand;
 
-  // Strict role check: This Refreshment Demand Console is exclusively for UNIT
+  // Role check: shared by UNIT (own unit) and ADMIN (any unit, picked via selector)
+  const isAdmin = user?.role === 'ADMIN';
   useEffect(() => {
-    if (user && user.role !== 'UNIT') {
+    if (user && user.role !== 'UNIT' && user.role !== 'ADMIN') {
       navigate('/dashboard', { replace: true });
     }
   }, [user, navigate]);
 
-  if (user && user.role !== 'UNIT') {
+  if (user && user.role !== 'UNIT' && user.role !== 'ADMIN') {
     return null;
   }
+
+  // Admin: pick which unit the demand belongs to
+  const [units, setUnits] = useState([]);
+  const [adminUnitId, setAdminUnitId] = useState('');
+  const effUnit = isAdmin ? units.find(u => String(u.id) === String(adminUnitId)) : null;
+  const effUnitId = isAdmin ? adminUnitId : user?.unit_id;
+  const effUnitName = isAdmin ? (effUnit?.unit_name || '') : user?.unit_name;
+  const effUnitCode = isAdmin ? (effUnit?.unit_code || '') : user?.unit_code;
+
+  useEffect(() => {
+    if (!isAdmin || !token) return;
+    fetch('/api/units', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setUnits(data);
+          setAdminUnitId(prev => prev || (data[0] ? String(data[0].id) : ''));
+        }
+      })
+      .catch(err => console.error('Error fetching units:', err));
+  }, [isAdmin, token]);
 
   // Mode: 'INSTITUTION' (on behalf) or 'UNIT_DIRECT' (direct unit demand)
   const [demandMode, setDemandMode] = useState('UNIT_DIRECT');
@@ -188,7 +210,15 @@ export default function UnitDemandPage() {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
+          if (isAdmin) {
+            if (!adminUnitId) return;
+            data = data.filter(i => String(i.unit_id) === String(adminUnitId));
+          }
           setInstitutions(data);
+          if (data.length === 0) {
+            setSelectedInstId('');
+            setSelectedInst(null);
+          }
           if (data.length > 0) {
             setSelectedInstId(String(data[0].id));
             setSelectedInst(data[0]);
@@ -208,17 +238,18 @@ export default function UnitDemandPage() {
         }
       })
       .catch(err => console.error('Error fetching institutions:', err));
-  }, [token]);
+  }, [token, isAdmin, adminUnitId]);
 
   // Fetch Recent Unit Demands (silent in background unless initial empty load)
   const fetchRecentDemands = useCallback(async (showFullLoader = false) => {
     if (!token) return;
+    if (isAdmin && !effUnitId) return;
     if (showFullLoader) {
       setLoadingDemands(true);
     }
     setIsSyncing(true);
     try {
-      const res = await fetch('/api/demands?unit_id=' + (user?.unit_id || ''), {
+      const res = await fetch('/api/demands?unit_id=' + (effUnitId || ''), {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -231,7 +262,7 @@ export default function UnitDemandPage() {
       setLoadingDemands(false);
       setIsSyncing(false);
     }
-  }, [token, user?.unit_id]);
+  }, [token, effUnitId, isAdmin]);
 
   useEffect(() => {
     fetchRecentDemands(true);
@@ -322,10 +353,10 @@ export default function UnitDemandPage() {
   // Preset Unit Venue default
   useEffect(() => {
     if (demandMode === 'UNIT_DIRECT' && !venue) {
-      setVenue(user?.unit_name || '2 Delhi Arty Bty NCC Headquarters, Delhi Cantt');
+      setVenue(effUnitName || '2 Delhi Arty Bty NCC Headquarters, Delhi Cantt');
       setPurpose('Combined Annual Training Camp (CATC) Direct Cadre');
     }
-  }, [demandMode, user?.unit_name, venue]);
+  }, [demandMode, effUnitName, venue]);
 
   // Calculations for Option 1 (Institution)
   const instS1 = Number(selectedInst?.strength_1st_year) || 0;
@@ -525,6 +556,9 @@ export default function UnitDemandPage() {
     setSubmitting(true);
 
     try {
+      if (isAdmin && !adminUnitId) {
+        throw new Error('Please select a Unit first.');
+      }
       if (demandMode === 'UNIT_DIRECT') {
         if (!unitPacketCount || unitPacketCount <= 0) {
           throw new Error('Please specify a positive total packet quantity.');
@@ -544,7 +578,8 @@ export default function UnitDemandPage() {
           demand_date: demandDate,
           demand_time: demandTime,
           purpose: purpose.trim(),
-          delivery_venue: venue.trim()
+          delivery_venue: venue.trim(),
+          ...(isAdmin ? { unit_id: Number(adminUnitId) } : {})
         };
 
         const res = await fetch(editDemandId ? `/api/demands/${editDemandId}` : '/api/demands', {
@@ -573,9 +608,9 @@ export default function UnitDemandPage() {
           total_quantity: unitPacketCount,
           total_amount: unitTotalAmount,
           purpose: purpose.trim(),
-          delivery_venue: venue.trim() || (user?.unit_name ? `${user.unit_name} HQ` : 'Battalion HQ'),
-          unit_code: user?.unit_code || 'UNIT HQ',
-          unit_name: user?.unit_name || 'Unit Battalion',
+          delivery_venue: venue.trim() || (effUnitName ? `${effUnitName} HQ` : 'Battalion HQ'),
+          unit_code: effUnitCode || 'UNIT HQ',
+          unit_name: effUnitName || 'Unit Battalion',
           ano_cto_name: 'UNIT ADM',
           status: 'APPROVED',
           delivery_status: 'PENDING',
@@ -712,9 +747,21 @@ export default function UnitDemandPage() {
 
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-500 hidden sm:inline">Jurisdiction:</span>
-          <span className="px-3 py-1.5 rounded-xl bg-white text-slate-800 font-extrabold text-xs border border-slate-200 shadow-xs truncate max-w-[200px]">
-            {user?.unit_name || '2 DELHI ARTY BTY NCC'}
-          </span>
+          {isAdmin ? (
+            <select
+              value={adminUnitId}
+              onChange={(e) => { setAdminUnitId(e.target.value); setEditDemandId(null); setSuccessMsg(''); setErrorMsg(''); }}
+              className="px-3 py-1.5 rounded-xl bg-white text-slate-800 font-extrabold text-xs border border-slate-200 shadow-xs max-w-[240px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              {units.map(u => (
+                <option key={u.id} value={u.id}>{u.unit_name}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="px-3 py-1.5 rounded-xl bg-white text-slate-800 font-extrabold text-xs border border-slate-200 shadow-xs truncate max-w-[200px]">
+              {user?.unit_name || '2 DELHI ARTY BTY NCC'}
+            </span>
+          )}
         </div>
       </div>
 

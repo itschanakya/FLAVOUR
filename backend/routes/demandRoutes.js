@@ -334,12 +334,21 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
       custom_unit_rate, 
       total_packets,
       delivery_venue,
-      institution_id: requestedInstId 
+      institution_id: requestedInstId,
+      unit_id: adminRequestedUnitId
     } = req.body;
 
     const db = await getDB();
     const isUnitOrAdmin = req.user.role === 'UNIT' || req.user.role === 'ADMIN';
     let unitId = req.user.unit_id;
+    // Admin has no unit of its own: it must name the unit for Unit-Direct demands
+    if (req.user.role === 'ADMIN' && adminRequestedUnitId) {
+      const chosenUnit = await db.get('SELECT id FROM units WHERE id = ?', [parseInt(adminRequestedUnitId, 10)]);
+      if (!chosenUnit) {
+        return res.status(400).json({ error: 'Selected unit does not exist.' });
+      }
+      unitId = chosenUnit.id;
+    }
     if (!unitId) {
       const defaultUnit = await db.get('SELECT id FROM units ORDER BY id ASC LIMIT 1');
       unitId = defaultUnit ? defaultUnit.id : 1;
@@ -431,7 +440,7 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
       for (const a of adminUsers) {
         await db.run(
           'INSERT INTO notifications (user_id, title, message, link_url) VALUES (?, ?, ?, ?)',
-          [a.id, 'New Unit Direct Demand', `Unit direct demand ${demandNumber} (${packetCount} pkts @ ₹${rate}) placed.`, '/approved-demands']
+          [a.id, 'New Unit Direct Demand', `Unit direct demand ${demandNumber} (${packetCount} pkts @ ₹${rate}) placed.`, '/demands']
         );
         broadcastToUser(a.id, 'NEW_NOTIFICATION', { count: 1, timestamp: Date.now() });
       }
@@ -467,6 +476,9 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
     }
     if (req.user.role === 'UNIT' && inst.unit_id !== unitId) {
       return res.status(403).json({ error: 'Selected institution does not belong to your Unit.' });
+    }
+    if (req.user.role === 'ADMIN') {
+      unitId = inst.unit_id;
     }
 
     // Weekly Cut-off Enforcement for ANO / Institution users
@@ -648,7 +660,7 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
       for (const a of adminUsers) {
         await db.run(
           'INSERT INTO notifications (user_id, title, message, link_url) VALUES (?, ?, ?, ?)',
-          [a.id, 'Approved Demand on Behalf', `Demand ${demandNumber} raised on behalf of ${inst.institution_name} by Unit.`, '/approved-demands']
+          [a.id, 'Approved Demand on Behalf', `Demand ${demandNumber} raised on behalf of ${inst.institution_name} by Unit.`, '/demands']
         );
         broadcastToUser(a.id, 'NEW_NOTIFICATION', { count: 1, timestamp: Date.now() });
       }

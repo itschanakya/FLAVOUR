@@ -157,7 +157,8 @@ export default function Layout({ children }) {
   const navItems = {
     ADMIN: [
       { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { path: '/demands', label: 'Demands', icon: ShoppingBag },
+      { path: '/admin-demand', label: 'Refreshment Demand', icon: ShoppingBag },
+      { path: '/demands', label: 'Demand Console', icon: FileCheck },
       { path: '/delivery', label: 'Delivery', icon: Truck },
       { path: '/distribution', label: 'Distribution', icon: ClipboardList },
       { path: '/admin/delivery-tracking', label: 'Live Tracking', icon: Navigation },
@@ -189,7 +190,8 @@ export default function Layout({ children }) {
   const mobileNavItems = {
     ADMIN: [
       { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { path: '/demands', label: 'Demands', icon: ShoppingBag },
+      { path: '/admin-demand', label: 'Demand', icon: ShoppingBag },
+      { path: '/demands', label: 'Console', icon: FileCheck },
       { path: '/delivery', label: 'Delivery', icon: Truck },
       { path: '/distribution', label: 'Distrib.', icon: ClipboardList },
       { path: '/admin/delivery-tracking', label: 'Live', icon: Navigation },
@@ -230,6 +232,12 @@ export default function Layout({ children }) {
       inactive: 'text-indigo-950 hover:text-indigo-700 hover:bg-indigo-50/90 border-indigo-200/80 hover:border-indigo-400 bg-white/90',
       iconActive: 'text-white',
       iconInactive: 'text-indigo-600 group-hover:scale-110'
+    },
+    '/admin-demand': {
+      active: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/30 border-blue-600',
+      inactive: 'text-blue-950 hover:text-blue-700 hover:bg-blue-50/90 border-blue-200/80 hover:border-blue-400 bg-white/90',
+      iconActive: 'text-white',
+      iconInactive: 'text-blue-600 group-hover:scale-110'
     },
     '/unit-demand': {
       active: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/30 border-blue-600',

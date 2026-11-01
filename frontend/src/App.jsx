@@ -70,6 +70,7 @@ export default function App() {
                   <Route path="/demands" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDemandsPage /></ProtectedRoute>} />
                   <Route path="/raise-demand" element={<ProtectedRoute allowedRoles={['INSTITUTION']}><RaiseDemandPage /></ProtectedRoute>} />
                   <Route path="/unit-demand" element={<ProtectedRoute allowedRoles={['UNIT']}><UnitDemandPage /></ProtectedRoute>} />
+                  <Route path="/admin-demand" element={<ProtectedRoute allowedRoles={['ADMIN']}><UnitDemandPage /></ProtectedRoute>} />
                   <Route path="/my-demands" element={<ProtectedRoute><MyDemandsList /></ProtectedRoute>} />
                   <Route path="/demand-history" element={<ProtectedRoute><MyDemandsList /></ProtectedRoute>} />
                   <Route path="/review-demands" element={<ProtectedRoute allowedRoles={['UNIT']}><ReviewDemandsQueue /></ProtectedRoute>} />
