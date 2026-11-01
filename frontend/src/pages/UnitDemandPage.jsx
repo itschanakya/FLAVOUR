@@ -229,7 +229,9 @@ export default function UnitDemandPage() {
             setYear2(s2);
             setYear3(s3 > 0 ? s3 : 0);
             setTotalDemanded(s1 + s2 + (s3 > 0 ? s3 : 0));
-            setVenue(data[0].complete_address || data[0].institution_name || '');
+            if (demandMode === 'INSTITUTION') {
+              setVenue(data[0].complete_address || data[0].institution_name || '');
+            }
             if (data[0].first_demand_day) {
               setDemandDate(getNextDate(data[0].first_demand_day));
               setDemandTime(data[0].first_demand_time || '08:00');
@@ -700,69 +702,91 @@ export default function UnitDemandPage() {
 
   return (
     <div className="space-y-4 w-full mx-auto pb-8">
-      {/* Top Banner with Integrated Mode Selector */}
+      {/* Top Banner: Unit Code Slicer for Admin | Mode Selector + Jurisdiction for Unit */}
       <div className="glass-card p-3 sm:p-4 border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
+        <div className="shrink-0">
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
             Refreshment Demand Console
           </h1>
         </div>
 
-        {/* Integrated Mode Selector */}
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <button
-            type="button"
-            onClick={() => {
-              setDemandMode('UNIT_DIRECT');
-              setErrorMsg('');
-              setSuccessMsg('');
-              setEditDemandId(null);
-            }}
-            className={`py-1.5 px-4 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${demandMode === 'UNIT_DIRECT'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Demand for Unit</span>
-          </button>
+        {isAdmin ? (
+          <div className="flex items-center gap-1.5 flex-wrap bg-slate-100 p-1 rounded-xl border border-slate-200">
+            {units.map(u => {
+              const active = String(adminUnitId) === String(u.id);
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => {
+                    setAdminUnitId(String(u.id));
+                    if (demandMode === 'UNIT_DIRECT') {
+                      setVenue(u.unit_name || '');
+                    }
+                    setEditDemandId(null);
+                    setSuccessMsg('');
+                    setErrorMsg('');
+                  }}
+                  title={u.unit_name}
+                  className={`py-1.5 px-3.5 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+                    active
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>{u.unit_code || u.unit_name}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <>
+            {/* Integrated Mode Selector */}
+            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setDemandMode('UNIT_DIRECT');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                  setEditDemandId(null);
+                }}
+                className={`py-1.5 px-4 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${demandMode === 'UNIT_DIRECT'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                  }`}
+              >
+                <Building2 className="w-4 h-4" />
+                <span>Demand for Unit</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setDemandMode('INSTITUTION');
-              setErrorMsg('');
-              setSuccessMsg('');
-              setEditDemandId(null);
-            }}
-            className={`py-1.5 px-4 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${demandMode === 'INSTITUTION'
-              ? 'bg-emerald-600 text-white shadow-md'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-          >
-            <School className="w-4 h-4" />
-            <span>Demand for Institution</span>
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDemandMode('INSTITUTION');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                  setEditDemandId(null);
+                }}
+                className={`py-1.5 px-4 rounded-lg font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${demandMode === 'INSTITUTION'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                  }`}
+              >
+                <School className="w-4 h-4" />
+                <span>Demand for Institution</span>
+              </button>
+            </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-500 hidden sm:inline">Jurisdiction:</span>
-          {isAdmin ? (
-            <select
-              value={adminUnitId}
-              onChange={(e) => { setAdminUnitId(e.target.value); setEditDemandId(null); setSuccessMsg(''); setErrorMsg(''); }}
-              className="px-3 py-1.5 rounded-xl bg-white text-slate-800 font-extrabold text-xs border border-slate-200 shadow-xs max-w-[240px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              {units.map(u => (
-                <option key={u.id} value={u.id}>{u.unit_name}</option>
-              ))}
-            </select>
-          ) : (
-            <span className="px-3 py-1.5 rounded-xl bg-white text-slate-800 font-extrabold text-xs border border-slate-200 shadow-xs truncate max-w-[200px]">
-              {user?.unit_name || '2 DELHI ARTY BTY NCC'}
-            </span>
-          )}
-        </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 hidden sm:inline">Jurisdiction:</span>
+              <span className="px-3 py-1.5 rounded-xl bg-white text-slate-800 font-extrabold text-xs border border-slate-200 shadow-xs truncate max-w-[200px]">
+                {user?.unit_name || '2 DELHI ARTY BTY NCC'}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Success / Error Alerts */}
