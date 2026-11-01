@@ -436,6 +436,89 @@ router.post('/reorder', authenticateToken, authorizeRoles('ADMIN'), async (req, 
   }
 });
 
+// POST /api/delivery/switch - Transfer one or many demands to another car / porter / self delivery (ADMIN only)
+router.post('/switch', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { demandIds, targetMode, targetPartnerId } = req.body;
+    if (!Array.isArray(demandIds) || demandIds.length === 0) {
+      return res.status(400).json({ error: 'At least one demand ID is required' });
+    }
+    const mode = targetMode || 'DRIVER';
+    if (!['DRIVER', 'PORTER', 'SELF_DELIVERY'].includes(mode)) {
+      return res.status(400).json({ error: 'Invalid target mode' });
+    }
+
+    const db = await getDB();
+    let pId = null, pName, pPhone, pVehicle;
+    if (mode === 'DRIVER') {
+      if (!targetPartnerId) return res.status(400).json({ error: 'Target car / partner is required' });
+      const partner = await db.get('SELECT id, name, phone, vehicle_no FROM delivery_partners WHERE id = ?', [targetPartnerId]);
+      if (!partner) return res.status(404).json({ error: 'Target delivery partner not found' });
+      pId = partner.id;
+      pName = partner.name;
+      pPhone = partner.phone || '';
+      pVehicle = partner.vehicle_no || '';
+    } else if (mode === 'PORTER') {
+      pName = 'Handled by Porter';
+      pPhone = 'Porter Staff';
+      pVehicle = 'Porter Transport';
+    } else {
+      pName = 'Admin Self Delivery';
+      pPhone = 'Self Service Rep';
+      pVehicle = 'Admin Direct Handover';
+    }
+
+    let moved = 0;
+    const skipped = [];
+    for (const rawId of demandIds) {
+      const demandId = Number(rawId);
+      const demand = await db.get('SELECT id, demand_date, delivery_status, delivery_partner_name FROM demands WHERE id = ? AND is_deleted = 0', [demandId]);
+      if (!demand || demand.delivery_status === 'DELIVERED') { skipped.push(demandId); continue; }
+
+      // Append to the end of the target's list for that day
+      let seqRow;
+      if (mode === 'DRIVER') {
+        seqRow = await db.get(
+          `SELECT COALESCE(MAX(delivery_sequence), 0) AS mx FROM demands
+           WHERE is_deleted = 0 AND delivery_mode = 'DRIVER' AND delivery_partner_id = ? AND demand_date = ? AND id <> ?`,
+          [pId, demand.demand_date, demandId]
+        );
+      } else {
+        seqRow = await db.get(
+          `SELECT COALESCE(MAX(delivery_sequence), 0) AS mx FROM demands
+           WHERE is_deleted = 0 AND delivery_mode = ? AND demand_date = ? AND id <> ?`,
+          [mode, demand.demand_date, demandId]
+        );
+      }
+      const nextSeq = (Number(seqRow && seqRow.mx) || 0) + 1;
+
+      await db.run(
+        `UPDATE demands
+         SET delivery_mode = ?, delivery_partner_id = ?, delivery_partner_name = ?,
+             delivery_partner_phone = ?, delivery_partner_vehicle = ?, delivery_sequence = ?
+         WHERE id = ?`,
+        [mode, pId, pName, pPhone, pVehicle, nextSeq, demandId]
+      );
+
+      const text = `Transferred from ${demand.delivery_partner_name || 'previous carrier'} to ${pName}${pVehicle ? ' (' + pVehicle + ')' : ''}`;
+      try {
+        await db.run(
+          'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
+          ['DEMAND', demandId, 'DELIVERY_TRANSFERRED', req.user.id, text]
+        );
+      } catch (e) { console.error('Audit log error (switch):', e.message); }
+
+      moved++;
+      broadcastToAll('DEMAND_UPDATED', { id: demandId, delivery_mode: mode, delivery_partner_id: pId, timestamp: Date.now() });
+    }
+
+    res.json({ message: `Transferred ${moved} demand(s)`, moved, skipped });
+  } catch (error) {
+    console.error('Error switching delivery carrier:', error);
+    res.status(500).json({ error: error.message || 'Failed to transfer demands' });
+  }
+});
+
 // POST /api/delivery/status - Update delivery status (dynamic multi-stage)
 router.post('/status', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {

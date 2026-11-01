@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import {
   Truck, ChevronLeft, ChevronRight, MapPin, ArrowUp, ArrowDown, Navigation, Phone, Calendar,
-  Package, RefreshCw, CheckCircle2, Clock, Share2
+  Package, RefreshCw, CheckCircle2, Clock, Share2, ArrowLeftRight, X, CheckSquare, Square
 } from 'lucide-react';
 
 const dateKey = (d) => (typeof d === 'string' ? d.split('T')[0] : '');
@@ -41,6 +41,9 @@ export default function Distribution() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
   const [savingId, setSavingId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [transferModal, setTransferModal] = useState({ open: false, ids: [] });
+  const [transferring, setTransferring] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -173,6 +176,75 @@ export default function Distribution() {
       fetchData();
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const toggleSelect = (id) =>
+    setSelectedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+
+  const toggleSelectAll = (stops) => {
+    const ids = stops.filter(s => (s.delivery_status || 'PENDING') !== 'DELIVERED').map(s => s.id);
+    const allSelected = ids.length > 0 && ids.every(id => selectedIds.includes(id));
+    setSelectedIds(prev => (allSelected ? prev.filter(id => !ids.includes(id)) : Array.from(new Set([...prev, ...ids]))));
+  };
+
+  // All places a demand can be sent to: every active car + Porter + Self Delivery
+  const transferTargets = useMemo(() => {
+    const cars = partners
+      .filter(p => p.is_active !== 0 && !['PORTER', 'SELF_SERVICE'].includes(p.vehicle_type))
+      .map(p => ({ key: 'D:' + p.id, mode: 'DRIVER', partnerId: p.id, title: p.vehicle_no || 'CAR', sub: p.name, phone: p.phone }));
+    return [
+      ...cars,
+      { key: 'PORTER', mode: 'PORTER', partnerId: null, title: 'PORTER', sub: 'Handled by Porter' },
+      { key: 'SELF_DELIVERY', mode: 'SELF_DELIVERY', partnerId: null, title: 'SELF DELIVERY', sub: 'Admin Direct' }
+    ];
+  }, [partners]);
+
+  const currentTargetKey = (d) => {
+    const m = d.delivery_mode || 'DRIVER';
+    if (m === 'DRIVER') return 'D:' + d.delivery_partner_id;
+    return m;
+  };
+
+  const doTransfer = async (ids, target) => {
+    if (!ids.length || !target) return;
+    setTransferring(true);
+    const snapshot = demands;
+    const car = target.mode === 'DRIVER' ? partners.find(p => p.id === target.partnerId) : null;
+    // Optimistic update so the card moves instantly
+    setDemands(prev => prev.map(d => {
+      if (!ids.includes(d.id)) return d;
+      if (target.mode === 'DRIVER') {
+        return { ...d, delivery_mode: 'DRIVER', delivery_partner_id: target.partnerId, delivery_partner_name: car?.name || d.delivery_partner_name, delivery_partner_phone: car?.phone || '', delivery_partner_vehicle: car?.vehicle_no || '', delivery_sequence: 9999 };
+      }
+      return {
+        ...d,
+        delivery_mode: target.mode,
+        delivery_partner_id: null,
+        delivery_partner_name: target.mode === 'PORTER' ? 'Handled by Porter' : 'Admin Self Delivery',
+        delivery_partner_phone: target.mode === 'PORTER' ? 'Porter Staff' : 'Self Service Rep',
+        delivery_sequence: 9999
+      };
+    }));
+    try {
+      const res = await fetch('/api/delivery/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ demandIds: ids, targetMode: target.mode, targetPartnerId: target.partnerId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to transfer demand');
+      if (data.skipped && data.skipped.length) alert(`${data.skipped.length} delivered demand(s) were not moved.`);
+      setSelectedIds(prev => prev.filter(id => !ids.includes(id)));
+      setTransferModal({ open: false, ids: [] });
+      // Switch the tab so the admin sees where the demand landed
+      if (target.mode !== mode) setMode(target.mode);
+      await fetchData();
+    } catch (err) {
+      setDemands(snapshot);
+      alert(err.message || 'Failed to transfer demand');
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -318,9 +390,19 @@ export default function Distribution() {
                   <Package className="w-3 h-3" />{total} Pkts
                 </span>
                 <button
+                  onClick={() => toggleSelectAll(stops)}
+                  disabled={stops.length === 0}
+                  className="ml-auto px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-slate-700 text-[10px] font-black flex items-center gap-1 shrink-0"
+                  title="Select all stops of this car"
+                  >
+                  <CheckSquare className="w-3 h-3" /> All
+
+                </button>
+
+                <button
                   onClick={() => shareList(partner, stops)}
                   disabled={stops.length === 0}
-                  className="ml-auto px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-[10px] font-black flex items-center gap-1 shrink-0"
+                  className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-[10px] font-black flex items-center gap-1 shrink-0"
                   title="Send this day's list on WhatsApp"
                 >
                   <Share2 className="w-3 h-3" /> Share
@@ -335,7 +417,16 @@ export default function Distribution() {
                 ) : stops.map((s, i) => {
                   const st = s.delivery_status || 'PENDING';
                   return (
-                    <div key={s.id} className="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center gap-2">
+                    <div key={s.id} className={`p-2.5 rounded-xl border bg-white flex items-center gap-2 ${selectedIds.includes(s.id) ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'}`}>
+                      <button
+                        type="button"
+                        onClick={() => toggleSelect(s.id)}
+                        disabled={st === 'DELIVERED'}
+                        className="shrink-0 text-slate-400 hover:text-blue-600 disabled:opacity-30"
+                        title="Select for transfer"
+                      >
+                        {selectedIds.includes(s.id) ? <CheckSquare className="w-4 h-4 text-blue-600" /> : <Square className="w-4 h-4" />}
+                      </button>
                       <span className={`w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${
                         st === 'DELIVERED' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white'
                       }`}>
@@ -352,6 +443,15 @@ export default function Distribution() {
                           {st.replace(/_/g, ' ')}
                         </span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setTransferModal({ open: true, ids: [s.id] })}
+                        disabled={st === 'DELIVERED'}
+                        className="shrink-0 p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-700 disabled:opacity-30 active:scale-95 transition-all"
+                        title="Switch to another car / Porter / Self Delivery"
+                      >
+                        <ArrowLeftRight className="w-4 h-4" />
+                      </button>
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         <span className="text-xs font-black text-indigo-900 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
                           {s.total_quantity || 0} Pkts
@@ -392,6 +492,77 @@ export default function Distribution() {
           );
         })}
       </div>
+
+      {/* Floating multi-select transfer bar */}
+      {selectedIds.length > 0 && !transferModal.open && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3 flex-wrap justify-center max-w-[95vw]">
+          <span className="text-xs font-black">
+            {selectedIds.length} selected ({demands.filter(d => selectedIds.includes(d.id)).reduce((s, d) => s + (Number(d.total_quantity) || 0), 0)} Pkts)
+          </span>
+          <button
+            type="button"
+            onClick={() => setTransferModal({ open: true, ids: selectedIds })}
+            className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-900 text-xs font-black flex items-center gap-1.5"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5" /> Transfer
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds([])}
+            className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* Transfer destination dialog */}
+      {transferModal.open && (() => {
+        const moving = demands.filter(d => transferModal.ids.includes(d.id));
+        const currentKeys = new Set(moving.map(currentTargetKey));
+        const hideKey = currentKeys.size === 1 ? Array.from(currentKeys)[0] : null;
+        const totalPk = moving.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-3">
+              <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                    <ArrowLeftRight className="w-4 h-4 text-amber-600" /> Transfer {moving.length} demand{moving.length !== 1 ? 's' : ''}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-bold mt-0.5 truncate max-w-[240px]">
+                    {moving.length === 1 ? moving[0].institution_name : `${totalPk} packets total`}
+                  </p>
+                </div>
+                <button type="button" onClick={() => setTransferModal({ open: false, ids: [] })} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {transferTargets.filter(t => t.key !== hideKey).map(t => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    disabled={transferring}
+                    onClick={() => doTransfer(transferModal.ids, t)}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-left transition-all disabled:opacity-50"
+                  >
+                    <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                      <Truck className="w-4 h-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-black text-slate-900">{t.title}</span>
+                      <span className="block text-[10px] text-slate-500 font-semibold truncate">{t.sub}{t.phone ? ` • ${t.phone}` : ''}</span>
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </button>
+                ))}
+              </div>
+              {transferring && <p className="text-center text-[11px] font-bold text-slate-500">Saving...</p>}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
