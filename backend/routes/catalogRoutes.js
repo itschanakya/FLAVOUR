@@ -112,7 +112,7 @@ router.get('/', authenticateToken, async (req, res) => {
       );
       const totalWastage = wastageRes ? Number(wastageRes.total_wastage || 0) : 0;
 
-      const isExpired = !!(item.expiry_date && item.expiry_date <= targetDate);
+      const isExpired = item.is_active === 1 && item.item_name !== 'Standard Refreshment Packet' && !!(item.expiry_date && item.expiry_date <= targetDate);
       const isOutOfStock = dateStockBalance <= 0;
       const isLowStock = dateStockBalance > 0 && dateStockBalance <= (item.min_threshold || 10);
 

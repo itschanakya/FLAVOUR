@@ -509,7 +509,7 @@ router.post('/', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN
         return res.status(400).json({ error: `Item ID ${item.item_id} is inactive or does not exist.` });
       }
       const todayStr = new Date().toISOString().split('T')[0];
-      if (catalogItem.expiry_date && catalogItem.expiry_date <= todayStr) {
+      if (catalogItem.item_name !== 'Standard Refreshment Packet' && catalogItem.expiry_date && catalogItem.expiry_date <= todayStr) {
         return res.status(400).json({
           error: `Item '${catalogItem.item_name}' is EXPIRED (Expiry: ${catalogItem.expiry_date}). Expired items cannot be added to cadet demands.`
         });

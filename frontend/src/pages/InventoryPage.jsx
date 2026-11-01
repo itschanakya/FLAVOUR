@@ -1353,8 +1353,8 @@ export default function InventoryPage({ embedded = false, initialView = 'stock' 
   };
 
   // PACKET BUILDER CALCULATIONS
-  const availableItems = items.filter(i => i.is_active === 1);
-  const expiredItems = items.filter(i => i.is_expired);
+  const availableItems = items.filter(i => i.is_active === 1 && i.item_name !== 'Standard Refreshment Packet');
+  const expiredItems = items.filter(i => i.is_active === 1 && i.is_expired && i.item_name !== 'Standard Refreshment Packet');
 
   const calculatePacketSummary = () => {
     let subtotal = 0;

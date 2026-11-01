@@ -527,8 +527,9 @@ async function initializeSchema(db) {
   // Set default future expiry dates for any existing items that don't have one
   try {
     const futureDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    await db.run("UPDATE refreshment_items SET expiry_date = ? WHERE expiry_date IS NULL OR expiry_date = ''", [futureDate]);
+    await db.run("UPDATE refreshment_items SET expiry_date = ? WHERE (expiry_date IS NULL OR expiry_date = '' OR expiry_date <= '2026-10-31') AND item_name != 'Standard Refreshment Packet'", [futureDate]);
     await db.run("UPDATE refreshment_items SET current_stock = 150 WHERE current_stock IS NULL");
+    await db.run("UPDATE refreshment_items SET expiry_date = NULL WHERE item_name = 'Standard Refreshment Packet'");
   } catch (err) { }
 
   // Ensure default packet template exists
@@ -848,7 +849,7 @@ async function syncStandardPacketPrice(db) {
       );
       packetItem = { id: res.lastID };
     } else {
-      await db.run("UPDATE refreshment_items SET unit_price = ?, is_active = 1 WHERE id = ?", [grandTotal, packetItem.id]);
+      await db.run("UPDATE refreshment_items SET unit_price = ?, is_active = 1, expiry_date = NULL WHERE id = ?", [grandTotal, packetItem.id]);
     }
 
     // Sync all demand items for Standard Refreshment Packet
