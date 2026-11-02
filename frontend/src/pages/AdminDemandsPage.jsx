@@ -107,7 +107,7 @@ export default function AdminDemandsPage() {
         if (sumRes.ok) setSummary(await sumRes.json());
         if (demRes.ok) {
           const demData = await demRes.json();
-          const filtered = Array.isArray(demData) ? demData.filter(d => ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED'].includes(d.status)) : [];
+          const filtered = Array.isArray(demData) ? demData.filter(d => ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED', 'REJECTED', 'CANCELLED'].includes(d.status)) : [];
           sessionStorage.setItem('admin_demands_cache', JSON.stringify(filtered));
           setDemands(filtered);
         }
@@ -145,7 +145,7 @@ export default function AdminDemandsPage() {
       
       if (demRes.ok) {
         const demData = await demRes.json();
-        const filtered = Array.isArray(demData) ? demData.filter(d => ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED'].includes(d.status)) : [];
+        const filtered = Array.isArray(demData) ? demData.filter(d => ['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED', 'REJECTED', 'CANCELLED'].includes(d.status)) : [];
         sessionStorage.setItem('admin_demands_cache', JSON.stringify(filtered));
         setDemands(filtered);
       }
@@ -199,7 +199,7 @@ export default function AdminDemandsPage() {
     if (reason === null) return;
     
     // Optimistic UI Update
-    setDemands(prev => prev.map(d => d.id === demandId ? { ...d, status: 'REJECTED' } : d));
+    setDemands(prev => prev.map(d => d.id === demandId ? { ...d, status: 'REJECTED', total_quantity: 0, total_amount: 0, total_packets: 0, review_remarks: reason || 'Rejected by Vendor/Admin.' } : d));
 
     try {
       const res = await fetch(`/api/demands/${demandId}/admin-reject`, {
@@ -213,6 +213,34 @@ export default function AdminDemandsPage() {
       const data = await res.json();
       if (!res.ok) {
         fetchDemandsData(true); // Revert on error
+        throw new Error(data.error);
+      }
+      fetchDemandsData(true);
+      window.dispatchEvent(new Event('demand-status-changed'));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleCancel = async (demandId) => {
+    const reason = window.prompt('Reason for cancelling this demand (e.g. Requested by Institution / Unit):');
+    if (reason === null) return;
+
+    // Optimistic UI Update
+    setDemands(prev => prev.map(d => d.id === demandId ? { ...d, status: 'CANCELLED', delivery_status: 'CANCELLED', total_quantity: 0, total_amount: 0, total_packets: 0, review_remarks: reason || 'Cancelled by Admin.' } : d));
+
+    try {
+      const res = await fetch(`/api/demands/${demandId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason: reason || 'Cancelled by Admin on Institution/Unit request.' })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        fetchDemandsData(true);
         throw new Error(data.error);
       }
       fetchDemandsData(true);
@@ -331,8 +359,9 @@ export default function AdminDemandsPage() {
 
     // 3. Status filter (Vendor sees APPROVED as PENDING action)
     if (statusFilter === 'PENDING' && d.status !== 'APPROVED') return false;
-    if (statusFilter === 'ACCEPTED' && !['ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED'].includes(d.status)) return false;
+    if (statusFilter === 'ACCEPTED' && !['ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED'].includes(d.status)) return false;
     if (statusFilter === 'REJECTED' && d.status !== 'REJECTED') return false;
+    if (statusFilter === 'CANCELLED' && d.status !== 'CANCELLED') return false;
 
     // 4. Time filter
     if (timeFilter !== 'ALL') {
@@ -445,7 +474,7 @@ export default function AdminDemandsPage() {
   const [visibleLimit, setVisibleLimit] = useState(5);
   const visibleDateGroups = dateGroups.slice(0, visibleLimit);
   
-  const pktsOf = (d) => Number(d.total_packets || d.total_quantity || d.quantity || 0);
+  const pktsOf = (d) => (d.status === 'REJECTED' || d.status === 'CANCELLED') ? 0 : Number(d.total_packets || d.total_quantity || d.quantity || 0);
 
   const dateBadge = (key) => {
     const diff = dayNum(key) - dayNum(todayKey);
@@ -584,8 +613,9 @@ export default function AdminDemandsPage() {
 
   // Status count counters for quick pill badges
   const pendingCount = activeDemands.filter(d => d.status === 'APPROVED').length;
-  const acceptedCount = activeDemands.filter(d => ['ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED'].includes(d.status)).length;
+  const acceptedCount = activeDemands.filter(d => ['ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED'].includes(d.status)).length;
   const rejectedCount = safeDemands.filter(d => d.status === 'REJECTED').length;
+  const cancelledCount = safeDemands.filter(d => d.status === 'CANCELLED').length;
 
   const hasActiveFilters = selectedUnitId !== 'ALL' || selectedInstitutionId !== 'ALL' || statusFilter !== 'ALL' || timeFilter !== 'ALL' || !!dateFilter || demandSearch.trim() !== '';
 
@@ -931,7 +961,8 @@ export default function AdminDemandsPage() {
                       { val: 'ALL', label: `All` },
                       { val: 'PENDING', label: `Pending (${pendingCount})` },
                       { val: 'ACCEPTED', label: `Accepted (${acceptedCount})` },
-                      { val: 'REJECTED', label: `Rejected (${rejectedCount})` }
+                      { val: 'REJECTED', label: `Rejected (${rejectedCount})` },
+                      { val: 'CANCELLED', label: `Cancelled (${cancelledCount})` }
                     ].map(sf => (
                       <button
                         key={sf.val}
@@ -1130,23 +1161,50 @@ export default function AdminDemandsPage() {
                           </span>
                         </td>
                         <td className="p-3.5 font-semibold text-slate-800">
-                          {dem.demand_type === 'UNIT_DIRECT' ? (dem.unit_code || dem.unit_name || '—') : (dem.institution_name || '—')}
+                          <div>{dem.demand_type === 'UNIT_DIRECT' ? (dem.unit_code || dem.unit_name || '—') : (dem.institution_name || '—')}</div>
+                          {(dem.status === 'REJECTED' || dem.status === 'CANCELLED') && dem.review_remarks && (
+                            <div className="text-[11px] font-medium text-rose-600 mt-0.5 italic">
+                              Reason: {dem.review_remarks}
+                            </div>
+                          )}
                         </td>
                         <td className="p-3.5 font-medium text-slate-600 whitespace-nowrap">
                           {formatDMY(dem.demand_date)}
                         </td>
                         <td className="p-3.5 font-bold text-slate-800">
-                          {(dem.total_packets || dem.total_quantity || dem.quantity || 0).toLocaleString('en-IN')}
+                          {(dem.status === 'REJECTED' || dem.status === 'CANCELLED') ? (
+                            <div className="flex flex-col">
+                              <span className="text-rose-600 font-black">0</span>
+                              {dem.original_quantity > 0 && (
+                                <span className="text-[10px] text-slate-400 line-through font-medium">
+                                  ({Number(dem.original_quantity).toLocaleString('en-IN')} pkts)
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            (dem.total_packets || dem.total_quantity || dem.quantity || 0).toLocaleString('en-IN')
+                          )}
                         </td>
                         <td className="p-3.5 font-bold text-emerald-700 whitespace-nowrap">
-                          ₹{(dem.total_amount || 0).toLocaleString('en-IN')}
+                          {(dem.status === 'REJECTED' || dem.status === 'CANCELLED') ? (
+                            <div className="flex flex-col">
+                              <span className="text-rose-600 font-black">₹0</span>
+                              {dem.original_amount > 0 && (
+                                <span className="text-[10px] text-slate-400 line-through font-medium">
+                                  (₹{Number(dem.original_amount).toLocaleString('en-IN')})
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            `₹${(dem.total_amount || 0).toLocaleString('en-IN')}`
+                          )}
                         </td>
                         <td className="p-3.5 whitespace-nowrap">
                           <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} />
                         </td>
                         <td className="p-3.5 text-right whitespace-nowrap">
                           {dem.status === 'APPROVED' ? (
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center justify-end gap-1.5">
                               <button
                                 onClick={() => handleAccept(dem.id)}
                                 className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer"
@@ -1157,14 +1215,31 @@ export default function AdminDemandsPage() {
                               <button
                                 onClick={() => handleReject(dem.id)}
                                 className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs inline-flex items-center gap-1 border border-rose-200 transition-all cursor-pointer"
+                                title="Reject demand"
                               >
                                 <X className="w-3.5 h-3.5" /> Reject
                               </button>
+                              <button
+                                onClick={() => handleCancel(dem.id)}
+                                className="px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs inline-flex items-center gap-1 border border-purple-200 transition-all cursor-pointer"
+                                title="Cancel demand on Institution / Unit request"
+                              >
+                                Cancel
+                              </button>
                             </div>
                           ) : ['ACCEPTED', 'READY_FOR_DISPATCH', 'PREPARING'].includes(dem.status) ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 text-cyan-800 font-bold text-xs rounded-lg border border-cyan-200" title="Demand is active in Fleet Delivery">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600" /> In Fleet Delivery
-                            </span>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-50 text-cyan-800 font-bold text-xs rounded-lg border border-cyan-200" title="Demand is active in Fleet Delivery">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600" /> In Fleet
+                              </span>
+                              <button
+                                onClick={() => handleCancel(dem.id)}
+                                className="px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[11px] inline-flex items-center gap-1 border border-purple-200 transition-all cursor-pointer"
+                                title="Cancel demand & unassign from fleet"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           ) : dem.status === 'DELIVERED' || dem.status === 'FULFILLED' ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-200">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Delivered
@@ -1172,6 +1247,10 @@ export default function AdminDemandsPage() {
                           ) : dem.status === 'REJECTED' ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-700 font-bold text-xs rounded-lg border border-rose-200">
                               <X className="w-3.5 h-3.5" /> Rejected
+                            </span>
+                          ) : dem.status === 'CANCELLED' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 text-purple-700 font-bold text-xs rounded-lg border border-purple-200">
+                              <X className="w-3.5 h-3.5" /> Cancelled
                             </span>
                           ) : (
                             <span className="text-slate-400 text-xs font-bold uppercase">{dem.status}</span>

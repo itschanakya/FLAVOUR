@@ -54,7 +54,7 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
       LEFT JOIN institutions i ON d.institution_id = i.id
       JOIN units u ON d.unit_id = u.id
       WHERE d.is_deleted = 0
-        AND d.status IN ('READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED', 'REJECTED')
+        AND d.status IN ('READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED', 'REJECTED', 'CANCELLED')
     `;
 
     const params = [];
@@ -105,8 +105,17 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
 
       for (const dem of demands) {
         dem.items = itemsMap[dem.id] || [];
-        dem.total_quantity = dem.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-        dem.total_amount = dem.items.reduce((sum, item) => sum + (Number(item.total_cost) || 0), 0);
+        const rawQty = dem.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+        const rawAmt = dem.items.reduce((sum, item) => sum + (Number(item.total_cost) || 0), 0);
+        dem.original_quantity = rawQty;
+        dem.original_amount = rawAmt;
+        if (dem.status === 'REJECTED' || dem.status === 'CANCELLED') {
+          dem.total_quantity = 0;
+          dem.total_amount = 0;
+        } else {
+          dem.total_quantity = rawQty;
+          dem.total_amount = rawAmt;
+        }
       }
     }
 

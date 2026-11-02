@@ -516,15 +516,39 @@ function DemandsTableView({ demands, onAction, onDelete, onClick, onEdit, select
                     )}
                   </td>
                   <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1 font-black text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg">
-                      <Package className="w-3.5 h-3.5 text-indigo-500" />
-                      {qty.toLocaleString()}
-                    </span>
+                    {(dem.status === 'REJECTED' || dem.status === 'CANCELLED') ? (
+                      <div className="flex flex-col items-center">
+                        <span className="inline-flex items-center gap-1 font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg text-xs">
+                          0
+                        </span>
+                        {dem.original_quantity > 0 && (
+                          <span className="text-[10px] text-slate-400 line-through font-medium">
+                            ({Number(dem.original_quantity).toLocaleString()} pkts)
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 font-black text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg">
+                        <Package className="w-3.5 h-3.5 text-indigo-500" />
+                        {qty.toLocaleString()}
+                      </span>
+                    )}
                   </td>
                   <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                    <span className="font-black text-emerald-700 text-sm">
-                      ₹{amt.toLocaleString('en-IN')}
-                    </span>
+                    {(dem.status === 'REJECTED' || dem.status === 'CANCELLED') ? (
+                      <div className="flex flex-col items-end">
+                        <span className="font-black text-rose-600 text-sm">₹0</span>
+                        {dem.original_amount > 0 && (
+                          <span className="text-[10px] text-slate-400 line-through font-medium">
+                            (₹{Number(dem.original_amount).toLocaleString('en-IN')})
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="font-black text-emerald-700 text-sm">
+                        ₹{amt.toLocaleString('en-IN')}
+                      </span>
+                    )}
                   </td>
                   <td className="py-3.5 px-4 text-center whitespace-nowrap">
                     <div onClick={(e) => { e.stopPropagation(); onClick(dem); }} className="cursor-pointer hover:opacity-80 inline-block" title="View Demand Details">
@@ -644,10 +668,13 @@ function DemandCard({ dem, onAction, onDelete, onClick, onEdit }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = dem.status === 'PENDING';
   const canCancel = ['PENDING', 'APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH'].includes(dem.status) && dem.delivery_status !== 'DELIVERED';
-  const total = Number(dem.total_amount) || 0;
-  const totalQty = (dem.items && dem.items.length > 0)
-    ? dem.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0)
-    : (Number(dem.total_quantity) || 0);
+  const isVoided = dem.status === 'REJECTED' || dem.status === 'CANCELLED';
+  const total = isVoided ? 0 : (Number(dem.total_amount) || 0);
+  const totalQty = isVoided
+    ? 0
+    : ((dem.items && dem.items.length > 0)
+        ? dem.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0)
+        : (Number(dem.total_quantity) || 0));
 
   return (
     <div className={`group relative bg-white rounded-2xl border transition-all duration-300 overflow-hidden
@@ -687,13 +714,23 @@ function DemandCard({ dem, onAction, onDelete, onClick, onEdit }) {
             <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1 flex items-center gap-1">
               <IndianRupee className="w-3 h-3" /> Amount
             </div>
-            <div className="text-sm font-bold text-emerald-700">₹{total.toLocaleString('en-IN')}</div>
+            <div className="text-sm font-bold text-emerald-700">
+              ₹{total.toLocaleString('en-IN')}
+              {isVoided && dem.original_amount > 0 && (
+                <span className="block text-[10px] text-slate-400 line-through">₹{Number(dem.original_amount).toLocaleString('en-IN')}</span>
+              )}
+            </div>
           </div>
           <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
             <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1 flex items-center gap-1">
               <Package className="w-3 h-3" /> Units
             </div>
-            <div className="text-sm font-bold text-blue-700">{totalQty}</div>
+            <div className="text-sm font-bold text-blue-700">
+              {totalQty}
+              {isVoided && dem.original_quantity > 0 && (
+                <span className="block text-[10px] text-slate-400 line-through">{dem.original_quantity} pkts</span>
+              )}
+            </div>
           </div>
         </div>
 

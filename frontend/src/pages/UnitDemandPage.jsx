@@ -28,6 +28,7 @@ import {
   Coffee,
   History,
   Printer,
+  Ban,
   Pencil,
   Trash2,
   FileEdit,
@@ -692,6 +693,43 @@ export default function UnitDemandPage() {
       setErrorMsg(err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCancelDemand = async (d) => {
+    const reason = window.prompt(`Enter reason for cancelling demand ${d.demand_number || ''}:`);
+    if (reason === null) return;
+    try {
+      const res = await fetch(`/api/demands/${d.id}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason: reason || 'Cancelled from Refreshment Demand Console' })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel demand');
+      fetchRecentUnitDemands();
+      window.dispatchEvent(new Event('demand-status-changed'));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteDemand = async (id, demandNum) => {
+    if (!window.confirm(`Are you sure you want to permanently delete demand ${demandNum || ''}?`)) return;
+    try {
+      const res = await fetch(`/api/demands/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete demand');
+      fetchRecentUnitDemands();
+      window.dispatchEvent(new Event('demand-status-changed'));
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -1432,6 +1470,11 @@ export default function UnitDemandPage() {
                         <div className="font-bold text-slate-800 uppercase text-xs truncate max-w-[160px]">
                           {d.demand_type === 'UNIT_DIRECT' ? (d.unit_code || d.unit_name || 'UNIT HQ') : (d.institution_name || 'INSTITUTION')}
                         </div>
+                        {(d.status === 'REJECTED' || d.status === 'CANCELLED') && d.review_remarks && (
+                          <div className="text-[10px] font-medium text-rose-600 mt-0.5 italic truncate max-w-[160px]" title={d.review_remarks}>
+                            {d.review_remarks}
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-4">
                         <div className="font-bold text-slate-600 uppercase text-[10px] bg-slate-100 px-2 py-1 rounded-md inline-block">
@@ -1451,15 +1494,37 @@ export default function UnitDemandPage() {
                         <StatusBadge status={d.status} deliveryStatus={d.delivery_status} demand={d} onClick={(e) => { e.stopPropagation(); setSelectedDemand(d); }} />
                       </td>
                       <td className="px-3 py-4 text-center">
-                        <span className="font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg inline-block text-xs">
-                          {d.total_quantity || d.quantity || 0}
-                        </span>
+                        {(d.status === 'REJECTED' || d.status === 'CANCELLED') ? (
+                          <div className="flex flex-col items-center">
+                            <span className="font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded text-xs">0</span>
+                            {d.original_quantity > 0 && (
+                              <span className="text-[10px] text-slate-400 line-through font-medium">
+                                ({d.original_quantity})
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg inline-block text-xs">
+                            {d.total_quantity || d.quantity || 0}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-4 text-right font-mono text-slate-600 text-xs">
                         ₹{d.custom_unit_rate ? Number(d.custom_unit_rate).toFixed(2) : (d.avg_unit_price ? Number(d.avg_unit_price).toFixed(2) : '75.00')}
                       </td>
                       <td className="px-3 py-4 text-right font-black text-emerald-600 font-mono text-xs">
-                        ₹{Number(d.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        {(d.status === 'REJECTED' || d.status === 'CANCELLED') ? (
+                          <div className="flex flex-col items-end">
+                            <span className="text-rose-600 font-black">₹0.00</span>
+                            {d.original_amount > 0 && (
+                              <span className="text-[10px] text-slate-400 line-through font-medium">
+                                (₹{Number(d.original_amount).toLocaleString('en-IN')})
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          `₹${Number(d.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                        )}
                       </td>
                       <td className="pr-4 pl-2 py-4 text-center rounded-r-xl">
                         <div className="flex items-center justify-center gap-1.5">
@@ -1471,6 +1536,17 @@ export default function UnitDemandPage() {
                               title="Edit Demand"
                             >
                               <FileEdit className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {!['DELIVERED', 'FULFILLED', 'REJECTED', 'CANCELLED'].includes(d.status) && d.delivery_status !== 'DELIVERED' && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleCancelDemand(d); }}
+                              className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 border border-amber-200 shadow-2xs transition-all cursor-pointer"
+                              title="Cancel Demand (Keep in record with 0 qty/amount)"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
                             </button>
                           )}
 

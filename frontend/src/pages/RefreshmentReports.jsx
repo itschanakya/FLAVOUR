@@ -636,6 +636,11 @@ export default function RefreshmentReports() {
       let candidateNum = maxSerial;
 
       orderedList.forEach((d) => {
+        if (d.status === 'REJECTED' || d.status === 'CANCELLED') {
+          newNos[d.id] = 'CANCELLED';
+          newDates[d.id] = '';
+          return;
+        }
         const existingInv = (newNos[d.id] !== undefined ? newNos[d.id] : d.invoice_no);
 
         if (!overwriteExisting && existingInv && String(existingInv).trim()) {
@@ -1174,12 +1179,28 @@ export default function RefreshmentReports() {
 
                             {/* ITEM */}
                             <td className="px-3 py-3 text-slate-700 font-normal whitespace-nowrap border border-slate-200 print:border-black">
-                              Refreshment Packet
+                              <span>Refreshment Packet</span>
+                              {(row.status === 'REJECTED' || row.status === 'CANCELLED') && (
+                                <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-black uppercase rounded bg-rose-100 text-rose-700 border border-rose-200">
+                                  {row.status}
+                                </span>
+                              )}
                             </td>
 
                             {/* QTY */}
                             <td className="px-3 py-3 text-center font-normal text-slate-900 print:text-black border border-slate-200 print:border-black">
-                              {Number(row.total_quantity) || 0}
+                              {(row.status === 'REJECTED' || row.status === 'CANCELLED') ? (
+                                <div className="flex flex-col items-center">
+                                  <span className="text-rose-600 font-black">0</span>
+                                  {row.original_quantity > 0 && (
+                                    <span className="text-[9px] text-slate-400 line-through print:hidden">
+                                      ({row.original_quantity})
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                Number(row.total_quantity) || 0
+                              )}
                             </td>
 
                             {/* RATE INCL GST */}
@@ -1189,7 +1210,18 @@ export default function RefreshmentReports() {
 
                             {/* AMOUNT */}
                             <td className="px-3 py-3 text-right font-bold text-emerald-600 print:text-black border border-slate-200 print:border-black">
-                              ₹{formatAmount(row.total_amount)}
+                              {(row.status === 'REJECTED' || row.status === 'CANCELLED') ? (
+                                <div className="flex flex-col items-end">
+                                  <span className="text-rose-600 font-black">₹0.00</span>
+                                  {row.original_amount > 0 && (
+                                    <span className="text-[9px] text-slate-400 line-through print:hidden">
+                                      (₹{formatAmount(row.original_amount)})
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                `₹${formatAmount(row.total_amount)}`
+                              )}
                             </td>
                           </tr>
                         );
@@ -1298,7 +1330,7 @@ export default function RefreshmentReports() {
       const monthSet = new Set();
 
       (demands || []).forEach(d => {
-        if (d.demand_date && d.status !== 'CANCELLED') {
+        if (d.demand_date) {
           // If unit is filtered, prioritize months that belong to that unit
           if (unitFilter !== 'All' && d.unit_name && d.unit_name !== unitFilter) {
             return;
@@ -1366,8 +1398,7 @@ export default function RefreshmentReports() {
           if (String(d.institution_id) !== String(instFilter) && d.institution_name !== instFilter) return false;
         }
 
-        // Exclude cancelled
-        if (d.status === 'CANCELLED') return false;
+        // Keep CANCELLED and REJECTED in record with 0 qty/amount for complete audit trail
 
         // Search query
         if (searchQuery.trim()) {
@@ -1699,12 +1730,28 @@ export default function RefreshmentReports() {
 
                               {/* ITEM */}
                               <td className="px-3 py-3 text-slate-700 print:text-black whitespace-nowrap border border-slate-200 print:border-black">
-                                Refreshment Packet
+                                <span>Refreshment Packet</span>
+                                {(row.status === 'REJECTED' || row.status === 'CANCELLED') && (
+                                  <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-black uppercase rounded bg-rose-100 text-rose-700 border border-rose-200">
+                                    {row.status}
+                                  </span>
+                                )}
                               </td>
 
                               {/* QTY */}
                               <td className="px-3 py-3 text-center font-bold text-slate-900 print:text-black border border-slate-200 print:border-black">
-                                {Number(row.total_quantity || row.quantity || 0)}
+                                {(row.status === 'REJECTED' || row.status === 'CANCELLED') ? (
+                                  <div className="flex flex-col items-center">
+                                    <span className="text-rose-600 font-black">0</span>
+                                    {row.original_quantity > 0 && (
+                                      <span className="text-[9px] text-slate-400 line-through print:hidden">
+                                        ({row.original_quantity})
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  Number(row.total_quantity || row.quantity || 0)
+                                )}
                               </td>
 
                               {/* RATE INCL GST */}
@@ -1714,7 +1761,18 @@ export default function RefreshmentReports() {
 
                               {/* AMOUNT */}
                               <td className="px-3 py-3 text-right font-bold text-emerald-600 print:text-black border border-slate-200 print:border-black">
-                                ₹{formatAmount(row.total_amount)}
+                                {(row.status === 'REJECTED' || row.status === 'CANCELLED') ? (
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-rose-600 font-black">₹0.00</span>
+                                    {row.original_amount > 0 && (
+                                      <span className="text-[9px] text-slate-400 line-through print:hidden">
+                                        (₹{formatAmount(row.original_amount)})
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  `₹${formatAmount(row.total_amount)}`
+                                )}
                               </td>
                             </tr>
                           );

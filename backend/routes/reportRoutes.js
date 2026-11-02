@@ -41,7 +41,7 @@ router.get('/summary', authenticateToken, async (req, res) => {
          SUM(CASE WHEN d.status IN ('FULFILLED', 'DELIVERED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END) as total_fulfilled_val,
          SUM(CASE WHEN d.status IN ('OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END) as total_packets_in_transit,
          SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END) as total_packets_delivered,
-         SUM(di.quantity) as total_packets_demanded
+         SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END) as total_packets_demanded
        FROM demands d
        JOIN demand_items di ON d.id = di.demand_id
        ${scopeWhere}`,
@@ -84,8 +84,8 @@ router.get('/periodic', authenticateToken, async (req, res) => {
       `SELECT 
          DATE_FORMAT(d.demand_date, '%Y-%m') as month,
          COUNT(DISTINCT d.id) as demand_count,
-         SUM(di.quantity) as total_quantity,
-         SUM(di.quantity * di.unit_price_snapshot) as total_cost
+         SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END) as total_quantity,
+         SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END) as total_cost
        FROM demands d
        JOIN demand_items di ON d.id = di.demand_id
        ${scopeWhere}
@@ -101,8 +101,8 @@ router.get('/periodic', authenticateToken, async (req, res) => {
          DATE_FORMAT(d.demand_date, '%Y-%u') as week,
          MIN(d.demand_date) as week_start,
          COUNT(DISTINCT d.id) as demand_count,
-         SUM(di.quantity) as total_quantity,
-         SUM(di.quantity * di.unit_price_snapshot) as total_cost
+         SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END) as total_quantity,
+         SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END) as total_cost
        FROM demands d
        JOIN demand_items di ON d.id = di.demand_id
        ${scopeWhere}
@@ -233,7 +233,7 @@ router.get('/utilization', authenticateToken, async (req, res) => {
         `SELECT di.year_group, SUM(di.quantity) as raised_qty
          FROM demands d
          JOIN demand_items di ON d.id = di.demand_id
-         WHERE d.institution_id = ? AND d.is_deleted = 0 AND d.status != 'CANCELLED'
+         WHERE d.institution_id = ? AND d.is_deleted = 0 AND d.status NOT IN ('CANCELLED', 'REJECTED')
          GROUP BY di.year_group`,
         [inst.id]
       );
@@ -321,7 +321,7 @@ router.get('/annual-summary', authenticateToken, async (req, res) => {
       const demands = await db.all(
         `SELECT d.id, d.demand_number, d.demand_date, d.status, d.purpose,
                 COALESCE(SUM(di.quantity), 0) as total_qty,
-                COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount
+                COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount
          FROM demands d
          LEFT JOIN demand_items di ON d.id = di.demand_id
          WHERE d.institution_id = ? 
@@ -338,7 +338,7 @@ router.get('/annual-summary', authenticateToken, async (req, res) => {
          JOIN demand_items di ON d.id = di.demand_id
          WHERE d.institution_id = ? 
            AND d.is_deleted = 0 
-           AND d.status != 'CANCELLED'
+           AND d.status NOT IN ('CANCELLED', 'REJECTED')
            AND DATE_FORMAT(d.demand_date, '%Y') = ?
          GROUP BY di.year_group`,
         [inst.id, targetYear]
@@ -428,8 +428,8 @@ router.get('/weekly-monthly-summary', authenticateToken, async (req, res) => {
          SUM(CASE WHEN d.status IN ('APPROVED', 'ACCEPTED') THEN 1 ELSE 0 END) as approved_count,
          SUM(CASE WHEN d.status = 'FULFILLED' THEN 1 ELSE 0 END) as fulfilled_count,
          SUM(CASE WHEN d.status IN ('CANCELLED', 'REJECTED') THEN 1 ELSE 0 END) as cancelled_count,
-         SUM(di.quantity) as total_packets,
-         SUM(di.quantity * di.unit_price_snapshot) as total_cost
+         SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END) as total_packets,
+         SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END) as total_cost
        FROM demands d
        JOIN demand_items di ON d.id = di.demand_id
        ${scopeWhere}
@@ -445,8 +445,8 @@ router.get('/weekly-monthly-summary', authenticateToken, async (req, res) => {
          MIN(d.demand_date) as week_start,
          MAX(d.demand_date) as week_end,
          COUNT(DISTINCT d.id) as demand_count,
-         SUM(di.quantity) as total_packets,
-         SUM(di.quantity * di.unit_price_snapshot) as total_cost
+         SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END) as total_packets,
+         SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END) as total_cost
        FROM demands d
        JOIN demand_items di ON d.id = di.demand_id
        ${scopeWhere}
@@ -464,8 +464,8 @@ router.get('/weekly-monthly-summary', authenticateToken, async (req, res) => {
            i.institution_name,
            u.unit_name,
            COUNT(DISTINCT d.id) as total_demands,
-           SUM(di.quantity) as total_packets,
-           SUM(di.quantity * di.unit_price_snapshot) as total_amount
+           SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END) as total_packets,
+           SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END) as total_amount
          FROM demands d
          JOIN demand_items di ON d.id = di.demand_id
          JOIN institutions i ON d.institution_id = i.id
@@ -541,11 +541,11 @@ router.get('/dashboard-analytics', authenticateToken, async (req, res) => {
            COUNT(DISTINCT d.id) as total_demands,
            COUNT(DISTINCT d.unit_id) as active_units,
            COUNT(DISTINCT d.institution_id) as active_institutions,
-           COALESCE(SUM(di.quantity), 0) as total_packets_demanded,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END), 0) as total_packets_demanded,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as total_packets_delivered,
            COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as total_packets_in_transit,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount_delivered,
-           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount_demanded,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount_demanded,
            COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as pending_vendor_demands,
            COALESCE(SUM(CASE WHEN d.status IN ('ACCEPTED', 'PREPARING') THEN 1 ELSE 0 END), 0) as accepted_demands,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_demands
@@ -565,11 +565,11 @@ router.get('/dashboard-analytics', authenticateToken, async (req, res) => {
            COUNT(DISTINCT d.id) as demand_count,
            COUNT(DISTINCT d.unit_id) as unit_count,
            COUNT(DISTINCT d.institution_id) as institution_count,
-           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END), 0) as total_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount,
            COALESCE(SUM(CASE WHEN d.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count,
            COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
            COALESCE(SUM(CASE WHEN d.status IN ('ACCEPTED', 'PREPARING') THEN 1 ELSE 0 END), 0) as accepted_count,
@@ -595,11 +595,11 @@ router.get('/dashboard-analytics', authenticateToken, async (req, res) => {
            COUNT(DISTINCT d.id) as demand_count,
            COUNT(DISTINCT d.unit_id) as unit_count,
            COUNT(DISTINCT d.institution_id) as institution_count,
-           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END), 0) as total_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
            COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
            COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
@@ -621,11 +621,11 @@ router.get('/dashboard-analytics', authenticateToken, async (req, res) => {
            COUNT(DISTINCT d.id) as demand_count,
            COUNT(DISTINCT d.unit_id) as unit_count,
            COUNT(DISTINCT d.institution_id) as institution_count,
-           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END), 0) as total_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
            COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
            COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
@@ -645,11 +645,11 @@ router.get('/dashboard-analytics', authenticateToken, async (req, res) => {
            COUNT(DISTINCT d.id) as demand_count,
            COUNT(DISTINCT d.unit_id) as unit_count,
            COUNT(DISTINCT d.institution_id) as institution_count,
-           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END), 0) as total_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN di.quantity ELSE 0 END), 0) as transit_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN 1 ELSE 0 END), 0) as delivered_count,
            COALESCE(SUM(CASE WHEN d.status IN ('READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'ARRIVED') THEN 1 ELSE 0 END), 0) as transit_count,
            COALESCE(SUM(CASE WHEN d.status = 'APPROVED' THEN 1 ELSE 0 END), 0) as approved_count,
@@ -670,10 +670,10 @@ router.get('/dashboard-analytics', authenticateToken, async (req, res) => {
            u.unit_code,
            u.ncc_group,
            COUNT(DISTINCT d.id) as demand_count,
-           COALESCE(SUM(di.quantity), 0) as total_packets,
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity ELSE 0 END), 0) as total_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity ELSE 0 END), 0) as delivered_packets,
            COALESCE(SUM(CASE WHEN d.status IN ('DELIVERED', 'FULFILLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as delivered_amount,
-           COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount
+           COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount
          FROM units u
          LEFT JOIN demands d ON u.id = d.unit_id AND d.is_deleted = 0 ${targetYear && targetYear !== 'ALL' ? "AND DATE_FORMAT(d.demand_date, '%Y') = ?" : ""}
          LEFT JOIN demand_items di ON d.id = di.demand_id

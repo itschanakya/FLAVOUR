@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
-import { FileText, FileCheck, Eye, Search, Calendar, MessageSquare, AlertCircle, CheckCircle, Truck, ClipboardList, Clock, MapPin } from 'lucide-react';
+import { FileText, FileCheck, Eye, Search, Calendar, MessageSquare, AlertCircle, CheckCircle, Truck, ClipboardList, Clock, MapPin, Ban } from 'lucide-react';
 
 const formatDMY = (dateStr) => {
   if (!dateStr) return '-';
@@ -59,6 +59,27 @@ export default function MyDemandsList() {
       fetchDemands();
     }
   }, [events?.DEMAND_UPDATED, events?.NEW_NOTIFICATION, events?.timestamp, fetchDemands]);
+
+  const handleCancelDemand = async (dem) => {
+    const reason = window.prompt(`Why do you want to cancel demand ${dem.demand_number} for ${formatDMY(dem.demand_date)}?`);
+    if (reason === null) return;
+    try {
+      const res = await fetch(`/api/demands/${dem.id}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason: reason || 'Cancelled by Institution (ANO)' })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel demand');
+      fetchDemands();
+      window.dispatchEvent(new Event('demand-status-changed'));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   useEffect(() => {
     const handleSync = () => fetchDemands();
@@ -168,7 +189,7 @@ export default function MyDemandsList() {
               }`}
           >
             <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
-            <span>Rejected</span>
+            <span>Rejected / Cancelled</span>
             <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-mono font-bold ${statusSlicer === 'REJECTED' ? 'bg-rose-50 text-rose-700' : 'bg-slate-200 text-slate-600'
               }`}>
               {countRejected}
@@ -202,7 +223,7 @@ export default function MyDemandsList() {
       <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-100 text-xs text-indigo-900 flex items-center gap-2.5">
         <AlertCircle className="w-4 h-4 text-indigo-600 shrink-0" />
         <span>
-          <strong>State Lock Notice:</strong> Once submitted, demands are locked for your institution. Only your assigned NCC Unit can approve, reject, cancel, or delete a demand.
+          <strong>Cancellation & Track Record Policy:</strong> You can cancel any upcoming demand before dispatch using the <strong>Cancel</strong> button. Cancelled and Rejected demands remain in your track record with <strong>0 quantity and ₹0 amount</strong>.
         </span>
       </div>
 
@@ -239,13 +260,46 @@ export default function MyDemandsList() {
                         ? dem.complete_address 
                         : (dem.purpose || 'Venue HQ')}
                     </td>
-                    <td className="p-4 text-slate-700">{dem.total_quantity || 0} items</td>
-                    <td className="p-4 text-slate-700 font-medium">₹{dem.total_quantity ? (dem.total_amount / dem.total_quantity).toFixed(2) : '0.00'}</td>
-                    <td className="p-4 font-bold text-emerald-600">₹{(dem.total_amount || 0).toLocaleString('en-IN')}</td>
+                    <td className="p-4 text-slate-700">
+                      {(dem.status === 'REJECTED' || dem.status === 'CANCELLED') ? (
+                        <div className="flex flex-col">
+                          <span className="font-bold text-rose-600">0 items</span>
+                          {dem.original_quantity > 0 && (
+                            <span className="text-[10px] text-slate-400 line-through">
+                              (was {dem.original_quantity} items)
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        `${dem.total_quantity || 0} items`
+                      )}
+                    </td>
+                    <td className="p-4 text-slate-700 font-medium">
+                      ₹{dem.custom_unit_rate ? Number(dem.custom_unit_rate).toFixed(2) : (dem.avg_unit_price ? Number(dem.avg_unit_price).toFixed(2) : (dem.total_quantity ? (dem.total_amount / dem.total_quantity).toFixed(2) : '75.00'))}
+                    </td>
+                    <td className="p-4 font-bold text-emerald-600">
+                      {(dem.status === 'REJECTED' || dem.status === 'CANCELLED') ? (
+                        <div className="flex flex-col">
+                          <span className="font-bold text-rose-600">₹0</span>
+                          {dem.original_amount > 0 && (
+                            <span className="text-[10px] text-slate-400 line-through">
+                              (was ₹{Number(dem.original_amount).toLocaleString('en-IN')})
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        `₹${(dem.total_amount || 0).toLocaleString('en-IN')}`
+                      )}
+                    </td>
                     <td className="p-4">
                       <div className="flex flex-col gap-1 items-start">
                         <StatusBadge status={dem.status} deliveryStatus={dem.delivery_status} demand={dem} onClick={(e) => { e.stopPropagation(); setSelectedDemand(dem); }} />
-                        {dem.delivery_partner_name && dem.delivery_status !== 'DELIVERED' && (
+                        {(dem.status === 'REJECTED' || dem.status === 'CANCELLED') && dem.review_remarks && (
+                          <span className="text-[10px] font-medium text-rose-600 italic max-w-[180px] truncate" title={dem.review_remarks}>
+                            Reason: {dem.review_remarks}
+                          </span>
+                        )}
+                        {dem.delivery_partner_name && dem.delivery_status !== 'DELIVERED' && dem.status !== 'REJECTED' && dem.status !== 'CANCELLED' && (
                           <span className="text-[10px] font-bold text-slate-500">
                             Handler: {dem.delivery_partner_name}
                           </span>
@@ -257,10 +311,19 @@ export default function MyDemandsList() {
                         {(dem.status === 'PENDING' || dem.status === 'SUBMITTED') && (
                           <button
                             onClick={() => navigate('/raise-demand', { state: { editDemand: dem } })}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors shadow-2xs"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors shadow-2xs cursor-pointer"
                             title="Edit Demand"
                           >
                             <FileText className="w-3.5 h-3.5 text-blue-600" /> Edit
+                          </button>
+                        )}
+                        {['PENDING', 'SUBMITTED', 'APPROVED'].includes(dem.status) && dem.delivery_status !== 'DELIVERED' && (
+                          <button
+                            onClick={() => handleCancelDemand(dem)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors shadow-2xs cursor-pointer"
+                            title="Cancel this demand for this date"
+                          >
+                            <Ban className="w-3.5 h-3.5 text-rose-600" /> Cancel
                           </button>
                         )}
                         {dem.delivery_receipt_url ? (

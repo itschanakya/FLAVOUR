@@ -8,6 +8,25 @@ export default function StatusBadge({ status, deliveryStatus, demand, onClick })
   const baseClasses = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shadow-2xs transition-all";
   const clickClasses = onClick ? " cursor-pointer hover:scale-105 hover:shadow-md" : "";
 
+  // Rejected / Cancelled take highest priority so revoked demands never appear active
+  if (mainStatus === 'CANCELLED' || dStatus === 'CANCELLED') {
+    return (
+      <span onClick={onClick} className={`${baseClasses} ${clickClasses} font-black bg-purple-50 text-purple-700 border border-purple-200`}>
+        <Ban className="w-3.5 h-3.5 text-purple-600" />
+        Cancelled
+      </span>
+    );
+  }
+
+  if (mainStatus === 'REJECTED') {
+    return (
+      <span onClick={onClick} className={`${baseClasses} ${clickClasses} font-black bg-rose-50 text-rose-700 border border-rose-200`}>
+        <XCircle className="w-3.5 h-3.5 text-rose-600" />
+        Rejected
+      </span>
+    );
+  }
+
   // Real-time Logistics Movement Status Priority
   if (dStatus === 'DELIVERED' || mainStatus === 'DELIVERED' || mainStatus === 'FULFILLED') {
     return (

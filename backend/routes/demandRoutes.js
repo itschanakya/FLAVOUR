@@ -135,8 +135,8 @@ router.get('/', authenticateToken, async (req, res) => {
       baseQuery += ' AND d.unit_id = ?';
       params.push(req.user.unit_id);
     } else if (req.user.role === 'ADMIN') {
-      // Admin sees all active/completed demands after unit approval
-      baseQuery += ` AND d.status IN ('APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED', 'FULFILLED')`;
+      // Admin sees all active/completed/rejected/cancelled demands
+      baseQuery += ` AND d.status IN ('APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'REJECTED', 'CANCELLED', 'FULFILLED')`;
     }
 
     // Additional query filters
@@ -220,10 +220,24 @@ router.get('/', authenticateToken, async (req, res) => {
     };
 
     for (const d of demands) {
-      d.total_quantity = Number(d.total_quantity) || 0;
-      d.total_amount = Number(d.total_amount) || 0;
+      const rawQty = Number(d.total_quantity) || 0;
+      const rawAmt = Number(d.total_amount) || 0;
+      d.original_quantity = rawQty;
+      d.original_amount = rawAmt;
       d.avg_unit_price = Number(d.avg_unit_price) || 0;
       d.items = itemsByDemand.get(d.id) || [];
+
+      if (d.status === 'REJECTED' || d.status === 'CANCELLED') {
+        d.total_quantity = 0;
+        d.total_amount = 0;
+        d.total_packets = 0;
+        d.y1_quantity = 0;
+        d.y2_quantity = 0;
+        d.y3_quantity = 0;
+      } else {
+        d.total_quantity = rawQty;
+        d.total_amount = rawAmt;
+      }
 
       if (req.user.role === 'ADMIN' && d.unit_id) {
         const uMenu = await loadUnitMenu(d.unit_id);
@@ -273,8 +287,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
     if (req.user.role === 'UNIT' && demand.unit_id !== req.user.unit_id) {
       return res.status(403).json({ error: 'Access denied to this demand.' });
     }
-    if (req.user.role === 'ADMIN' && !['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED'].includes(demand.status)) {
-      return res.status(403).json({ error: 'Admin can only view approved, accepted, preparing, dispatched, or fulfilled demands.' });
+    if (req.user.role === 'ADMIN' && !['APPROVED', 'ACCEPTED', 'PREPARING', 'READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED', 'REJECTED', 'CANCELLED'].includes(demand.status)) {
+      return res.status(403).json({ error: 'Access denied to this demand.' });
     }
 
     const items = await db.all(
@@ -979,7 +993,7 @@ router.post('/:id/ready-for-dispatch', authenticateToken, authorizeRoles('ADMIN'
   }
 });
 
-// POST /api/demands/:id/admin-reject - ADMIN rejects an APPROVED demand
+// POST /api/demands/:id/admin-reject - ADMIN rejects an APPROVED or active demand
 router.post('/:id/admin-reject', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const demandId = req.params.id;
@@ -988,18 +1002,39 @@ router.post('/:id/admin-reject', authenticateToken, authorizeRoles('ADMIN'), asy
     const demand = await db.get('SELECT * FROM demands WHERE id = ? AND is_deleted = 0', [demandId]);
 
     if (!demand) return res.status(404).json({ error: 'Demand not found.' });
-    if (demand.status !== 'APPROVED') return res.status(400).json({ error: `Only APPROVED demands can be rejected. Current status: ${demand.status}` });
+    if (['DELIVERED', 'FULFILLED', 'REJECTED', 'CANCELLED'].includes(demand.status)) {
+      return res.status(400).json({ error: `Cannot reject demand with status ${demand.status}` });
+    }
+
+    const fullReason = (reason && String(reason).trim()) ? String(reason).trim() : 'Rejected by Vendor/Admin.';
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
     await db.run(
-      `UPDATE demands SET status = 'REJECTED' WHERE id = ?`,
-      [demandId]
+      `UPDATE demands 
+       SET status = 'REJECTED',
+           delivery_status = 'REJECTED',
+           review_remarks = ?,
+           reviewed_by = ?,
+           reviewed_at = ?,
+           delivery_partner_id = NULL,
+           delivery_partner_name = NULL,
+           delivery_partner_phone = NULL,
+           delivery_partner_vehicle = NULL,
+           delivery_sequence = 0
+       WHERE id = ?`,
+      [fullReason, req.user.id, now, demandId]
+    );
+
+    // Audit Log
+    await db.run(
+      'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
+      ['DEMAND', demandId, 'REJECTED', req.user.id, `Rejected demand ${demand.demand_number}. Reason: ${fullReason}`]
     );
 
     // Timeline Activity Log
-    const fullReason = reason || 'Rejected by Vendor/Admin.';
     await db.run(
       'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
-      [demandId, req.user.id, 'STATUS_CHANGE', 'APPROVED', 'REJECTED', `Demand rejected by Vendor/Admin. Reason: ${fullReason}`]
+      [demandId, req.user.id, 'STATUS_CHANGE', demand.status, 'REJECTED', `Demand rejected by Vendor/Admin. Reason: ${fullReason}`]
     );
 
     const updatedDemand = await db.get('SELECT * FROM demands WHERE id = ?', [demandId]);
@@ -1081,41 +1116,85 @@ router.post('/:id/fulfill', authenticateToken, authorizeRoles('ADMIN'), uploadRe
   }
 });
 
-// POST /api/demands/:id/cancel - NCC UNIT ONLY can cancel demand
-router.post('/:id/cancel', authenticateToken, authorizeRoles('UNIT'), async (req, res) => {
+// POST /api/demands/:id/cancel - INSTITUTION, UNIT, or ADMIN can cancel a demand of a particular day/date
+router.post('/:id/cancel', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN'), async (req, res) => {
   try {
     const demandId = req.params.id;
-    const { remarks } = req.body;
+    const { remarks } = req.body || {};
     const db = await getDB();
-    const demand = await db.get('SELECT * FROM demands WHERE id = ? AND unit_id = ? AND is_deleted = 0', [demandId, req.user.unit_id]);
+    const demand = await db.get('SELECT * FROM demands WHERE id = ? AND is_deleted = 0', [demandId]);
 
     if (!demand) {
-      return res.status(404).json({ error: 'Demand not found under your unit jurisdiction.' });
+      return res.status(404).json({ error: 'Demand not found.' });
     }
 
-    if (['FULFILLED', 'CANCELLED'].includes(demand.status)) {
+    if (req.user.role === 'INSTITUTION') {
+      if (demand.institution_id !== req.user.institution_id) {
+        return res.status(403).json({ error: 'Access denied to this demand.' });
+      }
+      if (!['PENDING', 'SUBMITTED', 'APPROVED'].includes(demand.status)) {
+        return res.status(400).json({ error: `Cannot cancel demand once it is in ${demand.status} stage. Please contact your NCC Unit.` });
+      }
+    } else if (req.user.role === 'UNIT') {
+      if (demand.unit_id !== req.user.unit_id) {
+        return res.status(403).json({ error: 'Demand not found under your unit jurisdiction.' });
+      }
+    }
+
+    if (['DELIVERED', 'FULFILLED', 'CANCELLED'].includes(demand.status) || demand.delivery_status === 'DELIVERED') {
       return res.status(400).json({ error: `Cannot cancel demand with status ${demand.status}` });
     }
 
+    const roleLabel = req.user.role === 'INSTITUTION' ? 'Institution (ANO)' : req.user.role === 'UNIT' ? 'NCC Unit' : 'Admin';
+    const finalRemarks = (remarks && String(remarks).trim())
+      ? String(remarks).trim()
+      : `Cancelled by ${roleLabel} on institution request`;
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
     await db.run(
-      `UPDATE demands SET status = 'CANCELLED', review_remarks = ? WHERE id = ?`,
-      [remarks || 'Cancelled by NCC Unit', demandId]
+      `UPDATE demands 
+       SET status = 'CANCELLED',
+           delivery_status = 'CANCELLED',
+           review_remarks = ?,
+           reviewed_by = ?,
+           reviewed_at = ?,
+           delivery_partner_id = NULL,
+           delivery_partner_name = NULL,
+           delivery_partner_phone = NULL,
+           delivery_partner_vehicle = NULL,
+           delivery_sequence = 0
+       WHERE id = ?`,
+      [finalRemarks, req.user.id, now, demandId]
     );
 
     // Audit Log
     await db.run(
       'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
-      ['DEMAND', demandId, 'CANCELLED', req.user.id, `Cancelled demand ${demand.demand_number}. Reason: ${remarks || 'Unit decision'}`]
+      ['DEMAND', demandId, 'CANCELLED', req.user.id, `Cancelled demand ${demand.demand_number} (${demand.demand_date}) by ${roleLabel}. Reason: ${finalRemarks}`]
     );
 
-    const cancelEvent = { id: demandId, status: 'CANCELLED', timestamp: Date.now() };
+    // Timeline Activity Log
+    await db.run(
+      'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
+      [demandId, req.user.id, 'STATUS_CHANGE', demand.status, 'CANCELLED', `Demand cancelled by ${roleLabel}. Reason: ${finalRemarks}`]
+    );
+
+    // Notify relevant users
+    if (demand.raised_by && demand.raised_by !== req.user.id) {
+      const msg = `Demand ${demand.demand_number} for ${demand.demand_date} was cancelled (${finalRemarks}).`;
+      await db.run('INSERT INTO notifications (user_id, title, message, link_url) VALUES (?, ?, ?, ?)', [demand.raised_by, 'Demand Cancelled', msg, '/my-demands']);
+      broadcastToUser(demand.raised_by, 'NEW_NOTIFICATION', { count: 1 });
+    }
+
+    const updatedDemand = await db.get('SELECT * FROM demands WHERE id = ?', [demandId]);
+    const cancelEvent = { ...updatedDemand, id: Number(demandId), status: 'CANCELLED', delivery_status: 'CANCELLED', timestamp: Date.now() };
     broadcastToAll('DEMAND_UPDATED', cancelEvent);
     broadcastToUser(demand.raised_by, 'DEMAND_UPDATED', cancelEvent);
     broadcastToRole('INSTITUTION', 'DEMAND_UPDATED', cancelEvent);
     broadcastToRole('UNIT', 'DEMAND_UPDATED', cancelEvent);
     broadcastToRole('ADMIN', 'DEMAND_UPDATED', cancelEvent);
 
-    res.json({ message: 'Demand cancelled successfully.', status: 'CANCELLED' });
+    res.json({ message: 'Demand cancelled successfully. Record preserved with 0 quantity & amount.', status: 'CANCELLED', demand: updatedDemand });
   } catch (error) {
     console.error('Cancel demand error:', error);
     res.status(500).json({ error: 'Failed to cancel demand.' });
@@ -1139,9 +1218,7 @@ router.get('/:id/activity', authenticateToken, async (req, res) => {
     if (req.user.role === 'UNIT' && demand.unit_id !== req.user.unit_id) {
       return res.status(403).json({ error: 'Access denied.' });
     }
-    if (req.user.role === 'ADMIN' && !['APPROVED', 'ACCEPTED', 'FULFILLED'].includes(demand.status)) {
-      return res.status(403).json({ error: 'Access denied.' });
-    }
+    // Admin has full access to activity timeline for all non-deleted demands
 
     const activities = await db.all(
       `SELECT da.*, u.name as user_name, u.role as user_role
@@ -1180,9 +1257,7 @@ router.post('/:id/activity', authenticateToken, async (req, res) => {
     if (req.user.role === 'UNIT' && demand.unit_id !== req.user.unit_id) {
       return res.status(403).json({ error: 'Access denied.' });
     }
-    if (req.user.role === 'ADMIN' && !['APPROVED', 'ACCEPTED', 'FULFILLED'].includes(demand.status)) {
-      return res.status(403).json({ error: 'Access denied.' });
-    }
+    // Admin has full access to activity timeline for all non-deleted demands
 
     await db.run(
       'INSERT INTO demand_activity (demand_id, user_id, action_type, message) VALUES (?, ?, ?, ?)',
