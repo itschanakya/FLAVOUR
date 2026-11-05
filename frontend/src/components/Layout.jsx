@@ -89,6 +89,31 @@ export default function Layout({ children }) {
     } catch (e) {}
   };
 
+  // Auto-fit scaling for 13" / 14" / 15.6" laptops (1024px-1859px viewport) so 100% browser zoom matches 27" monitor layout
+  const [appZoom, setAppZoom] = useState(1);
+
+  useEffect(() => {
+    const updateScreenScale = () => {
+      if (typeof window === 'undefined') return;
+      const w = window.innerWidth;
+      if (!isMobileView && w >= 1024 && w < 1860) {
+        const computed = Math.min(1, Math.max(0.72, Number((w / 1860).toFixed(3))));
+        setAppZoom(computed);
+        document.documentElement.style.zoom = String(computed);
+      } else {
+        setAppZoom(1);
+        document.documentElement.style.zoom = '1';
+      }
+    };
+
+    updateScreenScale();
+    window.addEventListener('resize', updateScreenScale);
+    return () => {
+      window.removeEventListener('resize', updateScreenScale);
+      document.documentElement.style.zoom = '1';
+    };
+  }, [isMobileView]);
+
   // Track badges cleared by user click or visit until new counts arrive (like notification bell)
   const [clearedBadges, setClearedBadges] = useState(() => {
     try {
@@ -516,7 +541,9 @@ export default function Layout({ children }) {
   const consoleMeta = getConsoleMeta();
 
   return (
-    <div className={`flex flex-col print:block print:static print:!h-auto print:!overflow-visible print:!inset-auto bg-[#F8FAFC] text-slate-900 font-sans antialiased ${
+    <div
+      style={!isMobileView && appZoom < 1 ? { minHeight: `${Math.ceil(100 / appZoom)}vh` } : undefined}
+      className={`flex flex-col print:block print:static print:!h-auto print:!overflow-visible print:!inset-auto bg-[#F8FAFC] text-slate-900 font-sans antialiased ${
       isMobileView
         ? 'fixed inset-0 h-[100dvh] w-full overflow-hidden'
         : 'min-h-screen w-full'
@@ -524,17 +551,17 @@ export default function Layout({ children }) {
       {/* Top Header - Unified Professional Military / Institutional Government Grade */}
       <header className="shrink-0 z-40 bg-white border-b border-slate-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.04)] print:hidden max-w-full">
         {/* Tier 1: Identity, Console Details, Right-aligned Temp Demo & Account */}
-        <div className="w-full px-2.5 sm:px-6 lg:px-8 xl:px-10 max-w-full">
-          <div className="min-h-[3.75rem] sm:min-h-[4.5rem] py-1.5 sm:py-2 flex items-center justify-between gap-2 sm:gap-4 max-w-full">
+        <div className="w-full px-2.5 sm:px-4 lg:px-5 2xl:px-8 max-w-full">
+          <div className="min-h-[3.5rem] sm:min-h-[4rem] 2xl:min-h-[4.5rem] py-1.5 sm:py-2 flex items-center justify-between gap-2 2xl:gap-4 max-w-full">
 
             {/* Left: Emblem + System Title */}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden border border-slate-200 shadow-xs shrink-0 flex items-center justify-center bg-[#0d5ea6] transition-transform hover:scale-105 duration-200">
+            <div className="flex items-center gap-2 2xl:gap-3 min-w-0 shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 2xl:w-10 2xl:h-10 rounded-xl overflow-hidden border border-slate-200 shadow-xs shrink-0 flex items-center justify-center bg-[#0d5ea6] transition-transform hover:scale-105 duration-200">
                 <img src="/logo.png" alt="Flavour Base Logo" className="w-full h-full object-cover" />
               </div>
 
               <div className="flex flex-col min-w-0">
-                <h1 className="font-extrabold text-xs sm:text-base tracking-tight text-slate-900 leading-none truncate">
+                <h1 className="font-extrabold text-xs sm:text-[13px] 2xl:text-base tracking-tight text-slate-900 leading-none whitespace-nowrap">
                   NCC REFRESHMENT SYSTEM
                 </h1>
               </div>
@@ -542,7 +569,7 @@ export default function Layout({ children }) {
 
             {/* Center: Main Navigation (Visible in Laptop/PC View) */}
             {!isMobileView && (
-              <nav className="hidden lg:flex items-center justify-center gap-1.5 xl:gap-2.5 mx-4 flex-1">
+              <nav className="hidden lg:flex items-center justify-start xl:justify-center gap-1 2xl:gap-2 mx-1.5 2xl:mx-4 flex-1 min-w-0 overflow-x-auto no-scrollbar py-0.5">
                 {(Array.isArray(currentNav) ? currentNav : []).map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path ||
@@ -577,7 +604,7 @@ export default function Layout({ children }) {
                       key={item.path}
                       to={item.path}
                       onClick={() => handleClearBadge(item.path)}
-                      className={`group flex items-center gap-1.5 px-2 py-1.5 xl:px-3 xl:py-2 rounded-xl text-[11px] xl:text-xs font-bold border transition-all duration-200 shrink-0 ${isActive ? colorConfig.active : colorConfig.inactive
+                      className={`group flex items-center gap-1 2xl:gap-1.5 px-2 py-1.5 2xl:px-3 2xl:py-2 rounded-lg 2xl:rounded-xl text-[11px] 2xl:text-xs font-bold border transition-all duration-200 shrink-0 whitespace-nowrap ${isActive ? colorConfig.active : colorConfig.inactive
                         }`}
                     >
                       {Icon && (

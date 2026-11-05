@@ -1445,116 +1445,117 @@ _National Cadet Corps - Supply & Logistics Portal_`;
       </div>
 
       {/* Unified Navigation & Controls Strip */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 flex flex-col xl:flex-row xl:items-center gap-4">
-        {/* View Switcher */}
-        <div className="flex items-center bg-slate-50/80 p-1.5 rounded-2xl shrink-0 w-fit">
-          <button
-            type="button"
-            onClick={() => setViewMode('STOPS')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-              viewMode === 'STOPS'
-                ? 'bg-white text-blue-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <MapPin className="w-3.5 h-3.5 text-blue-600" />
-            Stops Manifest ({filteredDemands.length})
-          </button>
-
-        </div>
-
-        {/* Search and Filters */}
-        {viewMode === 'STOPS' && (
-          <div className="flex flex-wrap xl:flex-nowrap items-center gap-4 w-full justify-between xl:justify-end">
-            {/* Search Input */}
-            <div className="relative w-full xl:w-auto flex-1 min-w-[200px]">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search school, PIN, driver..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-[14px] text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
-              />
-            </div>
-
-            {/* Right Side Dropdowns */}
-            <div className="flex flex-wrap md:flex-nowrap items-center gap-2.5 w-full xl:w-auto">
-              {/* PIN Code Slicer Dropdown */}
-              <div className="flex items-center gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full md:w-auto">
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                  <span className="font-extrabold text-slate-400 text-[11px]">PIN:</span>
-                </div>
-                <select
-                  value={selectedPin}
-                  onChange={(e) => setSelectedPin(e.target.value)}
-                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer w-full md:w-auto"
-                >
-                  <option value="ALL">All PINs ({availablePins.length})</option>
-                  {availablePins.map(pin => (
-                    <option key={pin} value={pin}>PIN {pin}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Driver Slicer Dropdown */}
-              <div className="flex items-center gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full md:w-auto">
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Users className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                  <span className="font-extrabold text-slate-400 text-[11px]">Driver:</span>
-                </div>
-                <select
-                  value={selectedPartner}
-                  onChange={(e) => setSelectedPartner(e.target.value)}
-                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer w-full md:w-auto"
-                >
-                  <option value="ALL">All Drivers</option>
-                  {partners.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Status Slicer Dropdown */}
-              <div className="flex items-center gap-2 bg-white border border-slate-200 pl-3 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full md:w-auto">
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Filter className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                  <span className="font-extrabold text-slate-400 text-[11px]">Status:</span>
-                </div>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer w-full md:w-auto"
-                >
-                  <option value="ALL">All Demands ({demands.length})</option>
-                  <option value="PENDING">Ready for Dispatch ({pendingDispatchCount})</option>
-                  <option value="OUT_FOR_DELIVERY">Out for Delivery ({outForDeliveryCount})</option>
-                  <option value="DELIVERED">Delivered ({deliveredCount})</option>
-                </select>
-              </div>
-
-              {/* Reset if active */}
-              {(selectedPin !== 'ALL' || selectedStatus !== 'ALL' || selectedPartner !== 'ALL' || searchTerm) && (
-                <button
-                  onClick={() => {
-                    setSelectedPin('ALL');
-                    setSelectedStatus('ALL');
-                    setSelectedPartner('ALL');
-                    setSearchTerm('');
-                  }}
-                  className="shrink-0 text-right py-1 px-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 transition-colors"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3.5 flex flex-col gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 w-full">
+          {/* View Switcher */}
+          <div className="flex items-center bg-slate-50/80 p-1 rounded-2xl shrink-0 w-fit">
+            <button
+              type="button"
+              onClick={() => setViewMode('STOPS')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                viewMode === 'STOPS'
+                  ? 'bg-white text-blue-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5 text-blue-600" />
+              Stops Manifest ({filteredDemands.length})
+            </button>
           </div>
-        )}
+
+          {/* Search and Filters */}
+          {viewMode === 'STOPS' && (
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 flex-1 min-w-0">
+              {/* Search Input */}
+              <div className="relative w-full lg:w-auto flex-1 min-w-[180px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search school, PIN, driver..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-[14px] text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Right Side Dropdowns */}
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto shrink-0">
+                {/* PIN Code Slicer Dropdown */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 pl-2.5 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full sm:w-auto">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <span className="font-extrabold text-slate-400 text-[11px]">PIN:</span>
+                  </div>
+                  <select
+                    value={selectedPin}
+                    onChange={(e) => setSelectedPin(e.target.value)}
+                    className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer w-full sm:w-auto"
+                  >
+                    <option value="ALL">All PINs ({availablePins.length})</option>
+                    {availablePins.map(pin => (
+                      <option key={pin} value={pin}>PIN {pin}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Driver Slicer Dropdown */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 pl-2.5 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full sm:w-auto">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Users className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <span className="font-extrabold text-slate-400 text-[11px]">Driver:</span>
+                  </div>
+                  <select
+                    value={selectedPartner}
+                    onChange={(e) => setSelectedPartner(e.target.value)}
+                    className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer w-full sm:w-auto"
+                  >
+                    <option value="ALL">All Drivers</option>
+                    {partners.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status Slicer Dropdown */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 pl-2.5 pr-2 py-2 rounded-[14px] text-xs shadow-sm w-full sm:w-auto">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Filter className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span className="font-extrabold text-slate-400 text-[11px]">Status:</span>
+                  </div>
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer w-full sm:w-auto"
+                  >
+                    <option value="ALL">All Demands ({demands.length})</option>
+                    <option value="PENDING">Ready for Dispatch ({pendingDispatchCount})</option>
+                    <option value="OUT_FOR_DELIVERY">Out for Delivery ({outForDeliveryCount})</option>
+                    <option value="DELIVERED">Delivered ({deliveredCount})</option>
+                  </select>
+                </div>
+
+                {/* Reset if active */}
+                {(selectedPin !== 'ALL' || selectedStatus !== 'ALL' || selectedPartner !== 'ALL' || searchTerm) && (
+                  <button
+                    onClick={() => {
+                      setSelectedPin('ALL');
+                      setSelectedStatus('ALL');
+                      setSelectedPartner('ALL');
+                      setSearchTerm('');
+                    }}
+                    className="shrink-0 text-right py-1 px-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Quick PIN Code Pills for Fast 1-Click Cluster Filtering */}
         {viewMode === 'STOPS' && availablePins.length > 0 && (
-          <div className="pt-4 border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar text-xs">
+          <div className="pt-2.5 border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar text-xs">
             <span className="text-[11px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap mr-2">
               PIN Clusters:
             </span>
