@@ -2527,6 +2527,23 @@ export default function RefreshmentReports() {
         Object.keys(cachedLocal).forEach(k => {
           if (cachedLocal[k]?.updatedAt && (!merged[k] || cachedLocal[k].bill_submitted !== merged[k].bill_submitted)) {
             finalMerged[k] = { ...merged[k], ...cachedLocal[k] };
+            // Auto-sync unsaved localStorage state back to TiDB database so online & localhost match
+            if (month < currentYearMonth) {
+              fetch('/api/refreshment-bills/mark-received', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  institution_id: Number(k),
+                  month,
+                  received: cachedLocal[k].bill_submitted === 1,
+                  received_date: cachedLocal[k].bill_submitted_date || new Date().toISOString().split('T')[0],
+                  remarks: cachedLocal[k].remarks || ''
+                })
+              }).catch(() => null);
+            }
           }
           if (cachedLocal[k]?.remarks && !rMap[k]) {
             rMap[k] = cachedLocal[k].remarks;
@@ -2680,6 +2697,7 @@ export default function RefreshmentReports() {
               Authorization: `Bearer ${token}`
             },
             body: JSON.stringify({
+              institution_id: instId,
               institution: item.institution_name,
               month,
               billSubmitted: receivedState,

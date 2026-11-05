@@ -507,38 +507,59 @@ router.get('/', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req, 
 router.post('/', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req, res) => {
   try {
     const db = await getDB();
+    await ensureBillColumns(db);
     const {
-      institution, month, billSubmitted, billSubmittedDate,
+      institution_id, institution, month, billSubmitted, billSubmittedDate,
       billAmount, demandPackets, paymentStatus, paymentDate, paymentRef, remarks
     } = req.body;
 
-    // Get institution_id from name
-    const inst = await db.get('SELECT id FROM institutions WHERE institution_name = ?', [institution]);
-    if (!inst) {
-      return res.status(404).json({ error: `Institution ${institution} not found.` });
+    let instId = institution_id ? Number(institution_id) : null;
+    if (!instId && institution) {
+      const inst = await db.get('SELECT id FROM institutions WHERE TRIM(UPPER(institution_name)) = TRIM(UPPER(?))', [institution]);
+      if (inst) instId = inst.id;
+    }
+    if (!instId) {
+      return res.status(404).json({ error: `Institution ${institution || institution_id} not found.` });
     }
 
-    await db.run(
-      `INSERT INTO refreshment_bills (
-        institution_id, month, bill_submitted, bill_submitted_date,
-        bill_amount, demand_packets, payment_status, payment_date, payment_ref, remarks
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        bill_submitted = VALUES(bill_submitted),
-        bill_submitted_date = VALUES(bill_submitted_date),
-        bill_amount = VALUES(bill_amount),
-        demand_packets = VALUES(demand_packets),
-        payment_status = VALUES(payment_status),
-        payment_date = VALUES(payment_date),
-        payment_ref = VALUES(payment_ref),
-        remarks = VALUES(remarks),
-        updated_at = CURRENT_TIMESTAMP`,
-      [
-        inst.id, month, billSubmitted ? 1 : 0, billSubmittedDate || null,
-        billAmount || 0, demandPackets || 0, paymentStatus || 'PENDING',
-        paymentDate || null, paymentRef || null, remarks || null
-      ]
+    const existing = await db.get(
+      'SELECT id FROM refreshment_bills WHERE institution_id = ? AND month = ?',
+      [instId, month]
     );
+
+    if (existing) {
+      await db.run(
+        `UPDATE refreshment_bills SET
+          bill_submitted = ?,
+          bill_submitted_date = ?,
+          bill_amount = ?,
+          demand_packets = ?,
+          payment_status = ?,
+          payment_date = ?,
+          payment_ref = ?,
+          remarks = ?,
+          updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          billSubmitted ? 1 : 0, billSubmittedDate || null,
+          billAmount || 0, demandPackets || 0, paymentStatus || 'PENDING',
+          paymentDate || null, paymentRef || null, remarks || null,
+          existing.id
+        ]
+      );
+    } else {
+      await db.run(
+        `INSERT INTO refreshment_bills (
+          institution_id, month, bill_submitted, bill_submitted_date,
+          bill_amount, demand_packets, payment_status, payment_date, payment_ref, remarks
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          instId, month, billSubmitted ? 1 : 0, billSubmittedDate || null,
+          billAmount || 0, demandPackets || 0, paymentStatus || 'PENDING',
+          paymentDate || null, paymentRef || null, remarks || null
+        ]
+      );
+    }
 
     res.json({ message: 'Bill saved successfully.' });
   } catch (error) {
