@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { SSEProvider } from './context/SSEContext';
+import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -61,6 +62,7 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <SSEProvider>
+            <Toaster position="top-right" toastOptions={{ duration: 4000, style: { fontWeight: 700, fontSize: '13px' } }} />
             <BrowserRouter>
               <React.Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500 font-medium">Loading modules...</div>}>
                 <Routes>

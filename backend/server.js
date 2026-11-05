@@ -53,7 +53,8 @@ app.use('/api/institutions', require('./routes/institutionRoutes'));
 app.use('/api/catalog', require('./routes/catalogRoutes'));
 app.use('/api/demands', require('./routes/demandRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
-app.use('/api/refreshment-bills', require('./routes/billRoutes'));
+const billRoutes = require('./routes/billRoutes');
+app.use('/api/refreshment-bills', billRoutes);
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/bill-collection', require('./routes/billCollectionRoutes'));
 app.use('/api/delivery', require('./routes/deliveryRoutes'));
@@ -105,6 +106,10 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // Initialize database schema in background
-getDB().catch((err) => {
+getDB().then(() => {
+  if (typeof billRoutes.startDailyBillReminderScheduler === 'function') {
+    billRoutes.startDailyBillReminderScheduler();
+  }
+}).catch((err) => {
   console.error('Failed to initialize database:', err);
 });

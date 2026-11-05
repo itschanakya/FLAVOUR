@@ -43,6 +43,8 @@ export default function Layout({ children }) {
   const [documentationCount, setDocumentationCount] = useState(0);
   const [unitReviewCount, setUnitReviewCount] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [pendingAnoBillReturns, setPendingAnoBillReturns] = useState([]);
+  const [showAnoBillModal, setShowAnoBillModal] = useState(false);
   const userMenuRef = useRef(null);
 
   useEffect(() => {
@@ -149,6 +151,44 @@ export default function Layout({ children }) {
       console.error(err);
     } finally {
       setSwitching(false);
+    }
+  };
+
+  // Check pending countersigned bill returns for ANO on login (shows centered modal on Desktop & Mobile)
+  useEffect(() => {
+    if (!token || !user || user.role !== 'INSTITUTION') {
+      setShowAnoBillModal(false);
+      return;
+    }
+    const ackKey = `ano_bill_popup_ack_${user.id}`;
+    if (sessionStorage.getItem(ackKey) === '1') return;
+
+    let cancelled = false;
+    fetch('/api/refreshment-bills/my-pending-returns', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => (r.ok ? r.json() : []))
+      .then(data => {
+        if (cancelled) return;
+        if (Array.isArray(data) && data.length > 0) {
+          setPendingAnoBillReturns(data);
+          setShowAnoBillModal(true);
+        }
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [token, user?.id, user?.role]);
+
+  const handleDismissAnoBillModal = (goToBills = false) => {
+    if (user?.id) {
+      try {
+        sessionStorage.setItem(`ano_bill_popup_ack_${user.id}`, '1');
+      } catch (e) {}
+    }
+    setShowAnoBillModal(false);
+    if (goToBills) {
+      navigate('/bills');
     }
   };
 
@@ -638,6 +678,78 @@ export default function Layout({ children }) {
         </div>
 
       </header>
+
+      {/* Center-Screen Popup Alert for ANO Balance Countersigned Bill Submission (Desktop & Mobile) */}
+      {showAnoBillModal && pendingAnoBillReturns.length > 0 && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200 print:hidden">
+          <div className="bg-white rounded-2xl border-2 border-rose-600 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gradient-to-r from-rose-700 via-red-600 to-rose-700 px-5 py-3.5 text-white flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-rose-100">
+                  URGENT MILITARY NOTICE • ACTION REQUIRED
+                </div>
+                <h3 className="text-sm sm:text-base font-black uppercase tracking-tight mt-0.5">
+                  Balance Refreshment Bill Submission
+                </h3>
+              </div>
+              <Receipt className="w-6 h-6 text-rose-100 shrink-0" />
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-3.5 text-slate-800">
+              <p className="text-xs sm:text-sm font-semibold leading-relaxed text-slate-700">
+                Your physical Refreshment Bill(s) / Invoice(s), <strong>duly countersigned by the Institution Principal</strong>, are still <strong className="text-rose-600">Pending Submission (Balance)</strong> at your NCC Unit:
+              </p>
+
+              <div className="max-h-44 overflow-y-auto space-y-2 pr-1">
+                {pendingAnoBillReturns.map((item) => (
+                  <div
+                    key={item.month}
+                    className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 flex items-center justify-between gap-2"
+                  >
+                    <div>
+                      <div className="text-xs font-black text-rose-950 uppercase">
+                        Month: {item.month_label}
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-600 mt-0.5">
+                        {(item.demands || []).length} Requisition(s) • {item.total_packets} Packets
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-black text-rose-700">
+                        ₹{Number(item.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="inline-block px-1.5 py-0.5 text-[9px] font-black uppercase bg-rose-200/80 text-rose-900 rounded">
+                        Not Received at Unit
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-900 leading-snug">
+                ⚠️ Please submit the physical countersigned bill(s) to <strong>{pendingAnoBillReturns[0]?.unit_name || 'your NCC Unit Office'}</strong> immediately so bill claims are not delayed.
+              </div>
+
+              <div className="flex items-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleDismissAnoBillModal(true)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-xs transition-all cursor-pointer"
+                >
+                  View Bill Details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDismissAnoBillModal(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md transition-all cursor-pointer"
+                >
+                  Noted, Will Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area - Full Width Fluid Canvas */}
       <main className={`flex-1 w-full bg-[#F8FAFC] print:block print:!overflow-visible print:!h-auto ${

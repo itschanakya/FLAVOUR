@@ -143,7 +143,12 @@ async function upgradeInventorySchema(db) {
     "ALTER TABLE units ADD COLUMN demand_cutoff_day VARCHAR(20) DEFAULT 'Friday'",
     "ALTER TABLE units ADD COLUMN demand_cutoff_time VARCHAR(20) DEFAULT '14:00'",
     "ALTER TABLE units ADD COLUMN demand_cutoff_notice TEXT NULL",
-    "ALTER TABLE units ADD COLUMN demand_cutoff_enabled TINYINT DEFAULT 1"
+    "ALTER TABLE units ADD COLUMN demand_cutoff_enabled TINYINT DEFAULT 1",
+
+    // refreshment_bills tracking & reminder enhancements
+    "ALTER TABLE refreshment_bills ADD COLUMN received_by INTEGER NULL",
+    "ALTER TABLE refreshment_bills ADD COLUMN last_reminder_sent_at DATETIME NULL",
+    "ALTER TABLE refreshment_bills ADD COLUMN reminder_count INTEGER DEFAULT 0"
   ];
 
   for (const sql of alterStatements) {

@@ -68,7 +68,7 @@ router.get('/summary', authenticateToken, async (req, res) => {
 router.get('/periodic', authenticateToken, async (req, res) => {
   try {
     const db = await getDB();
-    let scopeWhere = 'WHERE d.is_deleted = 0';
+    let scopeWhere = "WHERE d.is_deleted = 0 AND d.status NOT IN ('REJECTED', 'CANCELLED')";
     const params = [];
 
     if (req.user.role === 'INSTITUTION') {
@@ -145,7 +145,7 @@ router.get('/cumulative', authenticateToken, async (req, res) => {
       JOIN refreshment_items ri ON di.item_id = ri.id
       JOIN institutions i ON d.institution_id = i.id
       JOIN units u ON d.unit_id = u.id
-      WHERE d.is_deleted = 0
+      WHERE d.is_deleted = 0 AND d.status NOT IN ('REJECTED', 'CANCELLED')
     `;
 
     const params = [];
@@ -321,11 +321,12 @@ router.get('/annual-summary', authenticateToken, async (req, res) => {
       const demands = await db.all(
         `SELECT d.id, d.demand_number, d.demand_date, d.status, d.purpose,
                 COALESCE(SUM(di.quantity), 0) as total_qty,
-                COALESCE(SUM(CASE WHEN d.status NOT IN ('REJECTED', 'CANCELLED') THEN di.quantity * di.unit_price_snapshot ELSE 0 END), 0) as total_amount
+                COALESCE(SUM(di.quantity * di.unit_price_snapshot), 0) as total_amount
          FROM demands d
          LEFT JOIN demand_items di ON d.id = di.demand_id
          WHERE d.institution_id = ? 
            AND d.is_deleted = 0 
+           AND d.status NOT IN ('REJECTED', 'CANCELLED')
            AND (DATE_FORMAT(d.demand_date, '%Y') = ? OR d.demand_date LIKE ?)
          GROUP BY d.id
          ORDER BY d.demand_date ASC`,
@@ -407,7 +408,7 @@ router.get('/weekly-monthly-summary', authenticateToken, async (req, res) => {
     const db = await getDB();
     const targetYear = year || new Date().getFullYear().toString();
 
-    let scopeWhere = "WHERE d.is_deleted = 0 AND DATE_FORMAT(d.demand_date, '%Y') = ?";
+    let scopeWhere = "WHERE d.is_deleted = 0 AND d.status NOT IN ('REJECTED', 'CANCELLED') AND DATE_FORMAT(d.demand_date, '%Y') = ?";
     const params = [targetYear];
 
     if (req.user.role === 'INSTITUTION') {
@@ -496,7 +497,7 @@ router.get('/dashboard-analytics', authenticateToken, async (req, res) => {
     const db = await getDB();
     const targetYear = year || new Date().getFullYear().toString();
 
-    let baseWhere = 'WHERE d.is_deleted = 0';
+    let baseWhere = "WHERE d.is_deleted = 0 AND d.status NOT IN ('REJECTED', 'CANCELLED')";
     const params = [];
 
     // Role scoping

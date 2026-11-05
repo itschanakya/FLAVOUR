@@ -7,6 +7,7 @@ export default function BillSubmission() {
   const { token } = useAuth();
   const { events } = useSSE();
   const [billEvents, setBillEvents] = useState([]);
+  const [pendingReturns, setPendingReturns] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +25,13 @@ export default function BillSubmission() {
 
   const fetchEvents = async () => {
     try {
+      fetch('/api/refreshment-bills/my-pending-returns', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(r => (r.ok ? r.json() : []))
+        .then(d => setPendingReturns(Array.isArray(d) ? d : []))
+        .catch(() => {});
+
       const res = await fetch('/api/bill-collection/my-schedule', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -76,6 +84,54 @@ export default function BillSubmission() {
           <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Refresh Schedule
         </button>
       </div>
+
+      {/* Balance Countersigned Bill Submission Alert Banner */}
+      {pendingReturns.length > 0 && (
+        <div className="bg-white rounded-3xl border-2 border-rose-500 p-5 shadow-md space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-rose-100 text-rose-700">
+                <AlertTriangle className="w-5 h-5" />
+              </span>
+              <div>
+                <h2 className="text-sm sm:text-base font-black text-rose-900 uppercase tracking-tight">
+                  Balance Refreshment Bill Submission (Pending at NCC Unit)
+                </h2>
+                <p className="text-xs font-semibold text-slate-600">
+                  Please submit the physical refreshment bill(s) duly countersigned by your Principal to the NCC Unit Office.
+                </p>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full text-[11px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300">
+              {pendingReturns.length} Month(s) Pending
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            {pendingReturns.map(item => (
+              <div key={item.month} className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-black text-slate-900 uppercase">{item.month_label}</div>
+                  <div className="text-[11px] font-bold text-slate-600 mt-0.5">
+                    {(item.demands || []).map(d => d.invoice_no || d.demand_number).join(', ')}
+                  </div>
+                  <div className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                    Total Packets: <strong>{item.total_packets}</strong>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-base font-black text-rose-700">
+                    ₹{Number(item.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-200/80 text-rose-900">
+                    Balance Bill
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Live Notification Banner if Delay is reported */}
       {delayedEvents.length > 0 && (

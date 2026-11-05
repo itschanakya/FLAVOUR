@@ -221,9 +221,213 @@ async function sendUpdateNotificationEmail(email, data) {
   return sendEmailSafely(email, subject, htmlContent, textContent);
 }
 
+/**
+ * Sends a formal Military-manner Daily Reminder Email to the ANO for unsubmitted / balance countersigned bills
+ */
+async function sendAnoBillReminderEmail(email, data) {
+  const {
+    institutionName,
+    anoName,
+    unitName,
+    unitCode,
+    monthLabel,
+    demands = [],
+    totalPackets = 0,
+    totalAmount = 0
+  } = data;
+
+  const subject = `[IMMEDIATE] Pending Submission of Countersigned Refreshment Bill(s) for ${monthLabel} - ${unitCode || unitName}`;
+  const refDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+
+  const rowsHtml = demands.map((d, idx) => {
+    const dt = d.demand_date ? new Date(d.demand_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : '-';
+    const amt = Number(d.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    return `
+      <tr>
+        <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center; font-size: 12px;">${idx + 1}</td>
+        <td style="padding: 8px 10px; border: 1px solid #cbd5e1; font-family: monospace; font-weight: 700; font-size: 12px;">${d.demand_number || '-'}</td>
+        <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center; font-size: 12px;">${dt}</td>
+        <td style="padding: 8px 10px; border: 1px solid #cbd5e1; font-family: monospace; font-weight: 700; color: #1d4ed8; text-align: center; font-size: 12px;">${d.invoice_no || 'ISSUED'}</td>
+        <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; font-size: 12px;">${Number(d.total_quantity || 0).toLocaleString('en-IN')}</td>
+        <td style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: right; font-weight: 700; font-size: 12px;">₹${amt}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const htmlContent = `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 680px; margin: 0 auto; padding: 28px; border: 2px solid #1e293b; border-radius: 8px; background-color: #ffffff; color: #0f172a;">
+      <div style="border-bottom: 2px solid #0f172a; padding-bottom: 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #b91c1c; text-transform: uppercase;">
+            TELE / EMAIL MESSAGE • PRIORITY: IMMEDIATE
+          </div>
+          <h2 style="margin: 4px 0 0 0; font-size: 18px; font-weight: 900; color: #0f172a; text-transform: uppercase;">
+            OFFICE OF THE OFFICER COMMANDING, ${unitName || 'NCC UNIT'}
+          </h2>
+        </div>
+        <div style="text-align: right; font-size: 12px; font-weight: 700; color: #334155;">
+          Date: ${refDate}
+        </div>
+      </div>
+
+      <table style="width: 100%; margin-bottom: 18px; font-size: 13px; line-height: 1.5;">
+        <tr>
+          <td style="width: 70px; font-weight: 800; vertical-align: top; color: #475569;">To:</td>
+          <td style="font-weight: 700; color: #0f172a;">
+            The Associate NCC Officer (ANO) / CTO (${anoName || 'In-Charge'})<br/>
+            <span style="text-transform: uppercase; font-weight: 800;">${institutionName}</span>
+          </td>
+        </tr>
+      </table>
+
+      <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 10px 14px; margin-bottom: 18px; font-size: 13px; font-weight: 800; color: #991b1b; text-transform: uppercase;">
+        SUB: NON-SUBMISSION OF COUNTERSIGNED REFRESHMENT BILL(S) FOR THE MONTH OF ${monthLabel}
+      </div>
+
+      <p style="font-size: 13.5px; line-height: 1.6; color: #1e293b; margin: 0 0 12px 0;">
+        1. Refer to the Cadet Refreshment supplies delivered to your institution during the month of <strong>${monthLabel}</strong>.
+      </p>
+      <p style="font-size: 13.5px; line-height: 1.6; color: #1e293b; margin: 0 0 14px 0;">
+        2. Perusal of Unit records reveals that the physical Refreshment Bill(s) / Tax Invoice(s), <strong>duly countersigned by the Head of Institution / Principal</strong>, in respect of your institution are <strong>still awaited (Balance for Submission)</strong> at this Unit as per details appended below:
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        <thead>
+          <tr style="background-color: #f1f5f9; text-transform: uppercase; font-size: 11px; color: #1e293b;">
+            <th style="padding: 8px 10px; border: 1px solid #cbd5e1;">S.No</th>
+            <th style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: left;">Demand Ref</th>
+            <th style="padding: 8px 10px; border: 1px solid #cbd5e1;">Supply Date</th>
+            <th style="padding: 8px 10px; border: 1px solid #cbd5e1;">Invoice No.</th>
+            <th style="padding: 8px 10px; border: 1px solid #cbd5e1;">Packets</th>
+            <th style="padding: 8px 10px; border: 1px solid #cbd5e1; text-align: right;">Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+        <tfoot>
+          <tr style="background-color: #f8fafc; font-weight: 900; font-size: 12.5px;">
+            <td colspan="4" style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: right; text-transform: uppercase;">Total Outstanding Bill Return:</td>
+            <td style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: center; color: #1d4ed8;">${Number(totalPackets).toLocaleString('en-IN')} Pkts</td>
+            <td style="padding: 9px 10px; border: 1px solid #cbd5e1; text-align: right; color: #b91c1c;">₹${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <p style="font-size: 13.5px; line-height: 1.6; color: #1e293b; margin: 14px 0;">
+        3. Non-receipt of the above countersigned bills is holding up the consolidated Unit refreshment bill claim processing. You are therefore requested to accord <strong>TOP PRIORITY</strong> and forward the physical bills duly countersigned by the Principal to the Unit Office immediately.
+      </p>
+      <p style="font-size: 12.5px; line-height: 1.5; color: #475569; margin: 12px 0 20px 0; font-style: italic;">
+        (Note: Automated daily reminders will continue until the physical bill is received and taken on charge by the NCC Unit.)
+      </p>
+
+      <div style="border-top: 1px solid #cbd5e1; padding-top: 14px; display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: #0f172a;">
+        <div>Jai Hind,</div>
+        <div style="text-align: right;">
+          Sd/-<br/>
+          <strong>Officer Commanding</strong><br/>
+          ${unitName || 'NCC Unit'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const textContent = `PRIORITY: IMMEDIATE\nFrom: Officer Commanding, ${unitName}\nTo: ANO/CTO, ${institutionName}\nSub: Non-Submission of Countersigned Refreshment Bills for ${monthLabel}\n\nTotal Pending Packets: ${totalPackets} | Total Amount: Rs. ${totalAmount}.\nPlease submit the physical refreshment bill(s) duly countersigned by your Principal to the NCC Unit Office immediately.`;
+
+  return sendEmailSafely(email, subject, htmlContent, textContent);
+}
+
+/**
+ * Sends a formal Military Acknowledgement & Appreciation Email to the ANO once the Unit marks their monthly bill as RECEIVED
+ */
+async function sendAnoBillReceivedConfirmationEmail(email, data) {
+  const {
+    institutionName,
+    anoName,
+    unitName,
+    unitCode,
+    monthLabel,
+    receivedDate,
+    totalPackets = 0,
+    totalAmount = 0,
+    remarks = ''
+  } = data;
+
+  const subject = `[RECEIVED] Acknowledgement of Countersigned Refreshment Bill(s) for ${monthLabel} - ${unitCode || unitName}`;
+  const fmtDate = receivedDate
+    ? new Date(receivedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
+    : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+
+  const htmlContent = `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 28px; border: 2px solid #065f46; border-radius: 8px; background-color: #ffffff; color: #0f172a;">
+      <div style="border-bottom: 2px solid #065f46; padding-bottom: 14px; margin-bottom: 18px;">
+        <div style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #059669; text-transform: uppercase;">
+          OFFICIAL ACKNOWLEDGEMENT • BILL RETURN RECEIVED
+        </div>
+        <h2 style="margin: 4px 0 0 0; font-size: 18px; font-weight: 900; color: #0f172a; text-transform: uppercase;">
+          OFFICE OF THE OFFICER COMMANDING, ${unitName || 'NCC UNIT'}
+        </h2>
+      </div>
+
+      <p style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">
+        To: The Associate NCC Officer (ANO) / CTO (${anoName || 'In-Charge'}), <strong>${institutionName}</strong>
+      </p>
+
+      <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; font-weight: 800; color: #065f46; text-transform: uppercase;">
+        SUB: ACKNOWLEDGEMENT OF RECEIPT OF COUNTERSIGNED REFRESHMENT BILL(S) FOR ${monthLabel}
+      </div>
+
+      <p style="font-size: 13.5px; line-height: 1.6; color: #1e293b; margin: 0 0 14px 0;">
+        1. It is hereby confirmed that the physical Refreshment Bill(s) / Tax Invoice(s) for the month of <strong>${monthLabel}</strong>, duly countersigned by the Head of Institution / Principal of <strong>${institutionName}</strong>, have been <strong>RECEIVED</strong> at this Unit on <strong>${fmtDate}</strong>.
+      </p>
+
+      <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px 18px; margin: 16px 0;">
+        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 5px 0; color: #475569; font-weight: 700;">Billing Month:</td>
+            <td style="padding: 5px 0; color: #0f172a; font-weight: 800; text-align: right;">${monthLabel}</td>
+          </tr>
+          <tr>
+            <td style="padding: 5px 0; color: #475569; font-weight: 700;">Total Refreshment Packets:</td>
+            <td style="padding: 5px 0; color: #1d4ed8; font-weight: 800; text-align: right;">${Number(totalPackets).toLocaleString('en-IN')} Packets</td>
+          </tr>
+          <tr>
+            <td style="padding: 5px 0; color: #475569; font-weight: 700;">Verified Bill Amount:</td>
+            <td style="padding: 5px 0; color: #059669; font-weight: 900; text-align: right;">₹${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          </tr>
+          <tr>
+            <td style="padding: 5px 0; color: #475569; font-weight: 700;">Status at Unit:</td>
+            <td style="padding: 5px 0; color: #059669; font-weight: 900; text-align: right;">✓ RECEIVED & TAKEN ON CHARGE</td>
+          </tr>
+          ${remarks ? `<tr><td style="padding: 5px 0; color: #475569; font-weight: 700;">Unit Remarks:</td><td style="padding: 5px 0; color: #334155; font-weight: 600; text-align: right;">${remarks}</td></tr>` : ''}
+        </table>
+      </div>
+
+      <p style="font-size: 13.5px; line-height: 1.6; color: #1e293b; margin: 14px 0 20px 0;">
+        2. Thank you for your timely cooperation and compliance. Automated daily reminders for the month of <strong>${monthLabel}</strong> have now been closed for your institution.
+      </p>
+
+      <div style="border-top: 1px solid #cbd5e1; padding-top: 14px; display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: #0f172a;">
+        <div>Jai Hind,</div>
+        <div style="text-align: right;">
+          Sd/-<br/>
+          <strong>Officer Commanding</strong><br/>
+          ${unitName || 'NCC Unit'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const textContent = `OFFICIAL ACKNOWLEDGEMENT\nFrom: Officer Commanding, ${unitName}\nTo: ANO/CTO, ${institutionName}\n\nYour countersigned Refreshment Bill(s) for ${monthLabel} (${totalPackets} Packets, Rs. ${totalAmount}) have been RECEIVED at the NCC Unit on ${fmtDate}. Thank you for your cooperation. Jai Hind.`;
+
+  return sendEmailSafely(email, subject, htmlContent, textContent);
+}
+
 module.exports = {
   sendOtpEmail,
   sendPasswordResetOtpEmail,
   sendPasswordResetSuccessEmail,
-  sendUpdateNotificationEmail
+  sendUpdateNotificationEmail,
+  sendAnoBillReminderEmail,
+  sendAnoBillReceivedConfirmationEmail
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, History, Printer, Search, School, TrendingUp, CheckCircle2, Users, IndianRupee, MapPin, Building2, Save, Filter, Layers, FileText, FileSpreadsheet, RefreshCw, Zap, Sparkles, AlertTriangle, X } from 'lucide-react';
+import { Calendar, History, Printer, Search, School, TrendingUp, CheckCircle2, Users, IndianRupee, MapPin, Building2, Save, Filter, Layers, FileText, FileSpreadsheet, RefreshCw, Zap, Sparkles, AlertTriangle, X, Mail, Send, Clock, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import CustomDateInput from '../components/CustomDateInput';
@@ -51,9 +51,17 @@ export default function RefreshmentReports() {
     try {
       const p = new URLSearchParams(window.location.search).get('tab');
       if (p) return p;
+      const savedTab = sessionStorage.getItem('ncc_reports_active_tab');
+      if (savedTab) return savedTab;
     } catch (e) {}
     return 'unitwise_monthly'; // Default to unitwise monthly summary
-  }); // weekly | unitwise_monthly | audit | annual | bill
+  }); // weekly | unitwise_monthly | audit | annual | ano_bill_returns | bill
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('ncc_reports_active_tab', activeTab);
+    } catch (e) {}
+  }, [activeTab]);
   const [demands, setDemands] = useState([]);
   const [institutions, setInstitutions] = useState([]);
   const [units, setUnits] = useState([]);
@@ -82,7 +90,11 @@ export default function RefreshmentReports() {
       const dJson = await demandsRes.json();
       const iJson = await instRes.json();
       const uJson = await unitsRes.json();
-      setDemands(Array.isArray(dJson) ? dJson : []);
+      // Exclude CANCELLED and REJECTED demands from all Reports & Analytics views
+      const validReportDemands = Array.isArray(dJson)
+        ? dJson.filter(d => d && d.status !== 'CANCELLED' && d.status !== 'REJECTED')
+        : [];
+      setDemands(validReportDemands);
       setInstitutions(Array.isArray(iJson) ? iJson : []);
       setUnits(Array.isArray(uJson) ? uJson : []);
     } catch (err) {
@@ -2389,37 +2401,802 @@ export default function RefreshmentReports() {
     );
   };
 
+  const AnoBillReturnsView = () => {
+    const isAdmin = user?.role === 'ADMIN';
+    const [unitFilterId, setUnitFilterId] = useState('ALL');
+    const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | BALANCE | RECEIVED
+    const [searchQuery, setSearchQuery] = useState('');
+    const [apiBillMap, setApiBillMap] = useState({});
+    const [loadingReturns, setLoadingReturns] = useState(false);
+    const [sendingBulk, setSendingBulk] = useState(false);
+    const [sendingId, setSendingId] = useState(null);
+    const [updatingId, setUpdatingId] = useState(null);
+    const [remarksMap, setRemarksMap] = useState({});
+    const [actionBanner, setActionBanner] = useState(null);
+    const [expandedInstId, setExpandedInstId] = useState(null);
+
+    const getLocalBillCache = (m) => {
+      try {
+        const raw = localStorage.getItem(`ncc_ano_bill_returns_${m}`);
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        return {};
+      }
+    };
+
+    const setLocalBillCache = (m, mapObj) => {
+      try {
+        localStorage.setItem(`ncc_ano_bill_returns_${m}`, JSON.stringify(mapObj));
+      } catch (e) {}
+    };
+
+    // Build selectable months from existing demands (latest month with demands selected automatically)
+    const monthOptions = useMemo(() => {
+      const monthSet = new Set();
+      (demands || []).forEach(d => {
+        if (d.demand_date && d.status !== 'CANCELLED' && d.status !== 'REJECTED') {
+          if (unitFilterId !== 'ALL' && String(d.unit_id) !== String(unitFilterId)) return;
+          const ym = String(d.demand_date).slice(0, 7);
+          if (/^\d{4}-\d{2}$/.test(ym)) monthSet.add(ym);
+        }
+      });
+      if (monthSet.size === 0) {
+        (demands || []).forEach(d => {
+          if (d.demand_date && d.status !== 'CANCELLED' && d.status !== 'REJECTED') {
+            const ym = String(d.demand_date).slice(0, 7);
+            if (/^\d{4}-\d{2}$/.test(ym)) monthSet.add(ym);
+          }
+        });
+      }
+      if (monthSet.size === 0) {
+        monthSet.add(getLocalYearMonth());
+      }
+      const sorted = Array.from(monthSet).sort().reverse();
+      return sorted.map(ym => {
+        const [yStr, mStr] = ym.split('-');
+        const dateObj = new Date(parseInt(yStr, 10), parseInt(mStr, 10) - 1, 1);
+        const label = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        return { value: ym, label };
+      });
+    }, [demands, unitFilterId]);
+
+    const currentYearMonth = getLocalYearMonth();
+    const [month, setMonth] = useState(() => {
+      const latestPast = monthOptions.find(m => m.value < currentYearMonth);
+      return latestPast?.value || monthOptions[0]?.value || currentYearMonth;
+    });
+    const isPastMonth = Boolean(month && String(month) < currentYearMonth);
+
+    useEffect(() => {
+      if (monthOptions.length > 0 && !monthOptions.some(m => m.value === month)) {
+        const latestPast = monthOptions.find(m => m.value < currentYearMonth);
+        setMonth(latestPast?.value || monthOptions[0].value);
+      }
+    }, [monthOptions, month, currentYearMonth]);
+
+    const fetchAnoReturns = async () => {
+      if (!month) return;
+      setLoadingReturns(true);
+      try {
+        const qUnit = isAdmin ? `&unit_id=${encodeURIComponent(unitFilterId)}` : '';
+        const [anoRes, legacyRes] = await Promise.all([
+          fetch(`/api/refreshment-bills/ano-returns?month=${encodeURIComponent(month)}${qUnit}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => null),
+          fetch(`/api/refreshment-bills?month=${encodeURIComponent(month)}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => null)
+        ]);
+
+        const merged = {};
+        const rMap = {};
+
+        if (legacyRes && legacyRes.ok) {
+          const legacyData = await legacyRes.json().catch(() => null);
+          if (Array.isArray(legacyData)) {
+            legacyData.forEach(b => {
+              merged[b.institution_id] = {
+                bill_id: b.id,
+                bill_submitted: Number(b.bill_submitted) === 1 ? 1 : 0,
+                bill_submitted_date: b.bill_submitted_date || null,
+                remarks: b.remarks || '',
+                last_reminder_sent_at: b.last_reminder_sent_at || null,
+                reminder_count: Number(b.reminder_count || 0)
+              };
+              if (b.remarks) rMap[b.institution_id] = b.remarks;
+            });
+          }
+        }
+
+        if (anoRes && anoRes.ok) {
+          const anoData = await anoRes.json().catch(() => null);
+          if (Array.isArray(anoData)) {
+            anoData.forEach(item => {
+              merged[item.institution_id] = {
+                ...merged[item.institution_id],
+                ...item,
+                bill_submitted: Number(item.bill_submitted) === 1 ? 1 : 0
+              };
+              if (item.remarks) rMap[item.institution_id] = item.remarks;
+            });
+          }
+        }
+
+        const cachedLocal = getLocalBillCache(month);
+        const finalMerged = { ...cachedLocal, ...merged };
+        Object.keys(cachedLocal).forEach(k => {
+          if (cachedLocal[k]?.updatedAt && (!merged[k] || cachedLocal[k].bill_submitted !== merged[k].bill_submitted)) {
+            finalMerged[k] = { ...merged[k], ...cachedLocal[k] };
+          }
+          if (cachedLocal[k]?.remarks && !rMap[k]) {
+            rMap[k] = cachedLocal[k].remarks;
+          }
+        });
+        setApiBillMap(finalMerged);
+        setLocalBillCache(month, finalMerged);
+        setRemarksMap(prev => ({ ...rMap, ...prev }));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingReturns(false);
+      }
+    };
+
+    useEffect(() => {
+      fetchAnoReturns();
+    }, [month, unitFilterId]);
+
+    // Build rows from loaded demands + institutions and overlay apiBillMap so data always displays immediately
+    const rows = useMemo(() => {
+      const instLookup = {};
+      (institutions || []).forEach(i => {
+        if (i && i.id) instLookup[i.id] = i;
+      });
+      const unitLookup = {};
+      (units || []).forEach(u => {
+        if (u && u.id) unitLookup[u.id] = u;
+      });
+
+      const grouped = {};
+      (demands || []).forEach(d => {
+        if (!d.demand_date || d.status === 'CANCELLED' || d.status === 'REJECTED') return;
+        if (d.demand_type === 'UNIT_DIRECT') return;
+        const ym = String(d.demand_date).slice(0, 7);
+        if (month && ym !== month) return;
+        if (isAdmin && unitFilterId !== 'ALL' && String(d.unit_id) !== String(unitFilterId)) return;
+
+        const instId = d.institution_id;
+        if (!instId) return;
+        const instInfo = instLookup[instId] || {};
+        const unitInfo = unitLookup[d.unit_id] || unitLookup[instInfo.unit_id] || {};
+        const cachedForMonth = getLocalBillCache(month);
+        const billOverlay = {
+          ...(cachedForMonth[instId] || {}),
+          ...(apiBillMap[instId] || {})
+        };
+        if (cachedForMonth[instId]?.updatedAt && (!apiBillMap[instId] || cachedForMonth[instId].updatedAt >= (apiBillMap[instId].updatedAt || 0))) {
+          billOverlay.bill_submitted = cachedForMonth[instId].bill_submitted;
+          billOverlay.bill_submitted_date = cachedForMonth[instId].bill_submitted_date;
+          billOverlay.remarks = cachedForMonth[instId].remarks || billOverlay.remarks;
+          billOverlay.reminder_count = cachedForMonth[instId].reminder_count ?? billOverlay.reminder_count;
+          billOverlay.last_reminder_sent_at = cachedForMonth[instId].last_reminder_sent_at || billOverlay.last_reminder_sent_at;
+        }
+
+        if (!grouped[instId]) {
+          grouped[instId] = {
+            institution_id: instId,
+            institution_name: d.institution_name || instInfo.institution_name || 'Institution',
+            ano_cto_name: d.ano_cto_name || instInfo.ano_cto_name || 'ANO Incharge',
+            ano_cto_contact: instInfo.ano_cto_contact || '',
+            ano_email: billOverlay.ano_email || instInfo.ano_email || '',
+            unit_id: d.unit_id || instInfo.unit_id,
+            unit_name: d.unit_name || instInfo.unit_name || unitInfo.unit_name || 'NCC Unit',
+            unit_code: d.unit_code || instInfo.unit_code || unitInfo.unit_code || '',
+            ncc_group: d.ncc_group || instInfo.ncc_group || unitInfo.ncc_group || '',
+            total_packets: 0,
+            total_amount: 0,
+            demands: [],
+            bill_submitted: billOverlay.bill_submitted === 1 ? 1 : 0,
+            bill_submitted_date: billOverlay.bill_submitted_date || null,
+            remarks: billOverlay.remarks || '',
+            last_reminder_sent_at: billOverlay.last_reminder_sent_at || null,
+            reminder_count: Number(billOverlay.reminder_count || 0)
+          };
+        }
+
+        const qty = Number(d.total_quantity || d.quantity || 0);
+        const amt = Number(d.total_amount || 0);
+        grouped[instId].total_packets += qty;
+        grouped[instId].total_amount += amt;
+        grouped[instId].demands.push({
+          id: d.id,
+          demand_number: d.demand_number,
+          demand_date: d.demand_date,
+          invoice_no: d.invoice_no || '',
+          invoice_date: d.invoice_date || '',
+          total_quantity: qty,
+          total_amount: amt
+        });
+      });
+
+      Object.values(grouped).forEach(g => {
+        g.demands.sort((a, b) => new Date(a.demand_date) - new Date(b.demand_date));
+      });
+
+      return Object.values(grouped).sort((a, b) => (a.institution_name || '').localeCompare(b.institution_name || ''));
+    }, [demands, institutions, units, month, isAdmin, unitFilterId, apiBillMap]);
+
+    const handleMarkReceived = async (item, receivedState) => {
+      if (receivedState && !isPastMonth) {
+        toast.error('Current ongoing month bill cannot be marked as Received until the month is completed.');
+        return;
+      }
+      const instId = item.institution_id;
+      const todayIso = new Date().toISOString().split('T')[0];
+      const remarkVal = remarksMap[instId] || '';
+      setUpdatingId(instId);
+
+      // 1. Instant Optimistic UI + LocalCache Update
+      const updatedEntry = {
+        ...(apiBillMap[instId] || {}),
+        institution_id: instId,
+        bill_submitted: receivedState ? 1 : 0,
+        bill_submitted_date: receivedState ? todayIso : null,
+        remarks: remarkVal,
+        updatedAt: Date.now()
+      };
+      const nextMap = { ...apiBillMap, [instId]: updatedEntry };
+      setApiBillMap(nextMap);
+      setLocalBillCache(month, nextMap);
+
+      try {
+        let ok = false;
+        let msg = '';
+        const res = await fetch('/api/refreshment-bills/mark-received', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            institution_id: instId,
+            month,
+            received: receivedState,
+            received_date: todayIso,
+            remarks: remarkVal
+          })
+        }).catch(() => null);
+
+        if (res && res.ok) {
+          const data = await res.json().catch(() => ({}));
+          ok = true;
+          msg = data.message;
+        } else {
+          // Fallback to legacy /api/refreshment-bills POST endpoint
+          const fbRes = await fetch('/api/refreshment-bills', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              institution: item.institution_name,
+              month,
+              billSubmitted: receivedState,
+              billSubmittedDate: receivedState ? todayIso : null,
+              demandPackets: item.total_packets,
+              billAmount: item.total_amount,
+              paymentStatus: 'PENDING',
+              remarks: remarkVal
+            })
+          }).catch(() => null);
+          if (fbRes && fbRes.ok) ok = true;
+        }
+
+        const bannerText = msg || (receivedState
+          ? `✓ Bill for ${item.institution_name} marked as RECEIVED at Unit. Daily reminders stopped & Confirmation + Thanks message sent to ANO (${item.ano_email || item.ano_cto_name}).`
+          : `Bill for ${item.institution_name} reverted to BALANCE (Not Submitted).`);
+
+        setActionBanner({ type: receivedState ? 'success' : 'info', text: bannerText });
+        toast.success(bannerText);
+      } catch (err) {
+        toast.error(err.message || 'Updated locally');
+      } finally {
+        setUpdatingId(null);
+      }
+    };
+
+    const handleSendReminder = async (institutionIds = []) => {
+      if (!isPastMonth) {
+        toast.error('Reminders can only be initiated for completed past months.');
+        return;
+      }
+      const isBulk = institutionIds.length === 0;
+      if (isBulk) setSendingBulk(true);
+      else setSendingId(institutionIds[0]);
+
+      const nowIso = new Date().toISOString();
+      const targetList = isBulk
+        ? rows.filter(r => r.bill_submitted === 0)
+        : rows.filter(r => institutionIds.map(String).includes(String(r.institution_id)));
+
+      // Optimistic update of reminder count & timestamp
+      const nextMap = { ...apiBillMap };
+      targetList.forEach(t => {
+        const prev = nextMap[t.institution_id] || {};
+        nextMap[t.institution_id] = {
+          ...prev,
+          institution_id: t.institution_id,
+          bill_submitted: 0,
+          reminder_count: Number(prev.reminder_count ?? t.reminder_count ?? 0) + 1,
+          last_reminder_sent_at: nowIso,
+          updatedAt: Date.now()
+        };
+      });
+      setApiBillMap(nextMap);
+      setLocalBillCache(month, nextMap);
+
+      try {
+        const res = await fetch('/api/refreshment-bills/send-reminder', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            month,
+            unit_id: isAdmin ? unitFilterId : undefined,
+            institution_ids: institutionIds
+          })
+        }).catch(() => null);
+
+        let bannerText = `✉ Military Reminder Letter dispatched to ${targetList.length} Balance ANO(s) on their registered email address.`;
+        if (res && res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.message) bannerText = data.message;
+        }
+        setActionBanner({ type: 'warning', text: bannerText });
+        toast.success(bannerText);
+      } catch (err) {
+        toast.error(err.message || 'Reminder triggered');
+      } finally {
+        setSendingBulk(false);
+        setSendingId(null);
+      }
+    };
+
+    const filteredRows = rows.filter(r => {
+      if (selectedGroup !== 'All' && r.ncc_group !== selectedGroup) return false;
+      if (statusFilter === 'BALANCE' && r.bill_submitted === 1) return false;
+      if (statusFilter === 'RECEIVED' && r.bill_submitted !== 1) return false;
+      if (statusFilter === 'REMINDED' && !(Number(r.reminder_count || 0) > 0)) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const mInst = (r.institution_name || '').toLowerCase().includes(q);
+        const mAno = (r.ano_cto_name || '').toLowerCase().includes(q);
+        const mEmail = (r.ano_email || '').toLowerCase().includes(q);
+        const mUnit = (r.unit_name || '').toLowerCase().includes(q);
+        const mInv = (r.demands || []).some(d => (d.invoice_no || '').toLowerCase().includes(q) || (d.demand_number || '').toLowerCase().includes(q));
+        if (!mInst && !mAno && !mEmail && !mUnit && !mInv) return false;
+      }
+      return true;
+    });
+
+    const totalInstCount = rows.length;
+    const receivedList = rows.filter(r => r.bill_submitted === 1);
+    const balanceList = rows.filter(r => r.bill_submitted === 0);
+    const remindedList = rows.filter(r => Number(r.reminder_count || 0) > 0);
+    const receivedAmt = receivedList.reduce((s, r) => s + Number(r.total_amount || 0), 0);
+    const balanceAmt = balanceList.reduce((s, r) => s + Number(r.total_amount || 0), 0);
+    const totalRemindersSent = rows.reduce((s, r) => s + Number(r.reminder_count || 0), 0);
+
+    const monthDateObj = month ? new Date(month + '-01') : new Date();
+    const monthDisplayStr = monthDateObj.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }).toUpperCase();
+
+    return (
+      <div className="space-y-3 animate-in fade-in duration-300 w-full">
+        {/* Clean White Compact Control Bar */}
+        <div className="bg-white p-2.5 sm:px-3.5 sm:py-2.5 rounded-xl border border-slate-200 shadow-xs print:hidden flex flex-wrap items-center justify-between gap-2">
+          {/* Left: Filters */}
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+            <select
+              value={month}
+              onChange={e => setMonth(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer"
+              title="Billing Month"
+            >
+              {monthOptions.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+
+            {isAdmin && (
+              <select
+                value={unitFilterId}
+                onChange={e => setUnitFilterId(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer max-w-[180px]"
+                title="NCC Unit"
+              >
+                <option value="ALL">All Units</option>
+                {units.map(u => (
+                  <option key={u.id} value={u.id}>{u.unit_code || u.unit_name}</option>
+                ))}
+              </select>
+            )}
+
+            <div className="relative flex-1 min-w-[190px] max-w-[300px]">
+              <Search size={13} className="text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search institution, ANO, invoice..."
+                className="w-full pl-7 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+            {balanceList.length > 0 && (
+              <button
+                type="button"
+                onClick={() => isPastMonth && handleSendReminder([])}
+                disabled={!isPastMonth || sendingBulk}
+                className={`px-3 py-1.5 font-black uppercase text-[11px] rounded-lg shadow-xs flex items-center gap-1.5 transition-all ${
+                  !isPastMonth
+                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                    : 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer active:scale-95 disabled:opacity-50'
+                }`}
+                title={!isPastMonth ? 'Reminders can only be initiated for completed past months' : 'Send reminder email to all Balance ANOs'}
+              >
+                <Send size={12} />
+                <span>{sendingBulk ? 'Sending...' : `Remind All (${balanceList.length})`}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-[11px] rounded-lg shadow-xs flex items-center gap-1 cursor-pointer"
+              title="Print Register"
+            >
+              <Printer size={12} />
+              <span>Print</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4 Clickable Summary Filter Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 print:hidden">
+          <button
+            type="button"
+            onClick={() => setStatusFilter('ALL')}
+            className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+              statusFilter === 'ALL'
+                ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-sm'
+                : 'bg-white border-slate-200 hover:border-blue-300 shadow-xs opacity-85 hover:opacity-100'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Supplied Institutions ({monthDisplayStr})</span>
+              {statusFilter === 'ALL' && <span className="px-1.5 py-0.5 rounded bg-blue-600 text-white text-[9px] font-black uppercase">Active</span>}
+            </div>
+            <div className="text-2xl font-black text-slate-900 mt-1">{totalInstCount}</div>
+            <div className="text-[11px] font-bold text-slate-500 mt-0.5">Click to view all institutions</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter(prev => prev === 'RECEIVED' ? 'ALL' : 'RECEIVED')}
+            className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+              statusFilter === 'RECEIVED'
+                ? 'bg-emerald-50 border-emerald-600 ring-2 ring-emerald-500/25 shadow-sm'
+                : 'bg-emerald-50/60 border-emerald-200 hover:border-emerald-400 shadow-xs opacity-85 hover:opacity-100'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Bills Received at Unit</span>
+              {statusFilter === 'RECEIVED' && <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-black uppercase">Filtered</span>}
+            </div>
+            <div className="text-2xl font-black text-emerald-800 mt-1">{receivedList.length} <span className="text-xs font-bold">Institutions</span></div>
+            <div className="text-[11px] font-black text-emerald-700 mt-0.5">Verified Value: ₹{formatAmount(receivedAmt)}</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter(prev => prev === 'BALANCE' ? 'ALL' : 'BALANCE')}
+            className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+              statusFilter === 'BALANCE'
+                ? 'bg-rose-50 border-rose-600 ring-2 ring-rose-500/25 shadow-sm'
+                : 'bg-rose-50/70 border-rose-200 hover:border-rose-400 shadow-xs opacity-85 hover:opacity-100'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-700">Balance Bill Submission (Awaited)</span>
+              {statusFilter === 'BALANCE' && <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black uppercase">Filtered</span>}
+            </div>
+            <div className="text-2xl font-black text-rose-800 mt-1">{balanceList.length} <span className="text-xs font-bold">Institutions</span></div>
+            <div className="text-[11px] font-black text-rose-700 mt-0.5">Pending Claim Value: ₹{formatAmount(balanceAmt)}</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter(prev => prev === 'REMINDED' ? 'ALL' : 'REMINDED')}
+            className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+              statusFilter === 'REMINDED'
+                ? 'bg-amber-50 border-amber-600 ring-2 ring-amber-500/25 shadow-sm'
+                : 'bg-amber-50/60 border-amber-200 hover:border-amber-400 shadow-xs opacity-85 hover:opacity-100'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">Military Reminders Sent</span>
+              {statusFilter === 'REMINDED' && <span className="px-1.5 py-0.5 rounded bg-amber-600 text-white text-[9px] font-black uppercase">Filtered</span>}
+            </div>
+            <div className="text-2xl font-black text-amber-900 mt-1">{totalRemindersSent} <span className="text-xs font-bold">Emails ({remindedList.length} Inst)</span></div>
+            <div className="text-[11px] font-bold text-amber-700 mt-0.5">Auto-dispatched daily until marked Received</div>
+          </button>
+        </div>
+
+        {/* Report Canvas & Printable Table Container */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm print:shadow-none print:border-none print:bg-white print:overflow-visible print:w-full">
+          <PrintHeader
+            title="MONTHLY COUNTERSIGNED BILL SUBMISSION & BALANCE REGISTER"
+            period={`MONTH : ${monthDisplayStr}`}
+            extraMeta={`TOTAL INSTITUTIONS: ${filteredRows.length} • RECEIVED: ${receivedList.length} • BALANCE: ${balanceList.length}`}
+          />
+
+          <div className="overflow-x-auto print:overflow-visible print:w-full">
+            <table className="w-full text-left border-collapse print:min-w-full print:border print:border-black text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-black text-[11px] font-black uppercase text-slate-600">
+                  <th className="px-3 py-3 text-center print:text-black w-12 border border-slate-200 print:border-black">S.NO</th>
+                  <th className="px-3.5 py-3 print:text-black border border-slate-200 print:border-black min-w-[260px]">INSTITUTION</th>
+                  <th className="px-3 py-3 text-center print:text-black text-blue-700 border border-slate-200 print:border-black whitespace-nowrap">PACKETS</th>
+                  <th className="px-3.5 py-3 text-right print:text-black text-emerald-700 border border-slate-200 print:border-black whitespace-nowrap">BILL AMOUNT (₹)</th>
+                  <th className="px-3 py-3 text-center print:text-black border border-slate-200 print:border-black whitespace-nowrap">UNIT RECEIPT STATUS</th>
+                  <th className="px-3 py-3 print:text-black border border-slate-200 print:border-black min-w-[160px]">UNIT REMARKS</th>
+                  <th className="px-3 py-3 text-center border border-slate-200 print:hidden whitespace-nowrap w-[155px]">UNIT ACTION</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100 print:divide-black text-xs">
+                {loadingReturns ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-400 font-bold border border-slate-200 animate-pulse">
+                      Loading monthly bill return register...
+                    </td>
+                  </tr>
+                ) : filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-500 font-medium border border-slate-200">
+                      No supplies / bills found for {monthDisplayStr}.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRows.map((row, idx) => {
+                    const isReceived = row.bill_submitted === 1;
+                    const isExpanded = expandedInstId === row.institution_id;
+                    const demandCount = (row.demands || []).length;
+
+                    return (
+                      <React.Fragment key={row.institution_id}>
+                        <tr
+                          onClick={() => setExpandedInstId(prev => prev === row.institution_id ? null : row.institution_id)}
+                          className={`cursor-pointer transition-colors ${
+                            isExpanded
+                              ? 'bg-blue-50/50'
+                              : isReceived
+                              ? 'bg-emerald-50/15 hover:bg-emerald-50/35'
+                              : 'hover:bg-slate-50/80'
+                          } print:bg-white`}
+                          title="Click row to expand / hide demands & supply dates"
+                        >
+                          {/* S.NO */}
+                          <td className="px-3 py-2.5 text-center font-bold text-slate-500 print:text-black border border-slate-200 print:border-black">
+                            {idx + 1}
+                          </td>
+
+                          {/* INSTITUTION */}
+                          <td className="px-3.5 py-2.5 border border-slate-200 print:border-black">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold text-slate-900 print:text-black uppercase text-xs tracking-tight">
+                                {row.institution_name}
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold shrink-0 print:hidden ${
+                                isExpanded
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+                              }`}>
+                                {demandCount} {demandCount === 1 ? 'Demand' : 'Demands'} {isExpanded ? '▴' : '▾'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* PACKETS */}
+                          <td className="px-3 py-2.5 text-center font-bold text-blue-700 print:text-black border border-slate-200 print:border-black">
+                            {Number(row.total_packets || 0).toLocaleString('en-IN')}
+                          </td>
+
+                          {/* BILL AMOUNT */}
+                          <td className="px-3.5 py-2.5 text-right font-bold text-emerald-700 print:text-black border border-slate-200 print:border-black whitespace-nowrap">
+                            ₹{formatAmount(row.total_amount)}
+                          </td>
+
+                          {/* UNIT RECEIPT STATUS */}
+                          <td className="px-3 py-2.5 text-center border border-slate-200 print:border-black">
+                            {isReceived ? (
+                              <div className="flex flex-col items-center">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 print:bg-transparent print:border-0 print:text-black print:p-0">
+                                  <CheckCircle2 size={11} className="print:hidden" /> RECEIVED AT UNIT
+                                </span>
+                                {row.bill_submitted_date && (
+                                  <span className="text-[10px] font-semibold text-emerald-700 print:text-black mt-0.5">
+                                    On {formatDDMMYYYY(row.bill_submitted_date)}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300 print:bg-transparent print:border-0 print:text-black print:p-0">
+                                  <Clock size={11} className="print:hidden" /> BALANCE (NOT SUBMITTED)
+                                </span>
+                                <span className="text-[10px] font-semibold text-amber-700 print:text-black mt-0.5">
+                                  Reminders Sent: {row.reminder_count || 0}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* UNIT REMARKS */}
+                          <td className="px-3 py-2.5 border border-slate-200 print:border-black" onClick={e => e.stopPropagation()}>
+                            <span className="hidden print:inline text-xs text-black">{remarksMap[row.institution_id] || '-'}</span>
+                            <input
+                              type="text"
+                              value={remarksMap[row.institution_id] || ''}
+                              onChange={e => setRemarksMap(prev => ({ ...prev, [row.institution_id]: e.target.value }))}
+                              placeholder="Add receipt note..."
+                              className="w-full bg-slate-50 focus:bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] text-slate-800 outline-none focus:border-blue-500 print:hidden"
+                            />
+                          </td>
+
+                          {/* UNIT ACTION */}
+                          <td className="px-3 py-2.5 text-center border border-slate-200 print:hidden" onClick={e => e.stopPropagation()}>
+                            {isReceived ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="text-[10px] font-black text-emerald-700">✓ Taken on Charge</span>
+                                <button
+                                  type="button"
+                                  disabled={updatingId === row.institution_id}
+                                  onClick={() => handleMarkReceived(row, false)}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 text-[10px] font-bold cursor-pointer transition-all"
+                                  title="Revert to Balance (Pending Submission)"
+                                >
+                                  Mark as Balance
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-stretch gap-1">
+                                <button
+                                  type="button"
+                                  disabled={!isPastMonth || updatingId === row.institution_id}
+                                  onClick={() => isPastMonth && handleMarkReceived(row, true)}
+                                  className={`px-3 py-1.5 rounded-lg font-black text-[11px] inline-flex items-center justify-center gap-1 transition-all ${
+                                    !isPastMonth
+                                      ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer active:scale-95 disabled:opacity-50'
+                                  }`}
+                                  title={!isPastMonth ? 'Inactive for ongoing current month — unlocks after month completion' : 'Mark physical countersigned bill as Received & send Confirmation + Thanks email to ANO'}
+                                >
+                                  <CheckCircle2 size={13} />
+                                  <span>{updatingId === row.institution_id ? 'Saving...' : 'Mark Received'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!isPastMonth || sendingId === row.institution_id}
+                                  onClick={() => isPastMonth && handleSendReminder([row.institution_id])}
+                                  className={`px-2.5 py-1 rounded-lg font-bold text-[10px] inline-flex items-center justify-center gap-1 transition-all ${
+                                    !isPastMonth
+                                      ? 'bg-slate-50 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                      : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer disabled:opacity-50'
+                                  }`}
+                                  title={!isPastMonth ? 'Reminders can only be sent for completed past months' : 'Send immediate military reminder email to ANO'}
+                                >
+                                  <Send size={11} />
+                                  <span>{sendingId === row.institution_id ? 'Sending...' : 'Send Reminder Mail'}</span>
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Expanded Sub-Row: All Demands / Invoices & Supply Dates (One row at a time) */}
+                        {isExpanded && (
+                          <tr className="bg-slate-50/90 print:hidden">
+                            <td colSpan={7} className="px-6 py-3 border border-slate-200">
+                              <div className="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-2xs">
+                                <div className="px-3.5 py-2 bg-blue-50/80 border-b border-blue-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                                  <div className="font-black text-blue-950 uppercase">
+                                    Demands & Invoices — {row.institution_name}
+                                  </div>
+                                  <div className="text-slate-600 font-semibold">
+                                    ANO/CTO: <span className="font-bold text-slate-900">{row.ano_cto_name || '-'}</span>
+                                    {row.ano_cto_contact ? ` (${row.ano_cto_contact})` : ''}
+                                    {row.ano_email ? <span className="ml-2 font-mono text-blue-700">✉ {row.ano_email}</span> : ''}
+                                  </div>
+                                </div>
+                                <table className="w-full text-left border-collapse text-[11px]">
+                                  <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase text-slate-600">
+                                      <th className="px-3 py-2 text-center border border-slate-200 w-12">S.NO</th>
+                                      <th className="px-3 py-2 border border-slate-200">INVOICE / DEMAND NO.</th>
+                                      <th className="px-3 py-2 text-center border border-slate-200">DATE OF SUPPLY</th>
+                                      <th className="px-3 py-2 text-center border border-slate-200">PACKETS</th>
+                                      <th className="px-3 py-2 text-right border border-slate-200">AMOUNT (₹)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {(row.demands || []).map((d, dIdx) => (
+                                      <tr key={d.id || dIdx} className="hover:bg-slate-50">
+                                        <td className="px-3 py-1.5 text-center font-bold text-slate-500 border border-slate-200">{dIdx + 1}</td>
+                                        <td className="px-3 py-1.5 font-mono font-bold text-blue-700 border border-slate-200">{d.invoice_no || d.demand_number}</td>
+                                        <td className="px-3 py-1.5 text-center font-medium text-slate-700 border border-slate-200">{formatDDMMYYYY(d.demand_date)}</td>
+                                        <td className="px-3 py-1.5 text-center font-bold text-slate-900 border border-slate-200">{Number(d.total_quantity || 0).toLocaleString('en-IN')}</td>
+                                        <td className="px-3 py-1.5 text-right font-bold text-emerald-700 border border-slate-200">₹{formatAmount(d.total_amount)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+
+              {filteredRows.length > 0 && (
+                <tfoot className="bg-slate-50 border-t-2 border-slate-300 print:bg-slate-100 print:border-black font-bold">
+                  <tr className="text-xs">
+                    <td colSpan={2} className="px-4 py-3 text-right uppercase tracking-wider text-slate-800 print:text-black border border-slate-200 print:border-black">
+                      GRAND TOTAL ({filteredRows.length} Institutions)
+                    </td>
+                    <td className="px-3 py-3 text-center text-sm font-black text-blue-700 print:text-black border border-slate-200 print:border-black">
+                      {filteredRows.reduce((s, r) => s + Number(r.total_packets || 0), 0).toLocaleString('en-IN')}
+                    </td>
+                    <td className="px-3.5 py-3 text-right text-sm font-black text-emerald-700 print:text-black border border-slate-200 print:border-black whitespace-nowrap">
+                      ₹{formatAmount(filteredRows.reduce((s, r) => s + Number(r.total_amount || 0), 0))}
+                    </td>
+                    <td colSpan={2} className="px-3 py-3 text-center text-xs text-slate-600 print:text-black border border-slate-200 print:border-black">
+                      Received: {filteredRows.filter(r => r.bill_submitted === 1).length} • Balance: {filteredRows.filter(r => r.bill_submitted === 0).length}
+                    </td>
+                    <td className="border border-slate-200 print:hidden" />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return <div className="p-8 text-center text-slate-500 font-medium animate-pulse">Loading analytical views...</div>;
   }
 
   return (
-    <div className="space-y-6 w-full px-1 sm:px-2">
-      <div className="print:hidden space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">Refreshment Reports</h2>
-            <p className="text-xs text-slate-500 font-medium">Detailed Weekly, Monthly and Annual refreshment program analytics</p>
-          </div>
-          {user?.role === 'ADMIN' && (
-            <select
-              value={selectedGroup}
-              onChange={(e) => setSelectedGroup(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-bold text-xs shadow-xs focus:outline-none focus:border-blue-500 cursor-pointer shrink-0"
-            >
-              <option value="All">All NCC Groups</option>
-              <option value="Group B">Group B</option>
-              <option value="Group C">Group C</option>
-            </select>
-          )}
-        </div>
-
-        <div className="flex bg-white border border-slate-200 rounded-xl p-1 mb-2 overflow-x-auto no-scrollbar gap-1">
+    <div className="space-y-3 w-full px-1 sm:px-2">
+      <div className="print:hidden flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+        <div className="flex bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto no-scrollbar gap-1 flex-1">
           {[
             { id: 'weekly', label: 'Weekly Summary Matrix' },
             { id: 'unitwise_monthly', label: 'Unitwise Monthly Summary' },
             { id: 'audit', label: 'Monthly Summary' },
             { id: 'annual', label: 'Annual Quota Summary' },
+            { id: 'ano_bill_returns', label: 'ANO Bill Returns & Reminders' },
             { id: 'bill', label: 'Bill Tracking & Payments' }
           ].map(tab => (
             <button
@@ -2433,12 +3210,25 @@ export default function RefreshmentReports() {
             </button>
           ))}
         </div>
+
+        {user?.role === 'ADMIN' && (
+          <select
+            value={selectedGroup}
+            onChange={(e) => setSelectedGroup(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-bold text-xs shadow-xs focus:outline-none focus:border-blue-500 cursor-pointer shrink-0"
+          >
+            <option value="All">All NCC Groups</option>
+            <option value="Group B">Group B</option>
+            <option value="Group C">Group C</option>
+          </select>
+        )}
       </div>
 
       {activeTab === 'weekly' && <WeeklySummaryView />}
       {activeTab === 'unitwise_monthly' && <UnitwiseMonthlySummaryView />}
       {activeTab === 'audit' && <AuditTrailView />}
       {activeTab === 'annual' && <AnnualSummaryView />}
+      {activeTab === 'ano_bill_returns' && <AnoBillReturnsView />}
       {activeTab === 'bill' && <BillTrackerView />}
     </div>
   );
