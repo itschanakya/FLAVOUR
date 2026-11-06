@@ -355,11 +355,18 @@ router.post('/send-reminder', authenticateToken, authorizeRoles('ADMIN', 'UNIT')
       });
     }
 
+    if (req.user.role === 'UNIT' && !req.user.unit_id) {
+      return res.status(403).json({ error: 'Unit scope missing. Cannot send reminders.' });
+    }
     const effectiveUnitId = req.user.role === 'UNIT' ? req.user.unit_id : (req.body.unit_id || 'ALL');
     const allMonthData = await buildMonthInstitutionBillData(db, month, effectiveUnitId);
 
     // Filter only BALANCE (bill_submitted === 0) institutions
     let targets = allMonthData.filter(item => item.bill_submitted === 0);
+    // Hard safety: a Unit (or Admin with a unit selected) only reminds institutions of that unit
+    if (effectiveUnitId && effectiveUnitId !== 'ALL') {
+      targets = targets.filter(item => String(item.unit_id) === String(effectiveUnitId));
+    }
     if (Array.isArray(institution_ids) && institution_ids.length > 0) {
       const idSet = new Set(institution_ids.map(String));
       targets = targets.filter(item => idSet.has(String(item.institution_id)));
