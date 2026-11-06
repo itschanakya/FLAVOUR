@@ -442,6 +442,10 @@ router.get('/my-pending-returns', authenticateToken, async (req, res) => {
     }
 
     const db = await getDB();
+    const myInst = await db.get('SELECT unit_id FROM institutions WHERE id = ?', [req.user.institution_id]);
+    if (!myInst || !(await isAnoPopupEnabled(db, myInst.unit_id))) {
+      return res.json([]);
+    }
     const instId = req.user.institution_id;
 
     // Find all distinct months where this institution has valid demands (not cancelled/rejected/pending)
@@ -470,6 +474,61 @@ router.get('/my-pending-returns', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Fetch my pending bill returns error:', error);
     res.status(500).json({ error: 'Failed to check pending bill returns.' });
+  }
+});
+
+// ANO balance-bill popup toggle, controlled per NCC Unit from the Unit portal's App Settings (OFF by default)
+const anoPopupKey = (unitId) => `ano_balance_popup_enabled_unit_${unitId}`;
+async function ensureAppSettingsTable(db) {
+  await db.run(`CREATE TABLE IF NOT EXISTS app_settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+}
+async function isAnoPopupEnabled(db, unitId) {
+  try {
+    if (!unitId) return false;
+    await ensureAppSettingsTable(db);
+    const row = await db.get('SELECT setting_value FROM app_settings WHERE setting_key = ?', [anoPopupKey(unitId)]);
+    return row ? String(row.setting_value) === 'true' : false;
+  } catch (e) {
+    return false;
+  }
+}
+
+// GET /api/refreshment-bills/ano-popup-setting (Unit: own unit; Admin: ?unit_id=)
+router.get('/ano-popup-setting', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req, res) => {
+  try {
+    const db = await getDB();
+    const unitId = req.user.role === 'UNIT' ? req.user.unit_id : req.query.unit_id;
+    res.json({ enabled: await isAnoPopupEnabled(db, unitId) });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to read setting.' });
+  }
+});
+
+// PUT /api/refreshment-bills/ano-popup-setting
+router.put('/ano-popup-setting', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req, res) => {
+  try {
+    const db = await getDB();
+    const unitId = req.user.role === 'UNIT' ? req.user.unit_id : req.body.unit_id;
+    if (!unitId) {
+      return res.status(400).json({ error: 'unit_id is required.' });
+    }
+    await ensureAppSettingsTable(db);
+    const key = anoPopupKey(unitId);
+    const value = req.body.enabled ? 'true' : 'false';
+    const existing = await db.get('SELECT setting_key FROM app_settings WHERE setting_key = ?', [key]);
+    if (existing) {
+      await db.run('UPDATE app_settings SET setting_value = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?', [value, key]);
+    } else {
+      await db.run('INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
+    }
+    res.json({ enabled: value === 'true' });
+  } catch (error) {
+    console.error('Save ano popup setting error:', error);
+    res.status(500).json({ error: 'Failed to save setting.' });
   }
 });
 

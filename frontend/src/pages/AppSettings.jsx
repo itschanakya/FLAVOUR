@@ -1142,6 +1142,13 @@ export default function AppSettings() {
                   <Building2 className="w-4 h-4 text-amber-500" />
                   Unit My Account
                 </button>
+                <button
+                  onClick={() => setActiveTab('ano-notices')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'ano-notices' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Clock className="w-4 h-4 text-rose-500" />
+                  ANO Bill Notices
+                </button>
               </>
             )}
 
@@ -1198,6 +1205,7 @@ export default function AppSettings() {
                 {activeTab === 'weekly-cutoff' && 'Weekly Demand Cut-Off & Timing Manager'}
                 {activeTab === 'auth-classes-quota' && 'Auth Classes Quota Distribution'}
                 {activeTab === 'inst-credentials' && 'Institutions Login Credentials & ANO Passwords'}
+                {activeTab === 'ano-notices' && 'ANO Bill Notices'}
                 {activeTab === 'institution-details' && 'Institution Details & Delivery Address'}
                 {activeTab === 'schedule' && 'Schedule of Refreshment'}
                 {activeTab === 'my-account' && 'Account Settings & Login Credentials'}
@@ -1215,6 +1223,7 @@ export default function AppSettings() {
                 {activeTab === 'weekly-cutoff' && 'Configure the weekly submission deadline day & time for Institutions/ANOs under your Unit, and publish holiday notices.'}
                 {activeTab === 'auth-classes-quota' && 'Configure the year-wise maximum authorized classes for the institutions under this unit.'}
                 {activeTab === 'inst-credentials' && 'Manage User ID, Login Emails & Passwords for ANOs/Schools under this NCC Unit.'}
+                {activeTab === 'ano-notices' && 'Control the Balance Bill popup shown to ANOs of your Unit.'}
                 {activeTab === 'institution-details' && 'Update your official institution name, ANO/CTO incharge, contact phone, delivery PIN code, Google Maps GPS link, and complete address.'}
                 {activeTab === 'schedule' && 'Configure your weekly default days and times for automatic demand placements.'}
                 {activeTab === 'my-account' && 'Update your official login email address, username ID, or set a new password.'}
@@ -1838,6 +1847,11 @@ export default function AppSettings() {
                 {/* ═══ DATA BACKUP TAB ═══ */}
                 {activeTab === 'data-backup' && role === 'ADMIN' && (
                   <DataBackupPanel token={token} />
+                )}
+
+                {/* ═══ ANO BILL NOTICES (UNIT ROLE) ═══ */}
+                {activeTab === 'ano-notices' && role === 'UNIT' && (
+                  <AnoNoticeSettingsPanel token={token} />
                 )}
 
                 {/* ═══ WEEKLY CUT-OFF SETTINGS (UNIT ROLE) ═══ */}
@@ -3219,3 +3233,67 @@ export default function AppSettings() {
   );
 }
 
+
+// Unit-controlled toggle: show/hide the "Balance Refreshment Bill Submission" popup to ANOs of this unit (OFF by default)
+function AnoNoticeSettingsPanel({ token }) {
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/refreshment-bills/ano-popup-setting', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : { enabled: false }))
+      .then(d => { if (!cancelled) setEnabled(Boolean(d.enabled)); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const toggle = async () => {
+    const next = !enabled;
+    setSaving(true);
+    setMsg('');
+    try {
+      const res = await fetch('/api/refreshment-bills/ano-popup-setting', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ enabled: next })
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      setEnabled(next);
+      setMsg(next ? 'Balance bill popup is now ACTIVE for your ANOs.' : 'Balance bill popup is now OFF for your ANOs.');
+    } catch (e) {
+      setMsg('Could not save setting. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-6 max-w-3xl space-y-4">
+      <div className="p-5 rounded-2xl border border-slate-200 bg-white flex items-start justify-between gap-4">
+        <div>
+          <div className="text-sm font-black text-slate-900">Balance Bill Popup on ANO Portal</div>
+          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            When ACTIVE, ANOs of your Unit see the "Balance Refreshment Bill Submission" alert after login for past months whose countersigned bill is not yet received. Keep it OFF to hide it.
+          </p>
+          <div className={`mt-2 inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+            {loading ? 'Loading...' : enabled ? 'Active' : 'Off'}
+          </div>
+        </div>
+        <button
+          type="button"
+          disabled={loading || saving}
+          onClick={toggle}
+          className={`shrink-0 w-14 h-8 rounded-full relative transition-colors cursor-pointer disabled:opacity-50 ${enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+          title={enabled ? 'Turn OFF' : 'Turn ON'}
+        >
+          <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : ''}`} />
+        </button>
+      </div>
+      {msg && <div className="text-xs font-bold text-slate-700">{msg}</div>}
+    </div>
+  );
+}
