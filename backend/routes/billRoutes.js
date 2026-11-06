@@ -211,9 +211,10 @@ router.post('/mark-received', authenticateToken, authorizeRoles('ADMIN', 'UNIT')
     };
 
     const existing = await db.get(
-      'SELECT id FROM refreshment_bills WHERE institution_id = ? AND month = ?',
+      'SELECT id, bill_submitted FROM refreshment_bills WHERE institution_id = ? AND month = ?',
       [institution_id, month]
     );
+    const wasAlreadyReceived = Boolean(existing && Number(existing.bill_submitted) === 1);
 
     if (existing) {
       try {
@@ -295,7 +296,8 @@ router.post('/mark-received', authenticateToken, authorizeRoles('ADMIN', 'UNIT')
     }
 
     let emailSent = false;
-    if (isReceived) {
+    // Thanks message goes out only when status changes Balance -> Received (never duplicated)
+    if (isReceived && !wasAlreadyReceived) {
       // Send Confirmation & Appreciation Email to ANO
       if (instSummary.ano_email && instSummary.ano_email.includes('@')) {
         emailSent = await sendAnoBillReceivedConfirmationEmail(instSummary.ano_email, {
@@ -523,9 +525,10 @@ router.post('/', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req,
     }
 
     const existing = await db.get(
-      'SELECT id FROM refreshment_bills WHERE institution_id = ? AND month = ?',
+      'SELECT id, bill_submitted FROM refreshment_bills WHERE institution_id = ? AND month = ?',
       [instId, month]
     );
+    const wasAlreadyReceived = Boolean(existing && Number(existing.bill_submitted) === 1);
 
     if (existing) {
       await db.run(
@@ -559,6 +562,42 @@ router.post('/', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req,
           paymentDate || null, paymentRef || null, remarks || null
         ]
       );
+    }
+
+    // Thanks email + in-app notification to ANO when bill newly marked Received via this route
+    if (billSubmitted && !wasAlreadyReceived) {
+      try {
+        const inst = await db.get('SELECT * FROM institutions WHERE id = ?', [instId]);
+        const data = await buildMonthInstitutionBillData(db, month, 'ALL');
+        const s = data.find(x => String(x.institution_id) === String(instId));
+        if (inst && s) {
+          if (s.ano_email && s.ano_email.includes('@')) {
+            await sendAnoBillReceivedConfirmationEmail(s.ano_email, {
+              institutionName: inst.institution_name,
+              anoName: s.ano_cto_name,
+              unitName: s.unit_name,
+              unitCode: s.unit_code,
+              monthLabel: s.month_label,
+              receivedDate: billSubmittedDate || new Date().toISOString().split('T')[0],
+              totalPackets: s.total_packets,
+              totalAmount: s.total_amount,
+              remarks: remarks || ''
+            });
+          }
+          if (s.ano_user_id) {
+            await db.run(
+              `INSERT INTO notifications (user_id, title, message, link_url) VALUES (?, ?, ?, '/bills')`,
+              [
+                s.ano_user_id,
+                `Countersigned Bill Received (${s.month_label})`,
+                `Your physical countersigned refreshment bill(s) for ${s.month_label} (${s.total_packets} pkts, ₹${Number(s.total_amount || 0).toLocaleString('en-IN')}) have been marked as RECEIVED by ${s.unit_name}. Thank you!`
+              ]
+            );
+          }
+        }
+      } catch (thanksErr) {
+        console.error('Thanks message error:', thanksErr.message);
+      }
     }
 
     res.json({ message: 'Bill saved successfully.' });
