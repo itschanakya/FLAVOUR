@@ -2952,7 +2952,7 @@ export default function RefreshmentReports() {
               {statusFilter === 'REMINDED' && <span className="px-1.5 py-0.5 rounded bg-amber-600 text-white text-[9px] font-black uppercase">Filtered</span>}
             </div>
             <div className="text-2xl font-black text-amber-900 mt-1">{totalRemindersSent} <span className="text-xs font-bold">Emails ({remindedList.length} Inst)</span></div>
-            <div className="text-[11px] font-bold text-amber-700 mt-0.5">Auto-dispatched daily until marked Received</div>
+            <div className="text-[11px] font-bold text-amber-700 mt-0.5">Sent manually when you click Send Reminder</div>
           </button>
         </div>
 

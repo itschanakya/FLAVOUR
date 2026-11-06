@@ -107,7 +107,9 @@ app.listen(PORT, '0.0.0.0', () => {
 
 // Initialize database schema in background
 getDB().then(() => {
-  if (typeof billRoutes.startDailyBillReminderScheduler === 'function') {
+  // Automatic daily bill reminder emails are DISABLED. Reminders are sent only when
+  // the user clicks "Send Reminder" / "Remind All". Set AUTO_BILL_REMINDERS=true to re-enable.
+  if (process.env.AUTO_BILL_REMINDERS === 'true' && typeof billRoutes.startDailyBillReminderScheduler === 'function') {
     billRoutes.startDailyBillReminderScheduler();
   }
 }).catch((err) => {
