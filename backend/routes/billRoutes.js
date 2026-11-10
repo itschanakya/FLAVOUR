@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDB } = require('../database');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
+const { uploadReceipt, getFileUrl } = require('../config/upload');
 const {
   sendAnoBillReminderEmail,
   sendAnoBillReceivedConfirmationEmail
@@ -26,6 +27,20 @@ async function ensureBillColumns(db) {
         month VARCHAR(50) NOT NULL,
         total_packets INTEGER DEFAULT 0,
         total_amount REAL DEFAULT 0,
+        gross_amount REAL DEFAULT 0,
+        gst_tds_rate REAL DEFAULT 2.0,
+        gst_tds_amount REAL DEFAULT 0,
+        it_tds_rate REAL DEFAULT 2.0,
+        it_tds_amount REAL DEFAULT 0,
+        other_deductions REAL DEFAULT 0,
+        total_deductions REAL DEFAULT 0,
+        net_credit_amount REAL DEFAULT 0,
+        submitted_to_pcda TINYINT DEFAULT 0,
+        pcda_submission_date TEXT NULL,
+        pcda_letter_ref TEXT NULL,
+        vendor_verified TINYINT DEFAULT 0,
+        vendor_verified_at DATETIME NULL,
+        payment_advice_url TEXT NULL,
         paid_amount REAL DEFAULT 0,
         payment_status VARCHAR(50) DEFAULT 'PENDING',
         payment_date TEXT,
@@ -40,6 +55,26 @@ async function ensureBillColumns(db) {
     `);
   } catch (e) {
     console.warn('ensure unit_monthly_payments error:', e.message);
+  }
+
+  const unitPayCols = [
+    "ALTER TABLE unit_monthly_payments ADD COLUMN gross_amount REAL DEFAULT 0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN gst_tds_rate REAL DEFAULT 2.0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN gst_tds_amount REAL DEFAULT 0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN it_tds_rate REAL DEFAULT 2.0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN it_tds_amount REAL DEFAULT 0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN other_deductions REAL DEFAULT 0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN total_deductions REAL DEFAULT 0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN net_credit_amount REAL DEFAULT 0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN submitted_to_pcda TINYINT DEFAULT 0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN pcda_submission_date TEXT NULL",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN pcda_letter_ref TEXT NULL",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN vendor_verified TINYINT DEFAULT 0",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN vendor_verified_at DATETIME NULL",
+    "ALTER TABLE unit_monthly_payments ADD COLUMN payment_advice_url TEXT NULL"
+  ];
+  for (const sql of unitPayCols) {
+    try { await db.run(sql); } catch (e) {}
   }
   billColsVerified = true;
 }
@@ -562,6 +597,54 @@ router.put('/ano-popup-setting', authenticateToken, authorizeRoles('ADMIN', 'UNI
   }
 });
 
+// Billing TDS settings (GST TDS & IT TDS), configured in App Settings (default 2% + 2%)
+async function getTdsSettings(db) {
+  try {
+    await ensureAppSettingsTable(db);
+    const row = await db.get("SELECT setting_value FROM app_settings WHERE setting_key = 'bill_tds_settings'");
+    if (row && row.setting_value) {
+      const parsed = JSON.parse(row.setting_value);
+      return {
+        gst_tds_rate: Number(parsed.gst_tds_rate !== undefined ? parsed.gst_tds_rate : 2.0),
+        it_tds_rate: Number(parsed.it_tds_rate !== undefined ? parsed.it_tds_rate : 2.0)
+      };
+    }
+  } catch (e) {}
+  return { gst_tds_rate: 2.0, it_tds_rate: 2.0 };
+}
+
+// GET /api/refreshment-bills/tds-settings
+router.get('/tds-settings', authenticateToken, async (req, res) => {
+  try {
+    const db = await getDB();
+    const settings = await getTdsSettings(db);
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to read TDS settings.' });
+  }
+});
+
+// PUT /api/refreshment-bills/tds-settings (ADMIN only)
+router.put('/tds-settings', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const db = await getDB();
+    await ensureAppSettingsTable(db);
+    const gstRate = Math.max(0, Number(req.body.gst_tds_rate !== undefined ? req.body.gst_tds_rate : 2.0));
+    const itRate = Math.max(0, Number(req.body.it_tds_rate !== undefined ? req.body.it_tds_rate : 2.0));
+    const val = JSON.stringify({ gst_tds_rate: gstRate, it_tds_rate: itRate });
+    const existing = await db.get("SELECT setting_key FROM app_settings WHERE setting_key = 'bill_tds_settings'");
+    if (existing) {
+      await db.run("UPDATE app_settings SET setting_value = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = 'bill_tds_settings'", [val]);
+    } else {
+      await db.run("INSERT INTO app_settings (setting_key, setting_value) VALUES ('bill_tds_settings', ?)", [val]);
+    }
+    res.json({ success: true, gst_tds_rate: gstRate, it_tds_rate: itRate });
+  } catch (error) {
+    console.error('Save TDS settings error:', error);
+    res.status(500).json({ error: 'Failed to save TDS settings.' });
+  }
+});
+
 // GET /api/refreshment-bills/unit-payments - Unit-wise monthly bill & payment tracking with expandable institutions
 router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req, res) => {
   try {
@@ -707,15 +790,44 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       });
     });
 
+    const tdsSettings = await getTdsSettings(db);
+    const defaultGstRate = tdsSettings.gst_tds_rate;
+    const defaultItRate = tdsSettings.it_tds_rate;
+
     // 6. Shape final response
     const result = Object.values(unitDataMap).map(u => {
       const pRec = paymentMap[u.unit_id];
       const instList = Object.values(u.institutions_map);
-      const paidAmount = Number(pRec?.paid_amount !== undefined && pRec?.paid_amount !== null
-        ? pRec.paid_amount
-        : (pRec?.payment_status === 'PAID' ? u.total_amount : 0));
-      const paymentStatus = pRec?.payment_status || (u.total_amount > 0 && paidAmount >= u.total_amount ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'PENDING'));
-      const balanceAmount = Math.max(0, u.total_amount - paidAmount);
+      const grossAmount = u.total_amount;
+
+      const gstRate = pRec?.gst_tds_rate !== undefined && pRec?.gst_tds_rate !== null ? Number(pRec.gst_tds_rate) : defaultGstRate;
+      const itRate = pRec?.it_tds_rate !== undefined && pRec?.it_tds_rate !== null ? Number(pRec.it_tds_rate) : defaultItRate;
+
+      const gstTdsAmount = pRec?.gst_tds_amount !== undefined && pRec?.gst_tds_amount !== null
+        ? Number(pRec.gst_tds_amount)
+        : Math.round((grossAmount * gstRate / 100) * 100) / 100;
+
+      const itTdsAmount = pRec?.it_tds_amount !== undefined && pRec?.it_tds_amount !== null
+        ? Number(pRec.it_tds_amount)
+        : Math.round((grossAmount * itRate / 100) * 100) / 100;
+
+      const otherDeductions = Number(pRec?.other_deductions || 0);
+      const totalDeductions = pRec?.total_deductions !== undefined && pRec?.total_deductions !== null
+        ? Number(pRec.total_deductions)
+        : Math.round((gstTdsAmount + itTdsAmount + otherDeductions) * 100) / 100;
+
+      const expectedNetCredit = Math.max(0, Math.round((grossAmount - totalDeductions) * 100) / 100);
+
+      const isPaid = pRec?.payment_status === 'PAID';
+      const isSubmittedToPcda = Number(pRec?.submitted_to_pcda || 0) === 1 || pRec?.payment_status === 'SUBMITTED_TO_PCDA';
+
+      const netCreditAmount = pRec?.net_credit_amount !== undefined && pRec?.net_credit_amount !== null && Number(pRec.net_credit_amount) > 0
+        ? Number(pRec.net_credit_amount)
+        : (isPaid ? Number(pRec?.paid_amount || expectedNetCredit) : expectedNetCredit);
+
+      const paidAmount = Number(pRec?.paid_amount || 0);
+      const paymentStatus = isPaid ? 'PAID' : (isSubmittedToPcda ? 'SUBMITTED_TO_PCDA' : 'PENDING');
+      const balanceAmount = isPaid ? 0 : grossAmount;
 
       return {
         unit_id: u.unit_id,
@@ -727,10 +839,25 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
         month_label: u.month_label,
         institutions_count: instList.length,
         total_packets: u.total_packets,
-        total_amount: u.total_amount,
+        total_amount: grossAmount,
+        gross_amount: grossAmount,
+        gst_tds_rate: gstRate,
+        gst_tds_amount: gstTdsAmount,
+        it_tds_rate: itRate,
+        it_tds_amount: itTdsAmount,
+        other_deductions: otherDeductions,
+        total_deductions: totalDeductions,
+        expected_net_credit: expectedNetCredit,
+        net_credit_amount: netCreditAmount,
         paid_amount: paidAmount,
         balance_amount: balanceAmount,
         payment_status: paymentStatus,
+        submitted_to_pcda: isSubmittedToPcda ? 1 : 0,
+        pcda_submission_date: pRec?.pcda_submission_date || null,
+        pcda_letter_ref: pRec?.pcda_letter_ref || '',
+        vendor_verified: Number(pRec?.vendor_verified || 0),
+        vendor_verified_at: pRec?.vendor_verified_at || null,
+        payment_advice_url: pRec?.payment_advice_url || null,
         payment_date: pRec?.payment_date || null,
         payment_mode: pRec?.payment_mode || '',
         payment_ref: pRec?.payment_ref || '',
@@ -745,6 +872,154 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
   } catch (error) {
     console.error('Fetch unit payments error:', error);
     res.status(500).json({ error: error.message || 'Failed to retrieve unit payments.' });
+  }
+});
+
+// POST /api/refreshment-bills/unit-pcda-submit (Unit records that monthly bill is submitted to PCDA)
+router.post('/unit-pcda-submit', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (req, res) => {
+  try {
+    const db = await getDB();
+    await ensureBillColumns(db);
+    const unitId = req.user.role === 'UNIT' ? req.user.unit_id : req.body.unit_id;
+    const { month, submission_date, letter_ref, remarks } = req.body;
+
+    if (!unitId || !month) {
+      return res.status(400).json({ error: 'unit_id and month are required.' });
+    }
+
+    const subDate = submission_date || new Date().toISOString().split('T')[0];
+    const existing = await db.get(
+      'SELECT id, payment_status FROM unit_monthly_payments WHERE unit_id = ? AND month = ?',
+      [unitId, month]
+    );
+
+    if (existing) {
+      const nextStatus = existing.payment_status === 'PAID' ? 'PAID' : 'SUBMITTED_TO_PCDA';
+      await db.run(
+        `UPDATE unit_monthly_payments
+         SET submitted_to_pcda = 1,
+             pcda_submission_date = ?,
+             pcda_letter_ref = ?,
+             remarks = COALESCE(?, remarks),
+             payment_status = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [subDate, letter_ref || null, remarks || null, nextStatus, existing.id]
+      );
+    } else {
+      await db.run(
+        `INSERT INTO unit_monthly_payments (
+           unit_id, month, submitted_to_pcda, pcda_submission_date,
+           pcda_letter_ref, remarks, payment_status
+         ) VALUES (?, ?, 1, ?, ?, ?, 'SUBMITTED_TO_PCDA')`,
+        [unitId, month, subDate, letter_ref || null, remarks || null]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Monthly bill marked as submitted to PCDA successfully.'
+    });
+  } catch (error) {
+    console.error('PCDA submit error:', error);
+    res.status(500).json({ error: error.message || 'Failed to record PCDA submission.' });
+  }
+});
+
+// POST /api/refreshment-bills/upload-advice (Vendor uploads bank payment advice / credit proof)
+router.post('/upload-advice', authenticateToken, authorizeRoles('ADMIN'), uploadReceipt.single('document'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded.' });
+  }
+  const fileUrl = getFileUrl(req, req.file);
+  res.json({ url: fileUrl });
+});
+
+// POST /api/refreshment-bills/verify-vendor-credit (Admin/Vendor confirms received bank credit from PCDA)
+router.post('/verify-vendor-credit', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const db = await getDB();
+    await ensureBillColumns(db);
+    const {
+      unit_id, month, paid_amount, payment_date, payment_mode,
+      payment_ref, payment_advice_url, other_deductions, remarks,
+      gst_tds_amount, it_tds_amount, gross_amount
+    } = req.body;
+
+    if (!unit_id || !month) {
+      return res.status(400).json({ error: 'unit_id and month are required.' });
+    }
+
+    const unit = await db.get('SELECT id, unit_name FROM units WHERE id = ?', [unit_id]);
+    if (!unit) {
+      return res.status(404).json({ error: 'Unit not found.' });
+    }
+
+    const gross = Number(gross_amount) || 0;
+    const netAmount = Number(paid_amount) || 0;
+    const otherDeduct = Number(other_deductions) || 0;
+    const gstTds = Number(gst_tds_amount) || 0;
+    const itTds = Number(it_tds_amount) || 0;
+    const totalDeduct = gstTds + itTds + otherDeduct;
+    const today = new Date().toISOString().split('T')[0];
+    const pDate = payment_date || today;
+
+    const existing = await db.get(
+      'SELECT id FROM unit_monthly_payments WHERE unit_id = ? AND month = ?',
+      [unit_id, month]
+    );
+
+    if (existing) {
+      await db.run(
+        `UPDATE unit_monthly_payments
+         SET payment_status = 'PAID',
+             gross_amount = COALESCE(?, gross_amount),
+             paid_amount = ?,
+             net_credit_amount = ?,
+             gst_tds_amount = ?,
+             it_tds_amount = ?,
+             other_deductions = ?,
+             total_deductions = ?,
+             payment_date = ?,
+             payment_mode = ?,
+             payment_ref = ?,
+             payment_advice_url = COALESCE(?, payment_advice_url),
+             remarks = ?,
+             vendor_verified = 1,
+             vendor_verified_at = CURRENT_TIMESTAMP,
+             registered_by = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          gross > 0 ? gross : null,
+          netAmount, netAmount, gstTds, itTds, otherDeduct, totalDeduct,
+          pDate, payment_mode || 'NEFT / RTGS (Bank Transfer)', payment_ref || null,
+          payment_advice_url || null, remarks || null, req.user.id, existing.id
+        ]
+      );
+    } else {
+      await db.run(
+        `INSERT INTO unit_monthly_payments (
+           unit_id, month, payment_status, gross_amount, paid_amount, net_credit_amount,
+           gst_tds_amount, it_tds_amount, other_deductions, total_deductions,
+           payment_date, payment_mode, payment_ref, payment_advice_url,
+           remarks, vendor_verified, vendor_verified_at, registered_by
+         ) VALUES (?, ?, 'PAID', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, ?)`,
+        [
+          unit_id, month, gross, netAmount, netAmount, gstTds, itTds, otherDeduct, totalDeduct,
+          pDate, payment_mode || 'NEFT / RTGS (Bank Transfer)', payment_ref || null,
+          payment_advice_url || null, remarks || null, req.user.id
+        ]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `Bank credit confirmed for ${unit.unit_name} (${formatMonthLabel(month)}).`
+    });
+  } catch (error) {
+    console.error('Verify credit error:', error);
+    res.status(500).json({ error: error.message || 'Failed to verify bank credit.' });
   }
 });
 

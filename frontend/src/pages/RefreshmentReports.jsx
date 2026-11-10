@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, History, Printer, Search, School, TrendingUp, CheckCircle2, Users, IndianRupee, MapPin, Building2, Save, Filter, Layers, FileText, FileSpreadsheet, RefreshCw, Zap, Sparkles, AlertTriangle, X, Mail, Send, Clock, ShieldAlert, ChevronDown, ChevronRight, ChevronUp, CreditCard } from 'lucide-react';
+import { Calendar, History, Printer, Search, School, TrendingUp, CheckCircle2, Users, IndianRupee, MapPin, Building2, Save, Filter, Layers, FileText, FileSpreadsheet, RefreshCw, Zap, Sparkles, AlertTriangle, X, Mail, Send, Clock, ShieldAlert, ChevronDown, ChevronRight, ChevronUp, CreditCard, Eye, Upload, Paperclip, Check, ExternalLink, FileCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import CustomDateInput from '../components/CustomDateInput';
@@ -2225,25 +2225,39 @@ export default function RefreshmentReports({ defaultTab }) {
   // 5. BILL TRACKING & PAYMENTS (UNITWISE MONTHLY CONSOLE WITH EXPANDABLE INSTITUTIONS)
   // ════════════════════════════════════════════════════════════════════════════
   const BillTrackerView = () => {
+    const isUnit = user?.role === 'UNIT';
     const isAdmin = user?.role === 'ADMIN';
     const [month, setMonth] = useState(getLocalYearMonth());
     const [unitPayments, setUnitPayments] = useState([]);
     const [loadingUnits, setLoadingUnits] = useState(false);
     const [expandedUnitIds, setExpandedUnitIds] = useState(new Set());
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | PENDING | PAID | PARTIAL
-    const [savingPayment, setSavingPayment] = useState(false);
-    
-    // Register Payment Modal State
-    const [paymentModal, setPaymentModal] = useState({
+    const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | PENDING | SUBMITTED | PAID
+    const [savingAction, setSavingAction] = useState(false);
+    const [uploadingAdvice, setUploadingAdvice] = useState(false);
+
+    // 1. Unit Action: Submit Bill to PCDA Modal State
+    const [pcdaModal, setPcdaModal] = useState({
       isOpen: false,
       unit: null,
       formData: {
-        payment_status: 'PAID',
+        submission_date: new Date().toISOString().split('T')[0],
+        letter_ref: '',
+        remarks: ''
+      }
+    });
+
+    // 2. Admin Action: View Details & Verify Vendor Bank Credit Modal State
+    const [adminDetailModal, setAdminDetailModal] = useState({
+      isOpen: false,
+      unit: null,
+      formData: {
         paid_amount: 0,
         payment_date: new Date().toISOString().split('T')[0],
         payment_mode: 'NEFT / RTGS (Bank Transfer)',
         payment_ref: '',
+        other_deductions: 0,
+        payment_advice_url: '',
         remarks: ''
       }
     });
@@ -2340,14 +2354,17 @@ export default function RefreshmentReports({ defaultTab }) {
         if (selectedGroup !== 'All' && u.ncc_group !== selectedGroup) return false;
         
         // Status filter
-        if (statusFilter !== 'ALL' && u.payment_status !== statusFilter) return false;
+        if (statusFilter === 'PAID' && u.payment_status !== 'PAID') return false;
+        if (statusFilter === 'SUBMITTED' && u.payment_status !== 'SUBMITTED_TO_PCDA') return false;
+        if (statusFilter === 'PENDING' && (u.payment_status === 'PAID' || u.payment_status === 'SUBMITTED_TO_PCDA')) return false;
 
         // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim();
           const matchUnit = (u.unit_name || '').toLowerCase().includes(q) ||
             (u.unit_code || '').toLowerCase().includes(q) ||
-            (u.payment_ref || '').toLowerCase().includes(q);
+            (u.payment_ref || '').toLowerCase().includes(q) ||
+            (u.pcda_letter_ref || '').toLowerCase().includes(q);
           const matchInst = (u.institutions || []).some(inst =>
             (inst.institution_name || '').toLowerCase().includes(q) ||
             (inst.ano_cto_name || '').toLowerCase().includes(q)
@@ -2359,94 +2376,98 @@ export default function RefreshmentReports({ defaultTab }) {
       });
     }, [unitPayments, selectedGroup, statusFilter, searchQuery]);
 
-    // Overall summary metrics
+    // Overall summary metrics including statutory TDS
     const summary = useMemo(() => {
       let unitsCount = 0;
       let totalPkts = 0;
-      let totalAmt = 0;
-      let totalPaid = 0;
-      let totalBal = 0;
+      let totalGross = 0;
+      let totalGstTds = 0;
+      let totalItTds = 0;
+      let totalDeductions = 0;
+      let totalNetCredit = 0;
+      let totalPaidReceived = 0;
       let paidCount = 0;
+      let submittedCount = 0;
       let pendingCount = 0;
-      let partialCount = 0;
 
       filteredUnitPayments.forEach(u => {
-        if (u.total_packets > 0 || u.paid_amount > 0) {
+        if (u.total_packets > 0 || u.gross_amount > 0 || u.paid_amount > 0) {
           unitsCount += 1;
         }
         totalPkts += Number(u.total_packets || 0);
-        totalAmt += Number(u.total_amount || 0);
-        totalPaid += Number(u.paid_amount || 0);
-        totalBal += Number(u.balance_amount || 0);
+        totalGross += Number(u.gross_amount || u.total_amount || 0);
+        totalGstTds += Number(u.gst_tds_amount || 0);
+        totalItTds += Number(u.it_tds_amount || 0);
+        totalDeductions += Number(u.total_deductions || 0);
+        totalNetCredit += Number(u.net_credit_amount || u.expected_net_credit || 0);
+        totalPaidReceived += Number(u.paid_amount || 0);
 
-        if (u.payment_status === 'PAID') paidCount += 1;
-        else if (u.payment_status === 'PARTIAL') partialCount += 1;
-        else pendingCount += 1;
+        if (u.payment_status === 'PAID') {
+          paidCount += 1;
+        } else if (u.submitted_to_pcda === 1 || u.payment_status === 'SUBMITTED_TO_PCDA') {
+          submittedCount += 1;
+        } else {
+          pendingCount += 1;
+        }
       });
+
+      const totalPendingBalance = Math.max(0, totalGross - totalPaidReceived);
 
       return {
         unitsCount,
         totalPkts,
-        totalAmt,
-        totalPaid,
-        totalBal,
+        totalGross,
+        totalGstTds,
+        totalItTds,
+        totalDeductions,
+        totalNetCredit,
+        totalPaidReceived,
+        totalPendingBalance,
         paidCount,
-        pendingCount,
-        partialCount
+        submittedCount,
+        pendingCount
       };
     }, [filteredUnitPayments]);
 
-    // Open Register Payment Modal
-    const handleOpenPaymentModal = (unit, e) => {
+    // ═══ Handlers for Unit PCDA Submission Modal ═══
+    const handleOpenPcdaModal = (unit, e) => {
       if (e) e.stopPropagation();
-      setPaymentModal({
+      setPcdaModal({
         isOpen: true,
         unit,
         formData: {
-          payment_status: unit.payment_status === 'PAID' ? 'PAID' : (unit.balance_amount === 0 && unit.total_amount > 0 ? 'PAID' : 'PAID'),
-          paid_amount: unit.paid_amount > 0 ? unit.paid_amount : unit.total_amount,
-          payment_date: unit.payment_date || new Date().toISOString().split('T')[0],
-          payment_mode: unit.payment_mode || 'NEFT / RTGS (Bank Transfer)',
-          payment_ref: unit.payment_ref || '',
+          submission_date: unit.pcda_submission_date || new Date().toISOString().split('T')[0],
+          letter_ref: unit.pcda_letter_ref || '',
           remarks: unit.remarks || ''
         }
       });
     };
 
-    // Close Modal
-    const handleClosePaymentModal = () => {
-      setPaymentModal({
+    const handleClosePcdaModal = () => {
+      setPcdaModal({
         isOpen: false,
         unit: null,
         formData: {
-          payment_status: 'PAID',
-          paid_amount: 0,
-          payment_date: '',
-          payment_mode: '',
-          payment_ref: '',
+          submission_date: new Date().toISOString().split('T')[0],
+          letter_ref: '',
           remarks: ''
         }
       });
     };
 
-    // Save Payment from Modal
-    const handleSaveUnitPayment = async (e) => {
+    const handleSavePcdaSubmit = async (e) => {
       e.preventDefault();
-      if (!paymentModal.unit) return;
-      setSavingPayment(true);
+      if (!pcdaModal.unit) return;
+      setSavingAction(true);
       try {
         const payload = {
-          unit_id: paymentModal.unit.unit_id,
+          unit_id: pcdaModal.unit.unit_id,
           month,
-          payment_status: paymentModal.formData.payment_status,
-          paid_amount: Number(paymentModal.formData.paid_amount) || 0,
-          payment_date: paymentModal.formData.payment_date,
-          payment_mode: paymentModal.formData.payment_mode,
-          payment_ref: paymentModal.formData.payment_ref,
-          remarks: paymentModal.formData.remarks
+          submission_date: pcdaModal.formData.submission_date,
+          letter_ref: pcdaModal.formData.letter_ref,
+          remarks: pcdaModal.formData.remarks
         };
-
-        const res = await fetch('/api/refreshment-bills/unit-payments', {
+        const res = await fetch('/api/refreshment-bills/unit-pcda-submit', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2454,24 +2475,136 @@ export default function RefreshmentReports({ defaultTab }) {
           },
           body: JSON.stringify(payload)
         });
-
         const data = await res.json();
         if (res.ok) {
-          toast.success(data.message || 'Unit payment registered successfully!');
-          handleClosePaymentModal();
+          toast.success(data.message || 'Bill submitted to PCDA recorded successfully!');
+          handleClosePcdaModal();
           fetchUnitPayments();
         } else {
-          toast.error(data.error || 'Failed to save payment.');
+          toast.error(data.error || 'Failed to record PCDA submission.');
         }
       } catch (err) {
-        console.error('Save unit payment error:', err);
-        toast.error('Network error saving payment.');
+        console.error('Save PCDA submit error:', err);
+        toast.error('Network error recording PCDA submission.');
       } finally {
-        setSavingPayment(false);
+        setSavingAction(false);
       }
     };
 
-    // Export to Excel (Unit summary + Institution breakdown)
+    // ═══ Handlers for Admin View Details & Bank Credit Verification Modal ═══
+    const handleOpenAdminDetailModal = (unit, e) => {
+      if (e) e.stopPropagation();
+      const expectedNet = unit.expected_net_credit || Math.max(0, (unit.gross_amount || unit.total_amount) - (unit.total_deductions || 0));
+      setAdminDetailModal({
+        isOpen: true,
+        unit,
+        formData: {
+          paid_amount: unit.net_credit_amount > 0 ? unit.net_credit_amount : expectedNet,
+          payment_date: unit.payment_date || new Date().toISOString().split('T')[0],
+          payment_mode: unit.payment_mode || 'NEFT / RTGS (Bank Transfer)',
+          payment_ref: unit.payment_ref || '',
+          other_deductions: unit.other_deductions || 0,
+          payment_advice_url: unit.payment_advice_url || '',
+          remarks: unit.remarks || ''
+        }
+      });
+    };
+
+    const handleCloseAdminDetailModal = () => {
+      setAdminDetailModal({
+        isOpen: false,
+        unit: null,
+        formData: {
+          paid_amount: 0,
+          payment_date: '',
+          payment_mode: '',
+          payment_ref: '',
+          other_deductions: 0,
+          payment_advice_url: '',
+          remarks: ''
+        }
+      });
+    };
+
+    const handleUploadAdviceFile = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setUploadingAdvice(true);
+      try {
+        const formData = new FormData();
+        formData.append('document', file);
+        const res = await fetch('/api/refreshment-bills/upload-advice', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          setAdminDetailModal(prev => ({
+            ...prev,
+            formData: {
+              ...prev.formData,
+              payment_advice_url: data.url
+            }
+          }));
+          toast.success('Payment advice uploaded successfully!');
+        } else {
+          toast.error(data.error || 'Failed to upload advice.');
+        }
+      } catch (err) {
+        console.error('Upload advice error:', err);
+        toast.error('Network error uploading payment advice.');
+      } finally {
+        setUploadingAdvice(false);
+      }
+    };
+
+    const handleVerifyVendorCredit = async (e) => {
+      e.preventDefault();
+      if (!adminDetailModal.unit) return;
+      setSavingAction(true);
+      try {
+        const payload = {
+          unit_id: adminDetailModal.unit.unit_id,
+          month,
+          gross_amount: adminDetailModal.unit.gross_amount || adminDetailModal.unit.total_amount,
+          paid_amount: Number(adminDetailModal.formData.paid_amount) || 0,
+          payment_date: adminDetailModal.formData.payment_date,
+          payment_mode: adminDetailModal.formData.payment_mode,
+          payment_ref: adminDetailModal.formData.payment_ref,
+          payment_advice_url: adminDetailModal.formData.payment_advice_url,
+          other_deductions: Number(adminDetailModal.formData.other_deductions) || 0,
+          gst_tds_amount: adminDetailModal.unit.gst_tds_amount,
+          it_tds_amount: adminDetailModal.unit.it_tds_amount,
+          remarks: adminDetailModal.formData.remarks
+        };
+        const res = await fetch('/api/refreshment-bills/verify-vendor-credit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          toast.success(data.message || 'Vendor bank credit confirmed & saved successfully!');
+          handleCloseAdminDetailModal();
+          fetchUnitPayments();
+        } else {
+          toast.error(data.error || 'Failed to confirm bank credit.');
+        }
+      } catch (err) {
+        console.error('Verify vendor credit error:', err);
+        toast.error('Network error confirming bank credit.');
+      } finally {
+        setSavingAction(false);
+      }
+    };
+
+    // Export to Excel (Unit summary with Statutory TDS + Institution breakdown)
     const handleExportExcel = () => {
       if (filteredUnitPayments.length === 0) {
         toast.error('No payment records to export.');
@@ -2489,13 +2622,23 @@ export default function RefreshmentReports({ defaultTab }) {
           'Month': u.month_label,
           'Institutions Count': u.institutions_count,
           'Total Packets': u.total_packets,
-          'Total Bill (₹)': u.total_amount,
-          'Paid Amount (₹)': u.paid_amount,
-          'Balance (₹)': u.balance_amount,
+          'Gross Bill (₹)': u.gross_amount || u.total_amount,
+          'GST TDS Rate (%)': `${u.gst_tds_rate || 2}%`,
+          'GST TDS Amount (₹)': u.gst_tds_amount || 0,
+          'IT TDS Rate (%)': `${u.it_tds_rate || 2}%`,
+          'IT TDS Amount (₹)': u.it_tds_amount || 0,
+          'Other Deductions (₹)': u.other_deductions || 0,
+          'Total Deductions (₹)': u.total_deductions || 0,
+          'Net Credit (₹)': u.net_credit_amount || u.expected_net_credit || 0,
+          'PCDA Submitted': u.submitted_to_pcda ? 'YES' : 'NO',
+          'PCDA Submission Date': u.pcda_submission_date ? formatDDMMYYYY(u.pcda_submission_date) : '-',
+          'PCDA Letter Ref': u.pcda_letter_ref || '-',
+          'Vendor Verified': u.vendor_verified ? 'YES' : 'NO',
           'Payment Status': u.payment_status,
           'Payment Date': u.payment_date ? formatDDMMYYYY(u.payment_date) : '-',
           'Payment Mode': u.payment_mode || '-',
           'Payment Ref / UTR': u.payment_ref || '-',
+          'Payment Advice Document': u.payment_advice_url || '-',
           'Remarks': u.remarks || '-'
         });
 
@@ -2509,13 +2652,23 @@ export default function RefreshmentReports({ defaultTab }) {
             'Month': u.month_label,
             'Institutions Count': `${inst.demand_count} Demands`,
             'Total Packets': inst.total_packets,
-            'Total Bill (₹)': inst.total_amount,
-            'Paid Amount (₹)': '-',
-            'Balance (₹)': '-',
+            'Gross Bill (₹)': inst.total_amount,
+            'GST TDS Rate (%)': '-',
+            'GST TDS Amount (₹)': '-',
+            'IT TDS Rate (%)': '-',
+            'IT TDS Amount (₹)': '-',
+            'Other Deductions (₹)': '-',
+            'Total Deductions (₹)': '-',
+            'Net Credit (₹)': '-',
+            'PCDA Submitted': '-',
+            'PCDA Submission Date': '-',
+            'PCDA Letter Ref': '-',
+            'Vendor Verified': '-',
             'Payment Status': inst.payment_status || 'PENDING',
             'Payment Date': inst.bill_submitted ? `Bill Recd (${formatDDMMYYYY(inst.bill_submitted_date)})` : 'Bill Awaited',
             'Payment Mode': '-',
             'Payment Ref / UTR': '-',
+            'Payment Advice Document': '-',
             'Remarks': '-'
           });
         });
@@ -2523,9 +2676,9 @@ export default function RefreshmentReports({ defaultTab }) {
 
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, `Unit_Payments_${month}`);
-      XLSX.writeFile(wb, `NCC_Unit_Payments_${month}.xlsx`);
-      toast.success('Unit payments exported to Excel!');
+      XLSX.utils.book_append_sheet(wb, ws, `Unit_Billing_${month}`);
+      XLSX.writeFile(wb, `NCC_Unit_Monthly_Billing_${month}.xlsx`);
+      toast.success('Unit monthly billing exported to Excel!');
     };
 
     return (
@@ -2595,9 +2748,9 @@ export default function RefreshmentReports({ defaultTab }) {
             <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
               {[
                 { id: 'ALL', label: `All Units (${summary.unitsCount})` },
-                { id: 'PENDING', label: `Pending (${summary.pendingCount})` },
-                { id: 'PAID', label: `Paid (${summary.paidCount})` },
-                { id: 'PARTIAL', label: `Partial (${summary.partialCount})` }
+                { id: 'PENDING', label: `Pending Submission (${summary.pendingCount})` },
+                { id: 'SUBMITTED', label: `Submitted to PCDA (${summary.submittedCount})` },
+                { id: 'PAID', label: `Credited / Paid (${summary.paidCount})` }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -2649,51 +2802,59 @@ export default function RefreshmentReports({ defaultTab }) {
           </div>
         </div>
 
-        {/* ═══ 5 Top Summary Metric KPI Cards ═══ */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 print:grid-cols-5">
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+        {/* ═══ 6 Top Summary Metric KPI Cards with TDS Breakdown ═══ */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 print:grid-cols-6">
+          <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Billed Units</span>
             <div className="flex items-baseline gap-1.5">
               <span className="text-xl font-black text-slate-900">{summary.unitsCount}</span>
               <span className="text-[10px] font-bold text-slate-400">Units</span>
             </div>
-            <div className="text-[10px] font-bold text-slate-500 mt-1">
-              Paid: {summary.paidCount} • Bal: {summary.pendingCount + summary.partialCount}
+            <div className="text-[10px] font-bold text-slate-500 mt-1 truncate">
+              Paid: {summary.paidCount} • Sub: {summary.submittedCount} • Bal: {summary.pendingCount}
             </div>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+          <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
             <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 block mb-0.5">Total Packets</span>
             <div className="flex items-baseline gap-1.5">
               <span className="text-xl font-black text-blue-900">{summary.totalPkts.toLocaleString('en-IN')}</span>
               <span className="text-[10px] font-bold text-blue-600">Pkts</span>
             </div>
-            <div className="text-[10px] font-bold text-slate-400 mt-1">Supplied in {formatMonthLabel(month)}</div>
+            <div className="text-[10px] font-bold text-slate-400 mt-1 truncate">Supplied in {formatMonthLabel(month)}</div>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 block mb-0.5">Total Bill Cost</span>
-            <div className="text-xl font-black text-slate-900">₹{formatAmount(summary.totalAmt)}</div>
-            <div className="text-[10px] font-bold text-slate-400 mt-1">Gross supply valuation</div>
+          <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 block mb-0.5">Gross Bill (100%)</span>
+            <div className="text-xl font-black text-slate-900 truncate">₹{formatAmount(summary.totalGross)}</div>
+            <div className="text-[10px] font-bold text-slate-400 mt-1 truncate">Total supply valuation</div>
           </div>
 
-          <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-200/90 shadow-2xs">
-            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 block mb-0.5">Paid Received</span>
-            <div className="text-xl font-black text-emerald-800">₹{formatAmount(summary.totalPaid)}</div>
-            <div className="text-[10px] font-bold text-emerald-600 mt-1">
-              {summary.totalAmt > 0 ? `${Math.round((summary.totalPaid / summary.totalAmt) * 100)}% Collected` : '0%'}
+          <div className="bg-rose-50/60 p-3 rounded-2xl border border-rose-200/90 shadow-2xs">
+            <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 block mb-0.5">TDS Deductions (4%)</span>
+            <div className="text-xl font-black text-rose-800 truncate">₹{formatAmount(summary.totalDeductions)}</div>
+            <div className="text-[10px] font-bold text-rose-600 mt-1 truncate">
+              GST: ₹{formatAmount(summary.totalGstTds)} • IT: ₹{formatAmount(summary.totalItTds)}
             </div>
           </div>
 
-          <div className={`p-3.5 rounded-2xl border shadow-2xs ${summary.totalBal > 0 ? 'bg-amber-50/70 border-amber-200/90' : 'bg-slate-50 border-slate-200'}`}>
-            <span className={`text-[10px] font-black uppercase tracking-wider block mb-0.5 ${summary.totalBal > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
+          <div className="bg-emerald-50/60 p-3 rounded-2xl border border-emerald-200/90 shadow-2xs">
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 block mb-0.5">Net Vendor Credit</span>
+            <div className="text-xl font-black text-emerald-800 truncate">₹{formatAmount(summary.totalNetCredit)}</div>
+            <div className="text-[10px] font-bold text-emerald-600 mt-1 truncate">
+              Recd: ₹{formatAmount(summary.totalPaidReceived)}
+            </div>
+          </div>
+
+          <div className={`p-3 rounded-2xl border shadow-2xs ${summary.totalPendingBalance > 0 ? 'bg-amber-50/70 border-amber-200/90' : 'bg-slate-50 border-slate-200'}`}>
+            <span className={`text-[10px] font-black uppercase tracking-wider block mb-0.5 ${summary.totalPendingBalance > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
               Pending Balance
             </span>
-            <div className={`text-xl font-black ${summary.totalBal > 0 ? 'text-amber-900' : 'text-slate-700'}`}>
-              ₹{formatAmount(summary.totalBal)}
+            <div className={`text-xl font-black truncate ${summary.totalPendingBalance > 0 ? 'text-amber-900' : 'text-slate-700'}`}>
+              ₹{formatAmount(summary.totalPendingBalance)}
             </div>
-            <div className={`text-[10px] font-bold mt-1 ${summary.totalBal > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
-              {summary.totalBal > 0 ? 'Awaiting Payment' : 'All Clear'}
+            <div className={`text-[10px] font-bold mt-1 truncate ${summary.totalPendingBalance > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
+              {summary.totalPendingBalance > 0 ? 'Awaiting PCDA Credit' : 'All Clear'}
             </div>
           </div>
         </div>
@@ -2721,22 +2882,23 @@ export default function RefreshmentReports({ defaultTab }) {
               <table className="w-full text-left text-sm border-collapse">
                 <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap">
                   <tr>
-                    <th className="px-4 py-3.5 w-[24%]"># / NCC Unit Details</th>
-                    <th className="px-4 py-3.5 text-center w-[10%]">Packets</th>
-                    <th className="px-4 py-3.5 text-right w-[12%]">Total Bill (₹)</th>
-                    <th className="px-4 py-3.5 text-right w-[12%]">Paid (₹)</th>
-                    <th className="px-4 py-3.5 text-right w-[11%]">Balance (₹)</th>
-                    <th className="px-4 py-3.5 text-center w-[11%]">Payment Status</th>
-                    <th className="px-4 py-3.5 w-[14%]">Payment Details / Ref</th>
-                    {isAdmin && <th className="px-4 py-3.5 text-right w-[6%] print:hidden">Action</th>}
+                    <th className="px-3 py-3.5 w-[20%]"># / NCC Unit Details</th>
+                    <th className="px-2 py-3.5 text-center w-[7%]">Packets</th>
+                    <th className="px-3 py-3.5 text-right w-[11%]">Gross Bill (₹)</th>
+                    <th className="px-2 py-3.5 text-right w-[9%] text-rose-700">GST TDS ({filteredUnitPayments[0]?.gst_tds_rate || 2}%)</th>
+                    <th className="px-2 py-3.5 text-right w-[9%] text-rose-700">IT TDS ({filteredUnitPayments[0]?.it_tds_rate || 2}%)</th>
+                    <th className="px-2 py-3.5 text-right w-[9%] text-rose-800">Total Deduct</th>
+                    <th className="px-3 py-3.5 text-right w-[11%] text-emerald-800">Net Credit (₹)</th>
+                    <th className="px-3 py-3.5 text-center w-[12%]">PCDA / Bank Status</th>
+                    <th className="px-3 py-3.5 text-right w-[10%] print:hidden">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {filteredUnitPayments.map((u, idx) => {
                     const isExpanded = expandedUnitIds.has(u.unit_id);
                     const isPaid = u.payment_status === 'PAID';
-                    const isPartial = u.payment_status === 'PARTIAL';
-                    const isPending = !isPaid && !isPartial;
+                    const isSubmittedToPcda = Number(u.submitted_to_pcda || 0) === 1 || u.payment_status === 'SUBMITTED_TO_PCDA';
+                    const isPending = !isPaid && !isSubmittedToPcda;
 
                     return (
                       <React.Fragment key={u.unit_id}>
@@ -2748,8 +2910,8 @@ export default function RefreshmentReports({ defaultTab }) {
                           }`}
                         >
                           {/* Col 1: Expand Chevron + Unit Name & Meta */}
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-start gap-2.5">
+                          <td className="px-3 py-3.5">
+                            <div className="flex items-start gap-2">
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); toggleExpandUnit(u.unit_id); }}
@@ -2789,95 +2951,132 @@ export default function RefreshmentReports({ defaultTab }) {
                           </td>
 
                           {/* Col 2: Supplied Packets */}
-                          <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                            <span className="text-xs font-black text-indigo-950 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-xl shadow-2xs inline-block">
+                          <td className="px-2 py-3.5 text-center whitespace-nowrap">
+                            <span className="text-xs font-black text-indigo-950 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-xl shadow-2xs inline-block">
                               {Number(u.total_packets || 0).toLocaleString('en-IN')} Pkts
                             </span>
                           </td>
 
-                          {/* Col 3: Total Bill Amount (₹) */}
-                          <td className="px-4 py-3.5 text-right whitespace-nowrap font-black text-sm text-slate-900">
-                            ₹{formatAmount(u.total_amount)}
+                          {/* Col 3: Gross Bill Amount (₹) */}
+                          <td className="px-3 py-3.5 text-right whitespace-nowrap font-black text-xs sm:text-sm text-slate-900">
+                            ₹{formatAmount(u.gross_amount || u.total_amount)}
                           </td>
 
-                          {/* Col 4: Paid Amount (₹) */}
-                          <td className="px-4 py-3.5 text-right whitespace-nowrap font-black text-sm text-emerald-700">
-                            ₹{formatAmount(u.paid_amount)}
+                          {/* Col 4: GST TDS (2%) */}
+                          <td className="px-2 py-3.5 text-right whitespace-nowrap font-black text-xs text-rose-700">
+                            -₹{formatAmount(u.gst_tds_amount)}
                           </td>
 
-                          {/* Col 5: Balance Amount (₹) */}
-                          <td className={`px-4 py-3.5 text-right whitespace-nowrap font-black text-sm ${u.balance_amount > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
-                            ₹{formatAmount(u.balance_amount)}
+                          {/* Col 5: IT TDS (2%) */}
+                          <td className="px-2 py-3.5 text-right whitespace-nowrap font-black text-xs text-rose-700">
+                            -₹{formatAmount(u.it_tds_amount)}
                           </td>
 
-                          {/* Col 6: Payment Status Badge */}
-                          <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          {/* Col 6: Total Deductions (₹) */}
+                          <td className="px-2 py-3.5 text-right whitespace-nowrap font-black text-xs text-rose-800 bg-rose-50/30">
+                            -₹{formatAmount(u.total_deductions)}
+                          </td>
+
+                          {/* Col 7: Net Vendor Credit (₹) */}
+                          <td className="px-3 py-3.5 text-right whitespace-nowrap font-black text-xs sm:text-sm text-emerald-700 bg-emerald-50/30">
+                            ₹{formatAmount(u.net_credit_amount || u.expected_net_credit)}
+                          </td>
+
+                          {/* Col 8: PCDA / Bank Status Badge & Ref */}
+                          <td className="px-3 py-3.5 text-center whitespace-nowrap">
                             {isPaid ? (
-                              <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1 shadow-2xs">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>PAID</span>
-                              </span>
-                            ) : isPartial ? (
-                              <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1 shadow-2xs">
-                                <Clock className="w-3.5 h-3.5 text-amber-600" />
-                                <span>PARTIAL</span>
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-rose-50 text-rose-800 border border-rose-200 inline-flex items-center gap-1 shadow-2xs">
-                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                                <span>PENDING</span>
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Col 7: Payment Details / Ref */}
-                          <td className="px-4 py-3.5 text-xs">
-                            {u.payment_date || u.payment_ref ? (
-                              <div className="space-y-0.5">
-                                <div className="font-extrabold text-slate-800 flex items-center gap-1">
-                                  <span>{u.payment_mode || 'Bank Transfer'}</span>
-                                  {u.payment_date && <span className="text-[10px] text-slate-400 font-bold">({formatDDMMYYYY(u.payment_date)})</span>}
-                                </div>
+                              <div className="space-y-1">
+                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1 shadow-2xs">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>CREDITED (PAID)</span>
+                                </span>
                                 {u.payment_ref && (
-                                  <div className="font-mono text-[10px] font-bold text-blue-700 truncate max-w-[150px]" title={u.payment_ref}>
-                                    Ref: {u.payment_ref}
+                                  <div className="text-[10px] font-mono font-bold text-slate-600 truncate max-w-[130px] mx-auto" title={u.payment_ref}>
+                                    UTR: {u.payment_ref}
                                   </div>
                                 )}
-                                {u.remarks && (
-                                  <div className="text-[10px] text-slate-500 font-medium truncate max-w-[150px]" title={u.remarks}>
-                                    {u.remarks}
+                                {u.payment_advice_url && (
+                                  <a
+                                    href={u.payment_advice_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={e => e.stopPropagation()}
+                                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 hover:underline"
+                                    title="View Payment Advice"
+                                  >
+                                    <Paperclip className="w-3 h-3 text-emerald-600" />
+                                    <span>Bank Advice</span>
+                                  </a>
+                                )}
+                              </div>
+                            ) : isSubmittedToPcda ? (
+                              <div className="space-y-1">
+                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-blue-50 text-blue-800 border border-blue-200 inline-flex items-center gap-1 shadow-2xs">
+                                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>SUBMITTED TO PCDA</span>
+                                </span>
+                                {u.pcda_submission_date && (
+                                  <div className="text-[10px] font-bold text-slate-500">
+                                    Date: {formatDDMMYYYY(u.pcda_submission_date)}
+                                  </div>
+                                )}
+                                {u.pcda_letter_ref && (
+                                  <div className="text-[10px] font-mono font-bold text-blue-700 truncate max-w-[130px] mx-auto" title={u.pcda_letter_ref}>
+                                    Ref: {u.pcda_letter_ref}
                                   </div>
                                 )}
                               </div>
                             ) : (
-                              <span className="text-[11px] text-slate-400 font-medium italic">Awaiting payment</span>
+                              <div className="space-y-1">
+                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1 shadow-2xs">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>PENDING PCDA</span>
+                                </span>
+                                <div className="text-[10px] font-bold text-slate-400">Bill at Unit</div>
+                              </div>
                             )}
                           </td>
 
-                          {/* Col 8: Admin Action (Register / Update Payment) */}
-                          {isAdmin && (
-                            <td className="px-4 py-3.5 text-right whitespace-nowrap print:hidden" onClick={e => e.stopPropagation()}>
+                          {/* Col 9: Action Column */}
+                          <td className="px-3 py-3.5 text-right whitespace-nowrap print:hidden" onClick={e => e.stopPropagation()}>
+                            {isAdmin ? (
                               <button
                                 type="button"
-                                onClick={(e) => handleOpenPaymentModal(u, e)}
-                                className={`px-3 py-1.5 rounded-xl font-black text-xs inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 ${
+                                onClick={(e) => handleOpenAdminDetailModal(u, e)}
+                                className={`px-2.5 py-1.5 rounded-xl font-black text-xs inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 ${
                                   isPaid
                                     ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+                                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
                                 }`}
-                                title="Register or update payment received from this Unit"
+                                title="View bill calculation & verify vendor bank credit"
                               >
-                                <CreditCard className="w-3.5 h-3.5" />
-                                <span>{isPaid ? 'Edit' : 'Register'}</span>
+                                <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>{isPaid ? 'View Details' : 'Verify Credit'}</span>
                               </button>
-                            </td>
-                          )}
+                            ) : isUnit ? (
+                              <button
+                                type="button"
+                                onClick={(e) => handleOpenPcdaModal(u, e)}
+                                className={`px-2.5 py-1.5 rounded-xl font-black text-xs inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 ${
+                                  u.submitted_to_pcda
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20'
+                                }`}
+                                title="Record physical bill submission to PCDA / Higher HQ"
+                              >
+                                <FileCheck className="w-3.5 h-3.5" />
+                                <span>{u.submitted_to_pcda ? 'PCDA Done ✓' : 'Submit PCDA'}</span>
+                              </button>
+                            ) : (
+                              <span className="text-slate-400 font-bold text-xs">-</span>
+                            )}
+                          </td>
                         </tr>
 
                         {/* ─── Expandable Nested Row: Institution-wise Details ─── */}
                         {isExpanded && (
                           <tr className="bg-slate-50/70 border-y border-blue-100">
-                            <td colSpan={isAdmin ? 8 : 7} className="px-4 py-4 sm:px-8">
+                            <td colSpan={9} className="px-4 py-4 sm:px-8">
                               <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-4 space-y-3">
                                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                                   <div className="flex items-center gap-2">
@@ -2989,25 +3188,31 @@ export default function RefreshmentReports({ defaultTab }) {
                 {filteredUnitPayments.length > 0 && (
                   <tfoot className="bg-slate-50 border-t-2 border-slate-300 print:bg-slate-100 font-black">
                     <tr className="text-xs">
-                      <td className="px-4 py-3.5 text-right uppercase tracking-wider text-slate-800">
+                      <td className="px-3 py-3.5 text-right uppercase tracking-wider text-slate-800">
                         Grand Total ({summary.unitsCount} Units)
                       </td>
-                      <td className="px-4 py-3.5 text-center text-blue-700 text-sm">
+                      <td className="px-2 py-3.5 text-center text-blue-700 text-xs sm:text-sm">
                         {summary.totalPkts.toLocaleString('en-IN')} Pkts
                       </td>
-                      <td className="px-4 py-3.5 text-right text-slate-900 text-sm whitespace-nowrap">
-                        ₹{formatAmount(summary.totalAmt)}
+                      <td className="px-3 py-3.5 text-right text-slate-900 text-xs sm:text-sm whitespace-nowrap">
+                        ₹{formatAmount(summary.totalGross)}
                       </td>
-                      <td className="px-4 py-3.5 text-right text-emerald-700 text-sm whitespace-nowrap">
-                        ₹{formatAmount(summary.totalPaid)}
+                      <td className="px-2 py-3.5 text-right text-rose-700 text-xs sm:text-sm whitespace-nowrap">
+                        -₹{formatAmount(summary.totalGstTds)}
                       </td>
-                      <td className={`px-4 py-3.5 text-right text-sm whitespace-nowrap ${summary.totalBal > 0 ? 'text-amber-800' : 'text-slate-400'}`}>
-                        ₹{formatAmount(summary.totalBal)}
+                      <td className="px-2 py-3.5 text-right text-rose-700 text-xs sm:text-sm whitespace-nowrap">
+                        -₹{formatAmount(summary.totalItTds)}
                       </td>
-                      <td className="px-4 py-3.5 text-center text-xs text-slate-600">
-                        {summary.paidCount} Paid • {summary.pendingCount} Pending
+                      <td className="px-2 py-3.5 text-right text-rose-800 text-xs sm:text-sm whitespace-nowrap bg-rose-50/30">
+                        -₹{formatAmount(summary.totalDeductions)}
                       </td>
-                      <td colSpan={isAdmin ? 2 : 1} className="px-4 py-3.5"></td>
+                      <td className="px-3 py-3.5 text-right text-emerald-700 text-xs sm:text-sm whitespace-nowrap bg-emerald-50/30">
+                        ₹{formatAmount(summary.totalNetCredit)}
+                      </td>
+                      <td className="px-3 py-3.5 text-center text-xs text-slate-600">
+                        {summary.paidCount} Paid • {summary.submittedCount} Sub • {summary.pendingCount} Bal
+                      </td>
+                      <td className="px-3 py-3.5 print:hidden"></td>
                     </tr>
                   </tfoot>
                 )}
@@ -3016,192 +3221,92 @@ export default function RefreshmentReports({ defaultTab }) {
           )}
         </div>
 
-        {/* ═══ Admin Register / Update Payment Modal ═══ */}
-        {paymentModal.isOpen && paymentModal.unit && (
+        {/* ═══ Unit Action: Submit Bill to PCDA Modal ═══ */}
+        {pcdaModal.isOpen && pcdaModal.unit && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200">
-              {/* Modal Header */}
               <div className="bg-gradient-to-r from-blue-700 to-indigo-800 px-6 py-4 text-white flex items-center justify-between">
                 <div>
                   <h4 className="font-black text-base tracking-tight flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-emerald-300" />
-                    <span>Register Unit Payment</span>
+                    <FileCheck className="w-5 h-5 text-emerald-300" />
+                    <span>Submit Monthly Bill to PCDA / Higher HQ</span>
                   </h4>
                   <p className="text-xs font-bold text-blue-100 mt-0.5">
-                    {paymentModal.unit.unit_name} ({formatMonthLabel(month)})
+                    {pcdaModal.unit.unit_name} — {formatMonthLabel(month)}
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={handleClosePaymentModal}
+                  onClick={handleClosePcdaModal}
                   className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Modal Form */}
-              <form onSubmit={handleSaveUnitPayment} className="p-6 space-y-4">
-                {/* Metric Summary Banner */}
+              <form onSubmit={handleSavePcdaSubmit} className="p-6 space-y-4">
                 <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center">
                   <div>
-                    <span className="text-[10px] font-black uppercase text-slate-400 block">Total Bill</span>
-                    <span className="text-sm font-black text-slate-900">₹{formatAmount(paymentModal.unit.total_amount)}</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400 block">Gross Bill</span>
+                    <span className="text-sm font-black text-slate-900">
+                      ₹{formatAmount(pcdaModal.unit.gross_amount || pcdaModal.unit.total_amount)}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] font-black uppercase text-slate-400 block">Packets</span>
-                    <span className="text-sm font-black text-blue-700">{paymentModal.unit.total_packets} Pkts</span>
+                    <span className="text-sm font-black text-blue-700">{pcdaModal.unit.total_packets} Pkts</span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-black uppercase text-slate-400 block">Institutions</span>
-                    <span className="text-sm font-black text-slate-900">{paymentModal.unit.institutions_count}</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400 block">Schools</span>
+                    <span className="text-sm font-black text-slate-900">{pcdaModal.unit.institutions_count}</span>
                   </div>
                 </div>
 
-                {/* Quick Shortcuts */}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentModal(prev => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        payment_status: 'PAID',
-                        paid_amount: prev.unit.total_amount
-                      }
-                    }))}
-                    className="flex-1 py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-black transition-colors"
-                  >
-                    ✓ Full Payment (₹{formatAmount(paymentModal.unit.total_amount)})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentModal(prev => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        payment_status: 'PENDING',
-                        paid_amount: 0
-                      }
-                    }))}
-                    className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-black transition-colors"
-                  >
-                    Reset to Pending (₹0)
-                  </button>
+                <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-2xl text-xs text-blue-900 font-medium">
+                  Recording PCDA submission informs the vendor that all compiled refreshment bills & supporting documents have been submitted to Higher HQ / PCDA for payment release.
                 </div>
 
-                {/* Status & Amount Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                      Payment Status *
-                    </label>
-                    <select
-                      value={paymentModal.formData.payment_status}
-                      onChange={e => {
-                        const nextStatus = e.target.value;
-                        setPaymentModal(prev => ({
-                          ...prev,
-                          formData: {
-                            ...prev.formData,
-                            payment_status: nextStatus,
-                            paid_amount: nextStatus === 'PAID' ? prev.unit.total_amount : (nextStatus === 'PENDING' ? 0 : prev.formData.paid_amount)
-                          }
-                        }));
-                      }}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                    >
-                      <option value="PAID">PAID (Full)</option>
-                      <option value="PARTIAL">PARTIAL (Part Payment)</option>
-                      <option value="PENDING">PENDING (Unpaid)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                      Paid Amount (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max={paymentModal.unit.total_amount * 2}
-                      value={paymentModal.formData.paid_amount}
-                      onChange={e => setPaymentModal(prev => ({
-                        ...prev,
-                        formData: { ...prev.formData, paid_amount: e.target.value }
-                      }))}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Date & Payment Mode */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                      Payment Date
-                    </label>
-                    <input
-                      type="date"
-                      value={paymentModal.formData.payment_date}
-                      onChange={e => setPaymentModal(prev => ({
-                        ...prev,
-                        formData: { ...prev.formData, payment_date: e.target.value }
-                      }))}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                      Payment Mode
-                    </label>
-                    <select
-                      value={paymentModal.formData.payment_mode}
-                      onChange={e => setPaymentModal(prev => ({
-                        ...prev,
-                        formData: { ...prev.formData, payment_mode: e.target.value }
-                      }))}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                    >
-                      <option value="NEFT / RTGS (Bank Transfer)">NEFT / RTGS (Bank Transfer)</option>
-                      <option value="Cheque / Demand Draft">Cheque / Demand Draft</option>
-                      <option value="Government Treasury Voucher">Government Treasury Voucher</option>
-                      <option value="UPI / Online Transfer">UPI / Online Transfer</option>
-                      <option value="Cash / Other">Cash / Other</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Transaction / UTR Ref */}
                 <div>
                   <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                    Payment Reference / UTR / Cheque No.
+                    PCDA Submission Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={pcdaModal.formData.submission_date}
+                    onChange={e => setPcdaModal(prev => ({
+                      ...prev,
+                      formData: { ...prev.formData, submission_date: e.target.value }
+                    }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                    PCDA Letter / Dispatch / Diary Ref #
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. UTR1234567890 / Chq #889912"
-                    value={paymentModal.formData.payment_ref}
-                    onChange={e => setPaymentModal(prev => ({
+                    placeholder="e.g. 2DAB/REF/NOV-2026/01 or Diary #9082"
+                    value={pcdaModal.formData.letter_ref}
+                    onChange={e => setPcdaModal(prev => ({
                       ...prev,
-                      formData: { ...prev.formData, payment_ref: e.target.value }
+                      formData: { ...prev.formData, letter_ref: e.target.value }
                     }))}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
-                {/* Remarks / Notes */}
                 <div>
                   <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                    Remarks / Auditor Notes
+                    Forwarding Remarks / Notes
                   </label>
                   <textarea
                     rows={2}
-                    placeholder="Enter any reference notes or approval details..."
-                    value={paymentModal.formData.remarks}
-                    onChange={e => setPaymentModal(prev => ({
+                    placeholder="Enter any diary notes or dispatch remarks..."
+                    value={pcdaModal.formData.remarks}
+                    onChange={e => setPcdaModal(prev => ({
                       ...prev,
                       formData: { ...prev.formData, remarks: e.target.value }
                     }))}
@@ -3209,29 +3314,288 @@ export default function RefreshmentReports({ defaultTab }) {
                   />
                 </div>
 
-                {/* Action Buttons */}
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={handleClosePaymentModal}
+                    onClick={handleClosePcdaModal}
                     className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={savingPayment}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    disabled={savingAction}
+                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-md shadow-blue-600/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    {savingPayment ? (
+                    {savingAction ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Saving...</span>
+                        <span>Recording...</span>
                       </>
                     ) : (
                       <>
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Save & Register Payment</span>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Mark PCDA Submitted</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ Admin View Details & Verify Vendor Bank Credit Modal ═══ */}
+        {adminDetailModal.isOpen && adminDetailModal.unit && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 px-6 py-4 text-white flex items-center justify-between sticky top-0 z-10">
+                <div>
+                  <h4 className="font-black text-base tracking-tight flex items-center gap-2">
+                    <Eye className="w-5 h-5 text-indigo-300" />
+                    <span>Unit Monthly Bill & Vendor Bank Credit Verification</span>
+                  </h4>
+                  <p className="text-xs font-bold text-indigo-200 mt-0.5">
+                    {adminDetailModal.unit.unit_name} ({adminDetailModal.unit.ncc_group}) — {formatMonthLabel(month)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseAdminDetailModal}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleVerifyVendorCredit} className="p-6 space-y-4">
+                {/* 4 Calculation Tiles */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center">
+                    <span className="text-[10px] font-black uppercase text-slate-400 block mb-0.5">Gross Bill (100%)</span>
+                    <span className="text-sm font-black text-slate-900">
+                      ₹{formatAmount(adminDetailModal.unit.gross_amount || adminDetailModal.unit.total_amount)}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 block mt-0.5">
+                      {adminDetailModal.unit.total_packets} Packets
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-2xl text-center">
+                    <span className="text-[10px] font-black uppercase text-rose-700 block mb-0.5">
+                      GST TDS ({adminDetailModal.unit.gst_tds_rate || 2}%)
+                    </span>
+                    <span className="text-sm font-black text-rose-900">
+                      -₹{formatAmount(adminDetailModal.unit.gst_tds_amount)}
+                    </span>
+                    <span className="text-[10px] font-bold text-rose-600 block mt-0.5">Sec 51 CGST+SGST</span>
+                  </div>
+
+                  <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-2xl text-center">
+                    <span className="text-[10px] font-black uppercase text-rose-700 block mb-0.5">
+                      IT TDS ({adminDetailModal.unit.it_tds_rate || 2}%)
+                    </span>
+                    <span className="text-sm font-black text-rose-900">
+                      -₹{formatAmount(adminDetailModal.unit.it_tds_amount)}
+                    </span>
+                    <span className="text-[10px] font-bold text-rose-600 block mt-0.5">Sec 194C IT Act</span>
+                  </div>
+
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-center">
+                    <span className="text-[10px] font-black uppercase text-emerald-700 block mb-0.5">Expected Net Credit</span>
+                    <span className="text-sm font-black text-emerald-900">
+                      ₹{formatAmount(adminDetailModal.unit.expected_net_credit)}
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-600 block mt-0.5">Net to Vendor A/C</span>
+                  </div>
+                </div>
+
+                {/* PCDA Submission Status Banner */}
+                <div className={`p-3.5 rounded-2xl border text-xs flex items-center justify-between ${
+                  adminDetailModal.unit.submitted_to_pcda
+                    ? 'bg-blue-50/80 border-blue-200 text-blue-900'
+                    : 'bg-amber-50/80 border-amber-200 text-amber-900'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {adminDetailModal.unit.submitted_to_pcda ? (
+                      <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    )}
+                    <div>
+                      <span className="font-black">
+                        {adminDetailModal.unit.submitted_to_pcda
+                          ? 'PCDA Documents Submitted by Unit'
+                          : 'Pending Unit Submission to PCDA'}
+                      </span>
+                      {adminDetailModal.unit.submitted_to_pcda && (
+                        <div className="text-[11px] font-bold text-blue-700 mt-0.5">
+                          Date: {formatDDMMYYYY(adminDetailModal.unit.pcda_submission_date)}
+                          {adminDetailModal.unit.pcda_letter_ref && ` • Ref: ${adminDetailModal.unit.pcda_letter_ref}`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {adminDetailModal.unit.vendor_verified === 1 && (
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-lg font-black text-[10px] border border-emerald-300">
+                      ✓ Credit Verified
+                    </span>
+                  )}
+                </div>
+
+                {/* Bank Credit Verification Fields */}
+                <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 space-y-3">
+                  <h5 className="font-black text-xs uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-emerald-600" />
+                    <span>Vendor Bank Credit & Payment Advice Confirmation</span>
+                  </h5>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                        Actual Net Credited Amount (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={adminDetailModal.formData.paid_amount}
+                        onChange={e => setAdminDetailModal(prev => ({
+                          ...prev,
+                          formData: { ...prev.formData, paid_amount: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                        Bank Credit Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={adminDetailModal.formData.payment_date}
+                        onChange={e => setAdminDetailModal(prev => ({
+                          ...prev,
+                          formData: { ...prev.formData, payment_date: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                        Bank Reference / UTR Number *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. UTR1234567890 / RBI RTGS Ref"
+                        value={adminDetailModal.formData.payment_ref}
+                        onChange={e => setAdminDetailModal(prev => ({
+                          ...prev,
+                          formData: { ...prev.formData, payment_ref: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                        Other Deductions (if any, ₹)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={adminDetailModal.formData.other_deductions}
+                        onChange={e => setAdminDetailModal(prev => ({
+                          ...prev,
+                          formData: { ...prev.formData, other_deductions: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Payment Advice Upload */}
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                      Bank Payment Advice / Statement Proof (Vendor Upload)
+                    </label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="px-3 py-2 bg-white border border-slate-300 hover:border-blue-500 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all">
+                        <Upload className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{uploadingAdvice ? 'Uploading...' : 'Choose Advice File (PDF/Image)'}</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleUploadAdviceFile}
+                          disabled={uploadingAdvice}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {adminDetailModal.formData.payment_advice_url && (
+                        <a
+                          href={adminDetailModal.formData.payment_advice_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-2 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-black flex items-center gap-1.5 hover:bg-emerald-100 transition-colors"
+                        >
+                          <Paperclip className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>View Uploaded Advice</span>
+                          <ExternalLink className="w-3 h-3 text-emerald-600" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Remarks */}
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                      Vendor Auditor Notes / Verification Remarks
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Payment verified in Flavour Base bank account via PCDA credit..."
+                      value={adminDetailModal.formData.remarks}
+                      onChange={e => setAdminDetailModal(prev => ({
+                        ...prev,
+                        formData: { ...prev.formData, remarks: e.target.value }
+                      }))}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleCloseAdminDetailModal}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingAction || uploadingAdvice}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {savingAction ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Verifying...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Confirm & Verify Bank Credit</span>
                       </>
                     )}
                   </button>

@@ -1108,6 +1108,13 @@ export default function AppSettings() {
                   <DatabaseBackup className="w-4 h-4 text-rose-600" />
                   Data Backup
                 </button>
+                <button
+                  onClick={() => setActiveTab('tds-settings')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'tds-settings' ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-300 shadow-xs' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <IndianRupee className="w-4 h-4 text-emerald-600" />
+                  TDS & Billing Rates
+                </button>
               </>
             )}
 
@@ -1230,6 +1237,7 @@ export default function AppSettings() {
                 {activeTab === 'driver-account' && 'Configure your vehicle fleet specifications, maximum daily load capacity (packets), travel distance range, and view real-time payload metrics.'}
                 {activeTab === 'km-history' && 'Record and review daily starting and closing odometer readings for all fleet drivers.'}
                 {activeTab === 'data-backup' && 'Export a full database backup, restore from a backup file, or reset all demand records.'}
+                {activeTab === 'tds-settings' && 'Configure statutory tax deduction rates (GST TDS & Income Tax TDS) applied when Higher HQ / PCDA releases payment to vendor.'}
               </p>
             </div>
 
@@ -1847,6 +1855,11 @@ export default function AppSettings() {
                 {/* ═══ DATA BACKUP TAB ═══ */}
                 {activeTab === 'data-backup' && role === 'ADMIN' && (
                   <DataBackupPanel token={token} />
+                )}
+
+                {/* ═══ TDS & BILLING RATES TAB (ADMIN ROLE) ═══ */}
+                {activeTab === 'tds-settings' && role === 'ADMIN' && (
+                  <TdsSettingsPanel token={token} />
                 )}
 
                 {/* ═══ ANO BILL NOTICES (UNIT ROLE) ═══ */}
@@ -3297,3 +3310,166 @@ function AnoNoticeSettingsPanel({ token }) {
     </div>
   );
 }
+
+const TdsSettingsPanel = ({ token }) => {
+  const [gstRate, setGstRate] = useState(2.0);
+  const [itRate, setItRate] = useState(2.0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/refreshment-bills/tds-settings', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!cancelled && data) {
+          if (data.gst_tds_rate !== undefined) setGstRate(Number(data.gst_tds_rate));
+          if (data.it_tds_rate !== undefined) setItRate(Number(data.it_tds_rate));
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch('/api/refreshment-bills/tds-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          gst_tds_rate: Number(gstRate),
+          it_tds_rate: Number(itRate)
+        })
+      });
+      if (res.ok) {
+        toast.success('TDS & Billing rates updated successfully!');
+      } else {
+        toast.error('Failed to update TDS rates.');
+      }
+    } catch (e) {
+      toast.error('Network error saving TDS rates.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-slate-500 font-bold">
+        <RefreshCw className="w-5 h-5 animate-spin mx-auto text-blue-600 mb-2" />
+        Loading statutory TDS settings...
+      </div>
+    );
+  }
+
+  const sampleGross = 100000;
+  const sampleGst = (sampleGross * gstRate) / 100;
+  const sampleIt = (sampleGross * itRate) / 100;
+  const sampleTotalDeduct = sampleGst + sampleIt;
+  const sampleNet = sampleGross - sampleTotalDeduct;
+
+  return (
+    <div className="p-6 max-w-3xl space-y-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
+        <div>
+          <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+            <IndianRupee className="w-5 h-5 text-emerald-600" />
+            Statutory Tax Deductions (TDS Configuration)
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Configure default statutory deductions applied when Higher HQ / PCDA passes monthly refreshment bills for payment to the vendor bank account.
+          </p>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+              <label className="block text-xs font-black uppercase text-slate-700">
+                GST TDS Rate (%):
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="50"
+                  value={gstRate}
+                  onChange={e => setGstRate(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  required
+                />
+                <span className="font-black text-slate-600">%</span>
+              </div>
+              <p className="text-[10px] text-slate-500 font-bold">
+                Typically 2% (1% CGST + 1% SGST) deducted by Government Departments on taxable contracts.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+              <label className="block text-xs font-black uppercase text-slate-700">
+                Income Tax TDS Rate (%):
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="50"
+                  value={itRate}
+                  onChange={e => setItRate(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  required
+                />
+                <span className="font-black text-slate-600">%</span>
+              </div>
+              <p className="text-[10px] text-slate-500 font-bold">
+                Section 194C contractor withholding tax (typically 2% for firms/companies or 1% for individuals).
+              </p>
+            </div>
+          </div>
+
+          {/* Real-time simulation */}
+          <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200 space-y-2">
+            <div className="text-xs font-black text-blue-900 uppercase tracking-wider">
+              Calculation Simulation (Per ₹1,00,000 Gross Bill):
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="bg-white p-2 rounded-lg border border-blue-100">
+                <div className="text-[10px] font-bold text-slate-500">Gross Bill</div>
+                <div className="font-black text-slate-900">₹1,00,000</div>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-blue-100">
+                <div className="text-[10px] font-bold text-amber-600">GST TDS ({gstRate}%)</div>
+                <div className="font-black text-amber-700">-₹{sampleGst.toLocaleString('en-IN')}</div>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-blue-100">
+                <div className="text-[10px] font-bold text-rose-600">IT TDS ({itRate}%)</div>
+                <div className="font-black text-rose-700">-₹{sampleIt.toLocaleString('en-IN')}</div>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-emerald-200 bg-emerald-50/50">
+                <div className="text-[10px] font-bold text-emerald-700">Net Credit to Bank</div>
+                <div className="font-black text-emerald-800">₹{sampleNet.toLocaleString('en-IN')}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>Save TDS & Billing Rates</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
