@@ -569,105 +569,158 @@ export default function DocumentationPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-          {/* Table Header */}
-          <div className="hidden lg:grid grid-cols-12 gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500 items-center">
-            <div className="col-span-5">Delivered Institution & Demand</div>
-            <div className="col-span-2 text-center">Packets / Value</div>
-            <div className="col-span-2 text-center">Delivered By</div>
-            <div className="col-span-2 text-center">Documentation Proof</div>
-            <div className="col-span-1 text-right">Summary Card</div>
-          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                <tr>
+                  <th className="px-4 py-3.5 w-[15%]"># / Demand Ref</th>
+                  <th className="px-4 py-3.5 w-[18%]">Battalion / Unit</th>
+                  <th className="px-4 py-3.5 w-[30%]">Delivered Institution & Address</th>
+                  <th className="px-4 py-3.5 text-center w-[11%]">Packets / Value</th>
+                  <th className="px-4 py-3.5 text-center w-[12%]">Delivered By</th>
+                  <th className="px-4 py-3.5 text-center w-[10%]">Documentation Proof</th>
+                  <th className="px-4 py-3.5 text-right w-[4%]">Summary Card</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {filteredDemands.map((dem, idx) => {
+                  const hasReceipt = Boolean(dem.delivery_receipt_url);
+                  const hasInvoice = Boolean(dem.invoice_url);
+                  const isFullyDoc = hasReceipt && hasInvoice;
 
-          {/* List of Delivered Demands */}
-          <div className="divide-y divide-slate-100">
-            {filteredDemands.map((dem, idx) => {
-              const hasReceipt = Boolean(dem.delivery_receipt_url);
-              const hasInvoice = Boolean(dem.invoice_url);
-              const isFullyDoc = hasReceipt && hasInvoice;
-
-              return (
-                <div
-                  key={dem.id}
-                  onClick={() => setSelectedDemandForSummary(dem)}
-                  className="p-3 sm:p-4 hover:bg-slate-50/90 transition-colors cursor-pointer group flex flex-col lg:grid lg:grid-cols-12 lg:items-center gap-3"
-                >
-                  {/* Col 1: Demand Ref & Institution (col-span-5) */}
-                  <div className="lg:col-span-5 flex items-start gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 font-mono font-black text-xs flex items-center justify-center shrink-0 border border-emerald-200 shadow-2xs">
-                      {idx + 1}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono font-black text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                          {dem.demand_number}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-slate-400" /> {formatDDMMYYYY(dem.demand_date)}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-200">
-                          <MapPin className="w-2.5 h-2.5 text-rose-500" />
-                          PIN {dem.pin_code || 'N/A'}
-                        </span>
-                      </div>
-                      <h5 className="font-black text-xs sm:text-sm text-slate-900 uppercase tracking-tight truncate mt-1 group-hover:text-indigo-600 transition-colors">
-                        {dem.institution_name}
-                      </h5>
-                      <p className="text-[11px] text-slate-500 font-medium truncate">
-                        {dem.unit_name} {dem.ncc_group ? `• ${dem.ncc_group}` : ''}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Col 2: Quantity & Amount (col-span-2) */}
-                  <div className="lg:col-span-2 flex lg:flex-col items-center justify-between lg:justify-center text-center">
-                    <span className="text-xs font-black text-indigo-950 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-xl shadow-2xs">
-                      {dem.total_quantity || 0} Pkts
-                    </span>
-                    <span className="text-xs font-black text-emerald-700 mt-0.5">
-                      ₹{(dem.total_amount || 0).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-
-                  {/* Col 3: Delivery Partner Info (col-span-2) */}
-                  <div className="lg:col-span-2 text-center">
-                    <div className="text-xs font-extrabold text-slate-800 truncate">
-                      {dem.delivery_partner_name || 'Assigned Driver'}
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-bold truncate mt-0.5">
-                      {dem.delivery_partner_vehicle || 'Delivery Van'}
-                    </div>
-                  </div>
-
-                  {/* Col 4: Documentation Status (col-span-2) */}
-                  <div className="lg:col-span-2 flex items-center justify-center gap-1.5">
-                    {isFullyDoc ? (
-                      <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 shadow-2xs">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Verified & Fully Doc</span>
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 shadow-2xs">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                        <span>{!hasReceipt ? 'Receipt Pending' : 'Bill Pending'}</span>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Col 5: Open Summary Card (col-span-1) */}
-                  <div className="lg:col-span-1 flex items-center justify-end" onClick={e => e.stopPropagation()}>
-                    <button
-                      type="button"
+                  return (
+                    <tr
+                      key={dem.id}
                       onClick={() => setSelectedDemandForSummary(dem)}
-                      className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-black text-xs shadow-xs transition-colors flex items-center gap-1 active:scale-95"
-                      title="Open Delivery Summary Card & Upload Documents"
+                      className="hover:bg-slate-50/90 transition-colors cursor-pointer group"
                     >
-                      <span>Card</span>
-                      <ExternalLink className="w-3 h-3 opacity-80" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                      {/* Col 1: # & Demand Ref (Bold & Prominent) */}
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 font-mono font-black text-xs flex items-center justify-center shrink-0 border border-emerald-200 shadow-2xs">
+                            {idx + 1}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-mono font-black text-base text-blue-700 group-hover:text-blue-800 tracking-tight">
+                              {dem.demand_number}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 mt-0.5">
+                              <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                              {formatDDMMYYYY(dem.demand_date)}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Col 2: Battalion / Unit */}
+                      <td className="px-4 py-3.5">
+                        <div className="font-extrabold text-xs text-slate-900" title={dem.unit_name}>
+                          {dem.unit_name || 'General Unit'}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          {dem.unit_code && (
+                            <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded text-[10px] font-mono font-bold border border-slate-200">
+                              {dem.unit_code}
+                            </span>
+                          )}
+                          {dem.ncc_group && (
+                            <span className="px-1.5 py-0.2 bg-amber-50 text-amber-800 rounded text-[10px] font-extrabold border border-amber-200">
+                              {dem.ncc_group}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Col 3: Delivered Institution & PIN & Address */}
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h5 className="font-black text-xs sm:text-sm text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">
+                            {dem.institution_name}
+                          </h5>
+                          {dem.pin_code && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-200 shrink-0">
+                              <MapPin className="w-2.5 h-2.5 text-rose-500" />
+                              PIN {dem.pin_code}
+                            </span>
+                          )}
+                        </div>
+                        {dem.complete_address && (
+                          <p className="text-[11px] text-slate-500 font-medium truncate max-w-xl mt-0.5" title={dem.complete_address}>
+                            {dem.complete_address}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Col 4: Quantity & Amount */}
+                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                        <span className="text-xs font-black text-indigo-950 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-xl shadow-2xs inline-block">
+                          {dem.total_quantity || 0} Pkts
+                        </span>
+                        <div className="text-xs font-black text-emerald-700 mt-0.5">
+                          ₹{(dem.total_amount || 0).toLocaleString('en-IN')}
+                        </div>
+                      </td>
+
+                      {/* Col 5: Delivered By */}
+                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                        <div className="text-xs font-extrabold text-slate-800" title={dem.delivery_partner_name}>
+                          {dem.delivery_partner_name || 'Assigned Driver'}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold mt-0.5">
+                          {dem.delivery_partner_vehicle || 'Delivery Van'}
+                        </div>
+                      </td>
+
+                      {/* Col 6: Documentation Proof */}
+                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          {isFullyDoc ? (
+                            <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Verified & Fully Doc</span>
+                            </span>
+                          ) : (
+                            <>
+                              {hasReceipt ? (
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Receipt
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 text-amber-600" /> Receipt Pending
+                                </span>
+                              )}
+                              {hasInvoice ? (
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-indigo-600" /> Bill
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 text-amber-600" /> Bill Pending
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Col 7: Summary Card */}
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDemandForSummary(dem)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-black text-xs shadow-xs transition-colors inline-flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                          title="Open Delivery Summary Card & Upload Documents"
+                        >
+                          <span>Card</span>
+                          <ExternalLink className="w-3 h-3 opacity-80" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
