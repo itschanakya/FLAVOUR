@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import { Link } from 'react-router-dom';
+import { getDocumentViewUrl, getDocumentImageUrl } from '../utils/documentViewer';
 import {
   FileCheck, CheckCircle2, Calendar, Upload, FileText,
   IndianRupee, MapPin, RefreshCw, School, Package, Users,
@@ -694,7 +695,7 @@ export default function DocumentationPage() {
                         <div className="flex items-center justify-between gap-1.5 flex-wrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <a
-                              href={selectedDemandForSummary.delivery_receipt_url}
+                              href={getDocumentViewUrl(selectedDemandForSummary.delivery_receipt_url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
@@ -704,7 +705,7 @@ export default function DocumentationPage() {
                             </a>
                             {selectedDemandForSummary.delivery_receipt_url.includes('cloudinary.com') && selectedDemandForSummary.delivery_receipt_url.toLowerCase().endsWith('.pdf') && (
                               <a
-                                href={selectedDemandForSummary.delivery_receipt_url.replace(/\.pdf$/i, '.jpg')}
+                                href={getDocumentImageUrl(selectedDemandForSummary.delivery_receipt_url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-0.5"
@@ -741,7 +742,7 @@ export default function DocumentationPage() {
                         <div className="flex items-center justify-between gap-1.5 flex-wrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <a
-                              href={selectedDemandForSummary.invoice_url}
+                              href={getDocumentViewUrl(selectedDemandForSummary.invoice_url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
@@ -751,7 +752,7 @@ export default function DocumentationPage() {
                             </a>
                             {selectedDemandForSummary.invoice_url.includes('cloudinary.com') && selectedDemandForSummary.invoice_url.toLowerCase().endsWith('.pdf') && (
                               <a
-                                href={selectedDemandForSummary.invoice_url.replace(/\.pdf$/i, '.jpg')}
+                                href={getDocumentImageUrl(selectedDemandForSummary.invoice_url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-0.5"

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
+import { getDocumentViewUrl, getDocumentImageUrl } from '../utils/documentViewer';
 import { FileText, FileCheck, Eye, Search, Calendar, MessageSquare, AlertCircle, CheckCircle, Truck, ClipboardList, Clock, MapPin, Ban } from 'lucide-react';
 
 const formatDMY = (dateStr) => {
@@ -328,7 +329,7 @@ export default function MyDemandsList() {
                         )}
                         {dem.delivery_receipt_url ? (
                           <a
-                            href={dem.delivery_receipt_url}
+                            href={getDocumentViewUrl(dem.delivery_receipt_url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors shadow-2xs"
@@ -344,7 +345,7 @@ export default function MyDemandsList() {
 
                         {dem.invoice_url ? (
                           <a
-                            href={dem.invoice_url}
+                            href={getDocumentViewUrl(dem.invoice_url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors shadow-2xs"
@@ -413,7 +414,7 @@ export default function MyDemandsList() {
                   {selectedDemand.delivery_receipt_url && (
                     <div className="inline-flex items-center gap-1">
                       <a
-                        href={selectedDemand.delivery_receipt_url}
+                        href={getDocumentViewUrl(selectedDemand.delivery_receipt_url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all"
@@ -422,7 +423,7 @@ export default function MyDemandsList() {
                       </a>
                       {selectedDemand.delivery_receipt_url.includes('cloudinary.com') && selectedDemand.delivery_receipt_url.toLowerCase().endsWith('.pdf') && (
                         <a
-                          href={selectedDemand.delivery_receipt_url.replace(/\.pdf$/i, '.jpg')}
+                          href={getDocumentImageUrl(selectedDemand.delivery_receipt_url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-2 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs"
@@ -436,7 +437,7 @@ export default function MyDemandsList() {
                   {selectedDemand.invoice_url && (
                     <div className="inline-flex items-center gap-1">
                       <a
-                        href={selectedDemand.invoice_url}
+                        href={getDocumentViewUrl(selectedDemand.invoice_url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all"
@@ -445,7 +446,7 @@ export default function MyDemandsList() {
                       </a>
                       {selectedDemand.invoice_url.includes('cloudinary.com') && selectedDemand.invoice_url.toLowerCase().endsWith('.pdf') && (
                         <a
-                          href={selectedDemand.invoice_url.replace(/\.pdf$/i, '.jpg')}
+                          href={getDocumentImageUrl(selectedDemand.invoice_url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-2 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold text-xs"

@@ -9,6 +9,55 @@ const { broadcastToAll } = require('../sse');
 
 const { uploadReceipt, getFileUrl } = require('../config/upload');
 const { chargeOffDemandStock, revertDemandStockChargeOff } = require('../utils/stockChargeOff');
+const cloudinary = require('cloudinary').v2;
+
+if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  });
+}
+
+// GET /api/delivery/view-doc - Safely view receipt/invoice PDFs or images with authorized signature
+router.get('/view-doc', async (req, res) => {
+  try {
+    const docUrl = req.query.url;
+    if (!docUrl || typeof docUrl !== 'string') {
+      return res.status(400).send('Invalid or missing document URL');
+    }
+
+    // If it's a Cloudinary URL
+    if (docUrl.includes('cloudinary.com')) {
+      const match = docUrl.match(/\/image\/upload\/(?:s--[^/]+--\/)?(?:v\d+\/)?([^?#]+)\.([a-zA-Z0-9]+)(?:[?#]|$)/);
+      if (match) {
+        const publicId = match[1];
+        const format = match[2].toLowerCase();
+
+        if (format === 'pdf' && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+          // Generate private authorized download URL that bypasses Cloudinary's raw PDF delivery block
+          const privateUrl = cloudinary.utils.private_download_url(publicId, 'pdf', {
+            resource_type: 'image',
+            type: 'upload',
+            expires_at: Math.floor(Date.now() / 1000) + 7200
+          });
+          return res.redirect(302, privateUrl);
+        }
+      }
+      return res.redirect(302, docUrl);
+    }
+
+    // Local /uploads/ files
+    if (docUrl.startsWith('/uploads/')) {
+      return res.redirect(302, docUrl);
+    }
+
+    return res.redirect(302, docUrl);
+  } catch (error) {
+    console.error('View doc error:', error);
+    res.status(500).send('Failed to generate document view');
+  }
+});
 
 // GET /api/delivery/demands - List demands ready/scheduled for physical delivery
 router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {

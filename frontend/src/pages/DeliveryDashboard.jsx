@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
+import { getDocumentViewUrl, getDocumentImageUrl } from '../utils/documentViewer';
 import {
   Gauge,
   Truck, MapPin, Navigation, Phone, MessageCircle, Calendar, Clock,
@@ -1038,7 +1039,7 @@ export default function DeliveryDashboard() {
                         {dem.delivery_receipt_url ? (
                           <>
                             <a
-                              href={dem.delivery_receipt_url}
+                              href={getDocumentViewUrl(dem.delivery_receipt_url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold rounded-lg flex items-center gap-1 text-[11px] transition-colors"
@@ -1048,7 +1049,7 @@ export default function DeliveryDashboard() {
                             </a>
                             {dem.delivery_receipt_url.includes('cloudinary.com') && dem.delivery_receipt_url.toLowerCase().endsWith('.pdf') && (
                               <a
-                                href={dem.delivery_receipt_url.replace(/\.pdf$/i, '.jpg')}
+                                href={getDocumentImageUrl(dem.delivery_receipt_url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold rounded-lg text-[10px] transition-colors"

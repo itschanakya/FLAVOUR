@@ -1,0 +1,1 @@
+function n(e){return!e||typeof e!="string"?"":e.includes("cloudinary.com")&&e.toLowerCase().endsWith(".pdf")?`/api/delivery/view-doc?url=${encodeURIComponent(e)}`:e}function t(e){return!e||typeof e!="string"?"":e.includes("cloudinary.com")&&e.toLowerCase().endsWith(".pdf")?e.replace(/\.pdf$/i,".jpg"):e}export{t as a,n as g};
