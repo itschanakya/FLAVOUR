@@ -237,6 +237,7 @@ export default function Layout({ children }) {
       { path: '/unit-demand', label: 'Refreshment Demand', icon: ShoppingBag },
       { path: '/institutions', label: 'Institutions & Vacancy', icon: School },
       { path: '/review-demands', label: 'Review Demands Queue', icon: FileCheck },
+      { path: '/ano-bill-returns', label: 'ANO Bill Returns', icon: Receipt },
       { path: '/reports', label: 'Reports & Analytics', icon: Layers }
     ],
     INSTITUTION: [
@@ -269,6 +270,7 @@ export default function Layout({ children }) {
       { path: '/unit-demand', label: 'Demand', icon: ShoppingBag },
       { path: '/review-demands', label: 'Review', icon: FileCheck },
       { path: '/institutions', label: 'Institutes', icon: School },
+      { path: '/ano-bill-returns', label: 'Bill Returns', icon: Receipt },
       { path: '/reports', label: 'Reports', icon: Layers }
     ],
     INSTITUTION: [
@@ -388,6 +390,12 @@ export default function Layout({ children }) {
       inactive: 'text-violet-950 hover:text-violet-700 hover:bg-violet-50/90 border-violet-200/80 hover:border-violet-400 bg-white/90',
       iconActive: 'text-white',
       iconInactive: 'text-violet-600 group-hover:scale-110'
+    },
+    '/ano-bill-returns': {
+      active: 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-rose-500/30 border-rose-600',
+      inactive: 'text-rose-950 hover:text-rose-700 hover:bg-rose-50/90 border-rose-200/80 hover:border-rose-400 bg-white/90',
+      iconActive: 'text-white',
+      iconInactive: 'text-rose-600 group-hover:scale-110'
     },
     '/bill-collection': {
       active: 'bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-md shadow-rose-500/30 border-rose-600',

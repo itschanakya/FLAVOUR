@@ -44,18 +44,51 @@ const StatCard = ({ icon, label, value, color, sub }) => (
   </div>
 );
 
-export default function RefreshmentReports() {
+export default function RefreshmentReports({ defaultTab }) {
   const { user, token } = useAuth();
+  const isUnit = user?.role === 'UNIT';
   
   const [activeTab, setActiveTab] = useState(() => {
     try {
+      if (defaultTab) {
+        if (defaultTab === 'ano_bill_returns' && user?.role !== 'UNIT') {
+          return 'unitwise_monthly';
+        }
+        return defaultTab;
+      }
       const p = new URLSearchParams(window.location.search).get('tab');
-      if (p) return p;
+      if (p) {
+        if (p === 'ano_bill_returns' && user?.role !== 'UNIT') {
+          return 'unitwise_monthly';
+        }
+        return p;
+      }
       const savedTab = sessionStorage.getItem('ncc_reports_active_tab');
-      if (savedTab) return savedTab;
+      if (savedTab) {
+        if (savedTab === 'ano_bill_returns' && user?.role !== 'UNIT') {
+          return 'unitwise_monthly';
+        }
+        return savedTab;
+      }
     } catch (e) {}
     return 'unitwise_monthly'; // Default to unitwise monthly summary
   }); // weekly | unitwise_monthly | audit | annual | ano_bill_returns | bill
+
+  useEffect(() => {
+    if (defaultTab) {
+      if (defaultTab === 'ano_bill_returns' && user?.role !== 'UNIT') {
+        setActiveTab('unitwise_monthly');
+      } else {
+        setActiveTab(defaultTab);
+      }
+    }
+  }, [defaultTab, user?.role]);
+
+  useEffect(() => {
+    if (user?.role && user.role !== 'UNIT' && activeTab === 'ano_bill_returns') {
+      setActiveTab('unitwise_monthly');
+    }
+  }, [user?.role, activeTab]);
 
   useEffect(() => {
     try {
@@ -3214,7 +3247,7 @@ export default function RefreshmentReports() {
             { id: 'unitwise_monthly', label: 'Unitwise Monthly Summary' },
             { id: 'audit', label: 'Monthly Summary' },
             { id: 'annual', label: 'Annual Quota Summary' },
-            { id: 'ano_bill_returns', label: 'ANO Bill Returns & Reminders' },
+            ...(isUnit ? [{ id: 'ano_bill_returns', label: 'ANO Bill Returns & Reminders' }] : []),
             { id: 'bill', label: 'Bill Tracking & Payments' }
           ].map(tab => (
             <button
@@ -3246,7 +3279,7 @@ export default function RefreshmentReports() {
       {activeTab === 'unitwise_monthly' && <UnitwiseMonthlySummaryView />}
       {activeTab === 'audit' && <AuditTrailView />}
       {activeTab === 'annual' && <AnnualSummaryView />}
-      {activeTab === 'ano_bill_returns' && <AnoBillReturnsView />}
+      {activeTab === 'ano_bill_returns' && isUnit && <AnoBillReturnsView />}
       {activeTab === 'bill' && <BillTrackerView />}
     </div>
   );

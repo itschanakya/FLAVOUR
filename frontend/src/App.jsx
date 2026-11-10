@@ -86,6 +86,7 @@ export default function App() {
                   <Route path="/distribution" element={<ProtectedRoute allowedRoles={['ADMIN']}><Distribution /></ProtectedRoute>} />
                   <Route path="/admin/delivery-tracking" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDeliveryTracking /></ProtectedRoute>} />
                   <Route path="/documentation" element={<ProtectedRoute><DocumentationPage /></ProtectedRoute>} />
+                  <Route path="/ano-bill-returns" element={<ProtectedRoute allowedRoles={['UNIT']}><RefreshmentReports defaultTab="ano_bill_returns" /></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute><RefreshmentReports /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><AppSettings /></ProtectedRoute>} />
                   <Route path="/summary" element={<ProtectedRoute><SummaryRouter /></ProtectedRoute>} />
