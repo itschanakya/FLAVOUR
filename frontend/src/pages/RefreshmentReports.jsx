@@ -1798,9 +1798,18 @@ export default function RefreshmentReports({ defaultTab }) {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-xs cursor-pointer"
               >
                 <option value="All">🏫 All Institutions ({availableInstitutions.length})</option>
-                {availableInstitutions.map(inst => (
-                  <option key={inst.id} value={inst.id}>{inst.institution_name}</option>
-                ))}
+                {availableInstitutions.map(inst => {
+                  const mCount = (demands || []).filter(d => 
+                    d.institution_id === inst.id && 
+                    String(d.demand_date).slice(0, 7) === selectedMonth &&
+                    (unitFilter === 'All' || d.unit_name === unitFilter)
+                  ).length;
+                  return (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.institution_name} {mCount > 0 ? `(${mCount} demands in ${selectedMonth})` : `(0 demands in ${selectedMonth})`}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -2020,6 +2029,22 @@ export default function RefreshmentReports({ defaultTab }) {
               )}
             </table>
           </div>
+
+          {/* Month Demands Scope Notice */}
+          {availableInstitutions.length > groupedByInstitution.length && (
+            <div className="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-600 font-medium flex flex-wrap items-center justify-between gap-2 print:hidden">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                <span>
+                  Showing <b>{groupedByInstitution.length}</b> of <b>{availableInstitutions.length}</b> {fundingFilter !== 'ALL' ? (fundingFilter === 'CENTRE' ? 'Centre' : 'State') : ''} institutions with demands in <b>{monthDisplayStr}</b>.
+                  {availableInstitutions.length - groupedByInstitution.length > 0 && ` (${availableInstitutions.length - groupedByInstitution.length} other registered institution(s) had 0 demands scheduled in this month).`}
+                </span>
+              </div>
+              <span className="text-[11px] text-blue-700 font-bold bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                Tip: Select earlier months (e.g. October 2026) to view their demands.
+              </span>
+            </div>
+          )}
         </div>
       </div>
     );

@@ -405,6 +405,26 @@ router.patch('/:id/type', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), as
   }
 });
 
+// PATCH /api/institutions/:id/type - Quick toggle between STATE and CENTRE funding type
+router.patch('/:id/type', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (req, res) => {
+  try {
+    const { institution_type } = req.body;
+    const instType = institution_type === 'CENTRE' ? 'CENTRE' : 'STATE';
+    const db = await getDB();
+
+    if (req.user.role === 'UNIT') {
+      const owned = await db.get('SELECT id FROM institutions WHERE id = ? AND unit_id = ?', [req.params.id, req.user.unit_id]);
+      if (!owned) return res.status(403).json({ error: 'Unauthorized to update this institution.' });
+    }
+
+    await db.run('UPDATE institutions SET institution_type = ? WHERE id = ?', [instType, req.params.id]);
+    res.json({ success: true, id: req.params.id, institution_type: instType });
+  } catch (error) {
+    console.error('Update institution type error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update institution funding type.' });
+  }
+});
+
 // PUT /api/institutions/:id/schedule - Institution or Unit/Admin updates their schedule
 router.put('/:id/schedule', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN'), async (req, res) => {
   try {
