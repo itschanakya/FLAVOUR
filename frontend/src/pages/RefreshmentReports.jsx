@@ -33,6 +33,13 @@ const getLocalYearMonth = () => {
   return `${year}-${month}`;
 };
 
+const formatMonthLabel = (ym) => {
+  if (!ym || !/^\d{4}-\d{2}$/.test(String(ym))) return String(ym || '');
+  const [y, m] = String(ym).split('-');
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }).toUpperCase();
+};
+
 const StatCard = ({ icon, label, value, color, sub }) => (
   <div className={`p-4 rounded-xl border border-${color}-200 bg-${color}-50/30`}>
     <div className={`flex items-center gap-2 text-${color}-600 mb-1`}>
