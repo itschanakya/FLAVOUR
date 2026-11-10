@@ -618,14 +618,27 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
               </span>
               <div className="flex flex-col sm:flex-row gap-2">
                 {currentDemand.delivery_receipt_url ? (
-                  <a
-                    href={currentDemand.delivery_receipt_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 rounded-2xl font-black text-xs transition-all shadow-md shadow-emerald-500/20"
-                  >
-                    <FileText className="w-4 h-4" /> View Signed Receipt ↗
-                  </a>
+                  <div className="flex-1 flex flex-col gap-1">
+                    <a
+                      href={currentDemand.delivery_receipt_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 rounded-2xl font-black text-xs transition-all shadow-md shadow-emerald-500/20"
+                    >
+                      <FileText className="w-4 h-4" /> View Signed Receipt ↗
+                    </a>
+                    {currentDemand.delivery_receipt_url.includes('cloudinary.com') && currentDemand.delivery_receipt_url.toLowerCase().endsWith('.pdf') && (
+                      <a
+                        href={currentDemand.delivery_receipt_url.replace(/\.pdf$/i, '.jpg')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-center text-[10.5px] font-bold text-emerald-700 hover:underline"
+                        title="View rendered preview image (works without Cloudinary PDF restrictions)"
+                      >
+                        Preview as Image ↗
+                      </a>
+                    )}
+                  </div>
                 ) : (
                   <div className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-slate-100 text-slate-400 border border-slate-200 rounded-2xl font-medium text-xs">
                     <FileText className="w-4 h-4 text-slate-300" /> Receipt: Pending Upload
@@ -633,14 +646,27 @@ export default function DemandDetailSidePanel({ demand, onClose, token }) {
                 )}
 
                 {currentDemand.invoice_url ? (
-                  <a
-                    href={currentDemand.invoice_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-700 rounded-2xl font-black text-xs transition-all shadow-md shadow-indigo-500/20"
-                  >
-                    <FileCheck className="w-4 h-4" /> View Bill / Invoice ↗
-                  </a>
+                  <div className="flex-1 flex flex-col gap-1">
+                    <a
+                      href={currentDemand.invoice_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-700 rounded-2xl font-black text-xs transition-all shadow-md shadow-indigo-500/20"
+                    >
+                      <FileCheck className="w-4 h-4" /> View Bill / Invoice ↗
+                    </a>
+                    {currentDemand.invoice_url.includes('cloudinary.com') && currentDemand.invoice_url.toLowerCase().endsWith('.pdf') && (
+                      <a
+                        href={currentDemand.invoice_url.replace(/\.pdf$/i, '.jpg')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-center text-[10.5px] font-bold text-indigo-700 hover:underline"
+                        title="View rendered preview image (works without Cloudinary PDF restrictions)"
+                      >
+                        Preview as Image ↗
+                      </a>
+                    )}
+                  </div>
                 ) : (
                   <div className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-slate-100 text-slate-400 border border-slate-200 rounded-2xl font-medium text-xs">
                     <FileCheck className="w-4 h-4 text-slate-300" /> Bill: Pending

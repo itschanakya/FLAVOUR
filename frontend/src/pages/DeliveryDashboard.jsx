@@ -1034,17 +1034,30 @@ export default function DeliveryDashboard() {
 
                     {/* Signed Delivery Receipt Section */}
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-white p-2.5 rounded-xl border border-slate-200">
-                      <div className="flex items-center gap-2 text-xs w-full sm:w-auto">
+                      <div className="flex items-center gap-1.5 flex-wrap text-xs w-full sm:w-auto">
                         {dem.delivery_receipt_url ? (
-                          <a
-                            href={dem.delivery_receipt_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold rounded-lg flex items-center gap-1 text-[11px] transition-colors"
-                          >
-                            <FileText className="w-3 h-3 text-emerald-600" />
-                            <span>View Signed Receipt</span>
-                          </a>
+                          <>
+                            <a
+                              href={dem.delivery_receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold rounded-lg flex items-center gap-1 text-[11px] transition-colors"
+                            >
+                              <FileText className="w-3 h-3 text-emerald-600" />
+                              <span>View Signed Receipt</span>
+                            </a>
+                            {dem.delivery_receipt_url.includes('cloudinary.com') && dem.delivery_receipt_url.toLowerCase().endsWith('.pdf') && (
+                              <a
+                                href={dem.delivery_receipt_url.replace(/\.pdf$/i, '.jpg')}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold rounded-lg text-[10px] transition-colors"
+                                title="Open preview as image"
+                              >
+                                View as Image
+                              </a>
+                            )}
+                          </>
                         ) : (
                           <span className="text-[10px] font-bold text-slate-400 italic">
                             Receipt: Not yet uploaded

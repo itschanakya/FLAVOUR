@@ -691,15 +691,29 @@ export default function DocumentationPage() {
                         1. Signed Delivery Receipt
                       </label>
                       {selectedDemandForSummary.delivery_receipt_url ? (
-                        <div className="flex items-center justify-between gap-1.5">
-                          <a
-                            href={selectedDemandForSummary.delivery_receipt_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> View Receipt
-                          </a>
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <a
+                              href={selectedDemandForSummary.delivery_receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                              title="Open original PDF / Document"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> View Receipt
+                            </a>
+                            {selectedDemandForSummary.delivery_receipt_url.includes('cloudinary.com') && selectedDemandForSummary.delivery_receipt_url.toLowerCase().endsWith('.pdf') && (
+                              <a
+                                href={selectedDemandForSummary.delivery_receipt_url.replace(/\.pdf$/i, '.jpg')}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-0.5"
+                                title="Open rendered preview image (bypasses direct PDF delivery restrictions)"
+                              >
+                                View as Image
+                              </a>
+                            )}
+                          </div>
                           <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
                             Uploaded
                           </span>
@@ -724,15 +738,29 @@ export default function DocumentationPage() {
                         2. Vendor Bill / Invoice
                       </label>
                       {selectedDemandForSummary.invoice_url ? (
-                        <div className="flex items-center justify-between gap-1.5">
-                          <a
-                            href={selectedDemandForSummary.invoice_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> View Invoice
-                          </a>
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <a
+                              href={selectedDemandForSummary.invoice_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                              title="Open original PDF / Invoice"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> View Invoice
+                            </a>
+                            {selectedDemandForSummary.invoice_url.includes('cloudinary.com') && selectedDemandForSummary.invoice_url.toLowerCase().endsWith('.pdf') && (
+                              <a
+                                href={selectedDemandForSummary.invoice_url.replace(/\.pdf$/i, '.jpg')}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-0.5"
+                                title="Open rendered preview image (bypasses direct PDF delivery restrictions)"
+                              >
+                                View as Image
+                              </a>
+                            )}
+                          </div>
                           <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
                             Uploaded
                           </span>

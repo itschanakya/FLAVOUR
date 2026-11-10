@@ -411,24 +411,50 @@ export default function MyDemandsList() {
                 </span>
                 <div className="flex flex-wrap gap-2.5">
                   {selectedDemand.delivery_receipt_url && (
-                    <a
-                      href={selectedDemand.delivery_receipt_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all"
-                    >
-                      <FileCheck className="w-4 h-4" /> View Signed Receipt
-                    </a>
+                    <div className="inline-flex items-center gap-1">
+                      <a
+                        href={selectedDemand.delivery_receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all"
+                      >
+                        <FileCheck className="w-4 h-4" /> View Signed Receipt
+                      </a>
+                      {selectedDemand.delivery_receipt_url.includes('cloudinary.com') && selectedDemand.delivery_receipt_url.toLowerCase().endsWith('.pdf') && (
+                        <a
+                          href={selectedDemand.delivery_receipt_url.replace(/\.pdf$/i, '.jpg')}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs"
+                          title="Open preview as image"
+                        >
+                          Image
+                        </a>
+                      )}
+                    </div>
                   )}
                   {selectedDemand.invoice_url && (
-                    <a
-                      href={selectedDemand.invoice_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all"
-                    >
-                      <FileText className="w-4 h-4" /> View Bill / Invoice
-                    </a>
+                    <div className="inline-flex items-center gap-1">
+                      <a
+                        href={selectedDemand.invoice_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all"
+                      >
+                        <FileText className="w-4 h-4" /> View Bill / Invoice
+                      </a>
+                      {selectedDemand.invoice_url.includes('cloudinary.com') && selectedDemand.invoice_url.toLowerCase().endsWith('.pdf') && (
+                        <a
+                          href={selectedDemand.invoice_url.replace(/\.pdf$/i, '.jpg')}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold text-xs"
+                          title="Open preview as image"
+                        >
+                          Image
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

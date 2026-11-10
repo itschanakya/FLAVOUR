@@ -25,7 +25,8 @@ const getStorage = (folderName) => {
       params: {
         folder: `ncc_refreshment/${folderName}`,
         allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
-        resource_type: 'auto'
+        resource_type: 'auto',
+        access_mode: 'public'
       }
     });
   } else {
