@@ -18,6 +18,28 @@ async function ensureBillColumns(db) {
   for (const sql of cols) {
     try { await db.run(sql); } catch (e) {}
   }
+  try {
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS unit_monthly_payments (
+        id INTEGER PRIMARY KEY AUTO_INCREMENT,
+        unit_id INTEGER NOT NULL,
+        month VARCHAR(50) NOT NULL,
+        total_packets INTEGER DEFAULT 0,
+        total_amount REAL DEFAULT 0,
+        paid_amount REAL DEFAULT 0,
+        payment_status VARCHAR(50) DEFAULT 'PENDING',
+        payment_date TEXT,
+        payment_mode TEXT,
+        payment_ref TEXT,
+        remarks TEXT,
+        registered_by INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (unit_id) REFERENCES units(id),
+        UNIQUE(unit_id, month)
+      )
+    `);
+  } catch (e) {}
   billColsVerified = true;
 }
 
@@ -536,6 +558,271 @@ router.put('/ano-popup-setting', authenticateToken, authorizeRoles('ADMIN', 'UNI
   } catch (error) {
     console.error('Save ano popup setting error:', error);
     res.status(500).json({ error: 'Failed to save setting.' });
+  }
+});
+
+// GET /api/refreshment-bills/unit-payments - Unit-wise monthly bill & payment tracking with expandable institutions
+router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'), async (req, res) => {
+  try {
+    const db = await getDB();
+    await ensureBillColumns(db);
+    const { month, ncc_group, unit_id } = req.query;
+
+    if (!month) {
+      return res.status(400).json({ error: 'Month parameter (YYYY-MM) is required.' });
+    }
+
+    // 1. Fetch units
+    let unitQuery = 'SELECT id, unit_name, unit_code, location, ncc_group FROM units WHERE is_deleted = 0';
+    const unitParams = [];
+    if (req.user.role === 'UNIT') {
+      unitQuery += ' AND id = ?';
+      unitParams.push(req.user.unit_id);
+    } else if (unit_id && unit_id !== 'ALL') {
+      unitQuery += ' AND id = ?';
+      unitParams.push(unit_id);
+    } else if (ncc_group && ncc_group !== 'All') {
+      unitQuery += ' AND ncc_group = ?';
+      unitParams.push(ncc_group);
+    }
+    unitQuery += ' ORDER BY unit_name ASC';
+    const units = await db.all(unitQuery, unitParams);
+
+    // 2. Fetch demands for the month
+    const demandsQuery = `
+      SELECT
+        d.id, d.demand_number, d.demand_date, d.status, d.invoice_no, d.invoice_date,
+        d.total_quantity, d.total_amount, d.institution_id, d.unit_id,
+        i.institution_name, i.ano_cto_name, i.ano_cto_contact, i.pin_code
+      FROM demands d
+      JOIN institutions i ON d.institution_id = i.id
+      WHERE d.is_deleted = 0
+        AND d.status NOT IN ('CANCELLED', 'REJECTED')
+        AND LEFT(d.demand_date, 7) = ?
+      ORDER BY i.institution_name ASC, d.demand_date ASC
+    `;
+    const demands = await db.all(demandsQuery, [month]);
+
+    // 3. Fetch unit_monthly_payments for the month
+    const unitPayments = await db.all(
+      'SELECT * FROM unit_monthly_payments WHERE month = ?',
+      [month]
+    );
+    const paymentMap = {};
+    unitPayments.forEach(p => {
+      paymentMap[p.unit_id] = p;
+    });
+
+    // 4. Fetch refreshment_bills for the month
+    const instBills = await db.all(
+      'SELECT * FROM refreshment_bills WHERE month = ?',
+      [month]
+    );
+    const instBillMap = {};
+    instBills.forEach(b => {
+      instBillMap[b.institution_id] = b;
+    });
+
+    // 5. Group demands by unit & institution
+    const unitDataMap = {};
+    units.forEach(u => {
+      unitDataMap[u.id] = {
+        unit_id: u.id,
+        unit_name: u.unit_name,
+        unit_code: u.unit_code,
+        location: u.location,
+        ncc_group: u.ncc_group,
+        month,
+        month_label: formatMonthLabel(month),
+        total_packets: 0,
+        total_amount: 0,
+        institutions_map: {}
+      };
+    });
+
+    demands.forEach(d => {
+      if (!unitDataMap[d.unit_id]) return;
+      const uEntry = unitDataMap[d.unit_id];
+      const q = Number(d.total_quantity) || 0;
+      const a = Number(d.total_amount) || 0;
+      uEntry.total_packets += q;
+      uEntry.total_amount += a;
+
+      if (!uEntry.institutions_map[d.institution_id]) {
+        const bRec = instBillMap[d.institution_id];
+        uEntry.institutions_map[d.institution_id] = {
+          institution_id: d.institution_id,
+          institution_name: d.institution_name,
+          ano_cto_name: d.ano_cto_name || '',
+          ano_cto_contact: d.ano_cto_contact || '',
+          pin_code: d.pin_code || '',
+          total_packets: 0,
+          total_amount: 0,
+          demand_count: 0,
+          demands: [],
+          bill_submitted: Number(bRec?.bill_submitted || 0) === 1 ? 1 : 0,
+          bill_submitted_date: bRec?.bill_submitted_date || null,
+          payment_status: bRec?.payment_status || 'PENDING'
+        };
+      }
+      const instEntry = uEntry.institutions_map[d.institution_id];
+      instEntry.total_packets += q;
+      instEntry.total_amount += a;
+      instEntry.demand_count += 1;
+      instEntry.demands.push({
+        id: d.id,
+        demand_number: d.demand_number,
+        demand_date: d.demand_date,
+        invoice_no: d.invoice_no || '',
+        invoice_date: d.invoice_date || '',
+        quantity: q,
+        amount: a
+      });
+    });
+
+    // 6. Shape final response
+    const result = Object.values(unitDataMap).map(u => {
+      const pRec = paymentMap[u.unit_id];
+      const instList = Object.values(u.institutions_map);
+      const paidAmount = Number(pRec?.paid_amount !== undefined && pRec?.paid_amount !== null
+        ? pRec.paid_amount
+        : (pRec?.payment_status === 'PAID' ? u.total_amount : 0));
+      const paymentStatus = pRec?.payment_status || (u.total_amount > 0 && paidAmount >= u.total_amount ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'PENDING'));
+      const balanceAmount = Math.max(0, u.total_amount - paidAmount);
+
+      return {
+        unit_id: u.unit_id,
+        unit_name: u.unit_name,
+        unit_code: u.unit_code,
+        location: u.location,
+        ncc_group: u.ncc_group,
+        month: u.month,
+        month_label: u.month_label,
+        institutions_count: instList.length,
+        total_packets: u.total_packets,
+        total_amount: u.total_amount,
+        paid_amount: paidAmount,
+        balance_amount: balanceAmount,
+        payment_status: paymentStatus,
+        payment_date: pRec?.payment_date || null,
+        payment_mode: pRec?.payment_mode || '',
+        payment_ref: pRec?.payment_ref || '',
+        remarks: pRec?.remarks || '',
+        registered_by: pRec?.registered_by || null,
+        updated_at: pRec?.updated_at || null,
+        institutions: instList
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Fetch unit payments error:', error);
+    res.status(500).json({ error: 'Failed to retrieve unit payments.' });
+  }
+});
+
+// POST /api/refreshment-bills/unit-payments - Admin registers/records Unit payment for a month
+router.post('/unit-payments', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const db = await getDB();
+    await ensureBillColumns(db);
+    const {
+      unit_id, month, payment_status, paid_amount,
+      payment_date, payment_mode, payment_ref, remarks
+    } = req.body;
+
+    if (!unit_id || !month) {
+      return res.status(400).json({ error: 'unit_id and month are required.' });
+    }
+
+    const unit = await db.get('SELECT id, unit_name FROM units WHERE id = ?', [unit_id]);
+    if (!unit) {
+      return res.status(404).json({ error: 'Unit not found.' });
+    }
+
+    const status = payment_status || 'PENDING';
+    const amount = Number(paid_amount) || 0;
+    const today = new Date().toISOString().split('T')[0];
+    const pDate = status !== 'PENDING' ? (payment_date || today) : null;
+
+    const existing = await db.get(
+      'SELECT id FROM unit_monthly_payments WHERE unit_id = ? AND month = ?',
+      [unit_id, month]
+    );
+
+    if (existing) {
+      await db.run(
+        `UPDATE unit_monthly_payments
+         SET payment_status = ?,
+             paid_amount = ?,
+             payment_date = ?,
+             payment_mode = ?,
+             payment_ref = ?,
+             remarks = ?,
+             registered_by = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          status, amount, pDate, payment_mode || null,
+          payment_ref || null, remarks || null, req.user.id,
+          existing.id
+        ]
+      );
+    } else {
+      await db.run(
+        `INSERT INTO unit_monthly_payments (
+           unit_id, month, payment_status, paid_amount, payment_date,
+           payment_mode, payment_ref, remarks, registered_by
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          unit_id, month, status, amount, pDate,
+          payment_mode || null, payment_ref || null, remarks || null, req.user.id
+        ]
+      );
+    }
+
+    // Sync to all institutions under this unit for this month in refreshment_bills
+    const instRows = await db.all(
+      `SELECT DISTINCT institution_id
+       FROM demands
+       WHERE is_deleted = 0
+         AND unit_id = ?
+         AND LEFT(demand_date, 7) = ?`,
+      [unit_id, month]
+    );
+
+    for (const inst of instRows) {
+      const bExists = await db.get(
+        'SELECT id FROM refreshment_bills WHERE institution_id = ? AND month = ?',
+        [inst.institution_id, month]
+      );
+      if (bExists) {
+        await db.run(
+          `UPDATE refreshment_bills
+           SET payment_status = ?,
+               payment_date = ?,
+               payment_ref = ?,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [status === 'PAID' ? 'PAID' : (status === 'PARTIAL' ? 'PROCESSED' : 'PENDING'), pDate, payment_ref || null, bExists.id]
+        );
+      } else {
+        await db.run(
+          `INSERT INTO refreshment_bills (
+             institution_id, month, bill_submitted, payment_status, payment_date, payment_ref
+           ) VALUES (?, ?, 0, ?, ?, ?)`,
+          [inst.institution_id, month, status === 'PAID' ? 'PAID' : (status === 'PARTIAL' ? 'PROCESSED' : 'PENDING'), pDate, payment_ref || null]
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Payment registered successfully for ${unit.unit_name} (${formatMonthLabel(month)}).`
+    });
+  } catch (error) {
+    console.error('Register unit payment error:', error);
+    res.status(500).json({ error: 'Failed to register unit payment.' });
   }
 });
 

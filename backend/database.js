@@ -370,6 +370,25 @@ async function initializeSchema(db) {
       FOREIGN KEY (institution_id) REFERENCES institutions(id),
       UNIQUE(institution_id, month)
     );
+
+    CREATE TABLE IF NOT EXISTS unit_monthly_payments (
+      id INTEGER PRIMARY KEY AUTO_INCREMENT,
+      unit_id INTEGER NOT NULL,
+      month VARCHAR(50) NOT NULL,
+      total_packets INTEGER DEFAULT 0,
+      total_amount REAL DEFAULT 0,
+      paid_amount REAL DEFAULT 0,
+      payment_status VARCHAR(50) DEFAULT 'PENDING',
+      payment_date TEXT,
+      payment_mode TEXT,
+      payment_ref TEXT,
+      remarks TEXT,
+      registered_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (unit_id) REFERENCES units(id),
+      UNIQUE(unit_id, month)
+    );
     CREATE TABLE IF NOT EXISTS item_stock_logs (
       id INTEGER PRIMARY KEY AUTO_INCREMENT,
       item_id INTEGER NOT NULL,

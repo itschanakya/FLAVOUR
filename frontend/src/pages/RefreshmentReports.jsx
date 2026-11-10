@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, History, Printer, Search, School, TrendingUp, CheckCircle2, Users, IndianRupee, MapPin, Building2, Save, Filter, Layers, FileText, FileSpreadsheet, RefreshCw, Zap, Sparkles, AlertTriangle, X, Mail, Send, Clock, ShieldAlert } from 'lucide-react';
+import { Calendar, History, Printer, Search, School, TrendingUp, CheckCircle2, Users, IndianRupee, MapPin, Building2, Save, Filter, Layers, FileText, FileSpreadsheet, RefreshCw, Zap, Sparkles, AlertTriangle, X, Mail, Send, Clock, ShieldAlert, ChevronDown, ChevronRight, ChevronUp, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import CustomDateInput from '../components/CustomDateInput';
@@ -2214,222 +2214,1010 @@ export default function RefreshmentReports({ defaultTab }) {
     );
   };
 
-  const BillTableRow = ({ inst, sysAgg, billRecord, onSave, isAdmin }) => {
-    const [editData, setEditData] = useState({
-      id: billRecord?.id,
-      billSubmitted: billRecord?.bill_submitted === 1,
-      billSubmittedDate: billRecord?.bill_submitted_date || '',
-      demandPackets: billRecord?.demand_packets || sysAgg.packets,
-      billAmount: billRecord?.bill_amount || sysAgg.amount,
-      paymentStatus: billRecord?.payment_status || 'PENDING',
-      remarks: billRecord?.remarks || ''
+  // ════════════════════════════════════════════════════════════════════════════
+  // 5. BILL TRACKING & PAYMENTS (UNITWISE MONTHLY CONSOLE WITH EXPANDABLE INSTITUTIONS)
+  // ════════════════════════════════════════════════════════════════════════════
+  const BillTrackerView = () => {
+    const isAdmin = user?.role === 'ADMIN';
+    const [month, setMonth] = useState(getLocalYearMonth());
+    const [unitPayments, setUnitPayments] = useState([]);
+    const [loadingUnits, setLoadingUnits] = useState(false);
+    const [expandedUnitIds, setExpandedUnitIds] = useState(new Set());
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | PENDING | PAID | PARTIAL
+    const [savingPayment, setSavingPayment] = useState(false);
+    
+    // Register Payment Modal State
+    const [paymentModal, setPaymentModal] = useState({
+      isOpen: false,
+      unit: null,
+      formData: {
+        payment_status: 'PAID',
+        paid_amount: 0,
+        payment_date: new Date().toISOString().split('T')[0],
+        payment_mode: 'NEFT / RTGS (Bank Transfer)',
+        payment_ref: '',
+        remarks: ''
+      }
     });
 
-    useEffect(() => {
-      setEditData({
-        id: billRecord?.id,
-        billSubmitted: billRecord?.bill_submitted === 1,
-        billSubmittedDate: billRecord?.bill_submitted_date || '',
-        demandPackets: billRecord?.demand_packets || sysAgg.packets,
-        billAmount: billRecord?.bill_amount || sysAgg.amount,
-        paymentStatus: billRecord?.payment_status || 'PENDING',
-        remarks: billRecord?.remarks || ''
-      });
-    }, [
-      billRecord?.id, billRecord?.bill_submitted, billRecord?.bill_submitted_date, 
-      billRecord?.demand_packets, billRecord?.bill_amount, billRecord?.payment_status, billRecord?.remarks,
-      sysAgg.packets, sysAgg.amount
-    ]);
-
-    return (
-      <tr className="hover:bg-slate-100/40 print:bg-white">
-        <td className="px-4 py-4">
-          <div className="font-black text-xs text-slate-800 uppercase print:text-black truncate">{inst.institution_name}</div>
-          <div className="text-[10px] font-bold text-slate-500 uppercase print:text-slate-700">{inst.ano_cto_name || '-'}</div>
-        </td>
-        <td className="px-4 py-4 text-center font-black text-blue-600 border-l border-slate-200 print:text-black print:border-black bg-slate-50/50 print:bg-slate-100">{sysAgg.packets}</td>
-        <td className="px-4 py-4 text-right font-black text-emerald-600 border-r border-slate-200 print:text-black print:border-black bg-slate-50/50 print:bg-slate-100">₹{formatAmount(sysAgg.amount)}</td>
-        
-        <td className="px-4 py-4 text-center">
-          {isAdmin ? (
-            <div className="flex flex-col gap-1 items-center">
-              <input type="checkbox" checked={editData.billSubmitted} onChange={e => setEditData({...editData, billSubmitted: e.target.checked})} className="w-4 h-4 bg-white border-slate-300 rounded" />
-              {editData.billSubmitted && <input type="date" value={editData.billSubmittedDate} onChange={e => setEditData({...editData, billSubmittedDate: e.target.value})} className="bg-slate-50 border border-slate-300 text-[10px] rounded px-1" />}
-            </div>
-          ) : (
-            <span className={`px-2 py-1 rounded text-[10px] font-black ${billRecord?.bill_submitted ? 'bg-emerald-900/50 text-emerald-600' : 'bg-rose-900/50 text-rose-600'} print:text-black print:bg-transparent`}>
-              {billRecord?.bill_submitted ? `YES (${formatDate(billRecord.bill_submitted_date)})` : 'NO'}
-            </span>
-          )}
-        </td>
-        
-        <td className="px-4 py-4 text-center border-l border-slate-200 print:border-black">
-          {isAdmin ? (
-            <input type="number" value={editData.demandPackets} onChange={e => setEditData({...editData, demandPackets: Number(e.target.value)})} className="bg-slate-50 border border-slate-300 rounded px-2 py-1 w-16 text-center text-xs font-black text-slate-800" />
-          ) : (
-            <span className="font-black text-xs print:text-black">{billRecord?.demand_packets || '-'}</span>
-          )}
-        </td>
-        
-        <td className="px-4 py-4 text-right">
-          {isAdmin ? (
-            <input type="number" value={editData.billAmount} onChange={e => setEditData({...editData, billAmount: Number(e.target.value)})} className="bg-slate-50 border border-slate-300 rounded px-2 py-1 w-24 text-right text-xs font-black text-slate-800" />
-          ) : (
-            <span className="font-black text-xs print:text-black">{billRecord?.bill_amount ? `₹${formatAmount(billRecord.bill_amount)}` : '-'}</span>
-          )}
-        </td>
-        
-        <td className="px-4 py-4 text-center border-l border-slate-200 print:border-black">
-          {isAdmin ? (
-            <select value={editData.paymentStatus} onChange={e => setEditData({...editData, paymentStatus: e.target.value})} className={`bg-slate-50 border border-slate-300 rounded px-2 py-1 text-[10px] font-black outline-none ${editData.paymentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-400'}`}>
-              <option value="PENDING">PENDING</option>
-              <option value="PAID">PAID</option>
-            </select>
-          ) : (
-            <span className={`px-2 py-1 rounded text-[10px] font-black ${billRecord?.payment_status === 'PAID' ? 'bg-emerald-900/50 text-emerald-600' : 'bg-amber-900/50 text-amber-400'} print:text-black print:bg-transparent`}>
-              {billRecord?.payment_status || 'PENDING'}
-            </span>
-          )}
-        </td>
-        
-        <td className="px-4 py-4">
-          {isAdmin ? (
-            <input type="text" value={editData.remarks} onChange={e => setEditData({...editData, remarks: e.target.value})} className="bg-slate-50 border border-slate-300 rounded px-2 py-1 w-full text-[10px] text-slate-700" placeholder="Remarks..." />
-          ) : (
-            <span className="text-[10px] text-slate-500 print:text-slate-700">{billRecord?.remarks || '-'}</span>
-          )}
-        </td>
-        
-        {isAdmin && (
-          <td className="px-4 py-4 text-center border-l border-slate-200 print:hidden">
-            <button onClick={() => onSave(inst.id, inst.institution_name, editData)} className="p-1.5 bg-blue-600/20 hover:bg-blue-600/50 text-blue-600 rounded-lg transition-all" title="Save Bill Data">
-              <Save size={14} />
-            </button>
-          </td>
-        )}
-      </tr>
-    );
-  };
-
-  const BillTrackerView = () => {
-    const [month, setMonth] = useState(getLocalYearMonth());
-    const [bills, setBills] = useState([]);
-    const [loadingBills, setLoadingBills] = useState(false);
-    
-    const safeDemands = Array.isArray(demands) ? demands : [];
-    const safeInstitutions = Array.isArray(institutions) ? institutions : [];
-    const safeBills = Array.isArray(bills) ? bills : [];
-
-    // Derived aggregates from demands for the selected month to aid billing
-    const monthDemandsAgg = useMemo(() => {
-      const agg = {};
-      const filteredDemands = safeDemands.filter(d => selectedGroup === 'All' || d.ncc_group === selectedGroup);
-      filteredDemands.forEach(d => {
-        if (!d.demand_date) return;
-        const dMonth = new Date(d.demand_date).toISOString().slice(0, 7);
-        if (dMonth === month && d.status !== 'CANCELLED' && d.status !== 'REJECTED') {
-          if (!agg[d.institution_id]) agg[d.institution_id] = { packets: 0, amount: 0 };
-          agg[d.institution_id].packets += (Number(d.total_quantity) || 0);
-          agg[d.institution_id].amount += (Number(d.total_amount) || 0);
+    // Month options derived from demands
+    const monthOptions = useMemo(() => {
+      const setM = new Set();
+      (demands || []).forEach(d => {
+        if (d.demand_date && d.status !== 'CANCELLED' && d.status !== 'REJECTED') {
+          const ym = String(d.demand_date).slice(0, 7);
+          if (/^\d{4}-\d{2}$/.test(ym)) setM.add(ym);
         }
       });
-      return agg;
-    }, [safeDemands, month, selectedGroup]);
+      const list = Array.from(setM).sort().reverse();
+      return list.map(ym => {
+        const [y, m] = ym.split('-');
+        const dateObj = new Date(Number(y), Number(m) - 1, 1);
+        const label = dateObj.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }).toUpperCase();
+        return { value: ym, label };
+      });
+    }, [demands]);
 
-    const fetchBills = async () => {
-      setLoadingBills(true);
+    // Fetch Unit payments from backend
+    const fetchUnitPayments = async () => {
+      if (!month) return;
+      setLoadingUnits(true);
       try {
-        const res = await fetch(`/api/refreshment-bills?month=${month}`, { headers: { Authorization: `Bearer ${token}` } });
-        const data = await res.json();
-        setBills(Array.isArray(data) ? data : []);
+        const qGroup = selectedGroup !== 'All' ? `&ncc_group=${encodeURIComponent(selectedGroup)}` : '';
+        const res = await fetch(`/api/refreshment-bills/unit-payments?month=${encodeURIComponent(month)}${qGroup}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUnitPayments(Array.isArray(data) ? data : []);
+        } else {
+          toast.error('Failed to load Unit payment records.');
+          setUnitPayments([]);
+        }
       } catch (err) {
-        toast.error('Failed to load bills');
-        setBills([]);
+        console.error('Fetch unit payments error:', err);
+        toast.error('Network error loading Unit payment records.');
+        setUnitPayments([]);
       } finally {
-        setLoadingBills(false);
+        setLoadingUnits(false);
       }
     };
 
     useEffect(() => {
-      fetchBills();
-    }, [month]);
-    
-    const handleSaveBill = async (instId, instName, data) => {
-      try {
-        const payload = {
-          institution: instName,
-          month,
-          ...data
-        };
-        const method = data.id ? 'PUT' : 'POST';
-        const url = data.id ? `/api/refreshment-bills/${data.id}` : '/api/refreshment-bills';
-        
-        await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(payload)
-        });
-        toast.success('Bill saved successfully');
-        fetchBills();
-      } catch (err) {
-        toast.error('Failed to save bill');
+      fetchUnitPayments();
+    }, [month, selectedGroup]);
+
+    // Toggle expand for a unit row
+    const toggleExpandUnit = (unitId) => {
+      setExpandedUnitIds(prev => {
+        const next = new Set(prev);
+        if (next.has(unitId)) {
+          next.delete(unitId);
+        } else {
+          next.add(unitId);
+        }
+        return next;
+      });
+    };
+
+    // Expand all / collapse all
+    const handleToggleExpandAll = () => {
+      if (expandedUnitIds.size === filteredUnitPayments.length && filteredUnitPayments.length > 0) {
+        setExpandedUnitIds(new Set());
+      } else {
+        const allIds = new Set(filteredUnitPayments.map(u => u.unit_id));
+        setExpandedUnitIds(allIds);
       }
     };
 
-    const displayedInstitutions = safeInstitutions.filter(i => selectedGroup === 'All' || i.ncc_group === selectedGroup);
+    // Filter by search query & payment status
+    const filteredUnitPayments = useMemo(() => {
+      return (unitPayments || []).filter(u => {
+        // Group filter
+        if (selectedGroup !== 'All' && u.ncc_group !== selectedGroup) return false;
+        
+        // Status filter
+        if (statusFilter !== 'ALL' && u.payment_status !== statusFilter) return false;
+
+        // Search query
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          const matchUnit = (u.unit_name || '').toLowerCase().includes(q) ||
+            (u.unit_code || '').toLowerCase().includes(q) ||
+            (u.payment_ref || '').toLowerCase().includes(q);
+          const matchInst = (u.institutions || []).some(inst =>
+            (inst.institution_name || '').toLowerCase().includes(q) ||
+            (inst.ano_cto_name || '').toLowerCase().includes(q)
+          );
+          if (!matchUnit && !matchInst) return false;
+        }
+
+        return true;
+      });
+    }, [unitPayments, selectedGroup, statusFilter, searchQuery]);
+
+    // Overall summary metrics
+    const summary = useMemo(() => {
+      let unitsCount = 0;
+      let totalPkts = 0;
+      let totalAmt = 0;
+      let totalPaid = 0;
+      let totalBal = 0;
+      let paidCount = 0;
+      let pendingCount = 0;
+      let partialCount = 0;
+
+      filteredUnitPayments.forEach(u => {
+        if (u.total_packets > 0 || u.paid_amount > 0) {
+          unitsCount += 1;
+        }
+        totalPkts += Number(u.total_packets || 0);
+        totalAmt += Number(u.total_amount || 0);
+        totalPaid += Number(u.paid_amount || 0);
+        totalBal += Number(u.balance_amount || 0);
+
+        if (u.payment_status === 'PAID') paidCount += 1;
+        else if (u.payment_status === 'PARTIAL') partialCount += 1;
+        else pendingCount += 1;
+      });
+
+      return {
+        unitsCount,
+        totalPkts,
+        totalAmt,
+        totalPaid,
+        totalBal,
+        paidCount,
+        pendingCount,
+        partialCount
+      };
+    }, [filteredUnitPayments]);
+
+    // Open Register Payment Modal
+    const handleOpenPaymentModal = (unit, e) => {
+      if (e) e.stopPropagation();
+      setPaymentModal({
+        isOpen: true,
+        unit,
+        formData: {
+          payment_status: unit.payment_status === 'PAID' ? 'PAID' : (unit.balance_amount === 0 && unit.total_amount > 0 ? 'PAID' : 'PAID'),
+          paid_amount: unit.paid_amount > 0 ? unit.paid_amount : unit.total_amount,
+          payment_date: unit.payment_date || new Date().toISOString().split('T')[0],
+          payment_mode: unit.payment_mode || 'NEFT / RTGS (Bank Transfer)',
+          payment_ref: unit.payment_ref || '',
+          remarks: unit.remarks || ''
+        }
+      });
+    };
+
+    // Close Modal
+    const handleClosePaymentModal = () => {
+      setPaymentModal({
+        isOpen: false,
+        unit: null,
+        formData: {
+          payment_status: 'PAID',
+          paid_amount: 0,
+          payment_date: '',
+          payment_mode: '',
+          payment_ref: '',
+          remarks: ''
+        }
+      });
+    };
+
+    // Save Payment from Modal
+    const handleSaveUnitPayment = async (e) => {
+      e.preventDefault();
+      if (!paymentModal.unit) return;
+      setSavingPayment(true);
+      try {
+        const payload = {
+          unit_id: paymentModal.unit.unit_id,
+          month,
+          payment_status: paymentModal.formData.payment_status,
+          paid_amount: Number(paymentModal.formData.paid_amount) || 0,
+          payment_date: paymentModal.formData.payment_date,
+          payment_mode: paymentModal.formData.payment_mode,
+          payment_ref: paymentModal.formData.payment_ref,
+          remarks: paymentModal.formData.remarks
+        };
+
+        const res = await fetch('/api/refreshment-bills/unit-payments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          toast.success(data.message || 'Unit payment registered successfully!');
+          handleClosePaymentModal();
+          fetchUnitPayments();
+        } else {
+          toast.error(data.error || 'Failed to save payment.');
+        }
+      } catch (err) {
+        console.error('Save unit payment error:', err);
+        toast.error('Network error saving payment.');
+      } finally {
+        setSavingPayment(false);
+      }
+    };
+
+    // Export to Excel (Unit summary + Institution breakdown)
+    const handleExportExcel = () => {
+      if (filteredUnitPayments.length === 0) {
+        toast.error('No payment records to export.');
+        return;
+      }
+
+      const rows = [];
+      filteredUnitPayments.forEach((u, uIdx) => {
+        rows.push({
+          'Record Type': 'UNIT SUMMARY',
+          'S.No': uIdx + 1,
+          'Unit Name': u.unit_name,
+          'Unit Code': u.unit_code || '-',
+          'NCC Group': u.ncc_group || '-',
+          'Month': u.month_label,
+          'Institutions Count': u.institutions_count,
+          'Total Packets': u.total_packets,
+          'Total Bill (₹)': u.total_amount,
+          'Paid Amount (₹)': u.paid_amount,
+          'Balance (₹)': u.balance_amount,
+          'Payment Status': u.payment_status,
+          'Payment Date': u.payment_date ? formatDDMMYYYY(u.payment_date) : '-',
+          'Payment Mode': u.payment_mode || '-',
+          'Payment Ref / UTR': u.payment_ref || '-',
+          'Remarks': u.remarks || '-'
+        });
+
+        (u.institutions || []).forEach((inst, iIdx) => {
+          rows.push({
+            'Record Type': '  └ Institution Breakdown',
+            'S.No': `  ${uIdx + 1}.${iIdx + 1}`,
+            'Unit Name': `  ${inst.institution_name}`,
+            'Unit Code': inst.ano_cto_name || '-',
+            'NCC Group': inst.ano_cto_contact || '-',
+            'Month': u.month_label,
+            'Institutions Count': `${inst.demand_count} Demands`,
+            'Total Packets': inst.total_packets,
+            'Total Bill (₹)': inst.total_amount,
+            'Paid Amount (₹)': '-',
+            'Balance (₹)': '-',
+            'Payment Status': inst.payment_status || 'PENDING',
+            'Payment Date': inst.bill_submitted ? `Bill Recd (${formatDDMMYYYY(inst.bill_submitted_date)})` : 'Bill Awaited',
+            'Payment Mode': '-',
+            'Payment Ref / UTR': '-',
+            'Remarks': '-'
+          });
+        });
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `Unit_Payments_${month}`);
+      XLSX.writeFile(wb, `NCC_Unit_Payments_${month}.xlsx`);
+      toast.success('Unit payments exported to Excel!');
+    };
 
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="space-y-4 animate-in fade-in duration-300">
         <PrintControls />
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-lg print:hidden flex flex-col md:flex-row justify-between items-center gap-4">
-          <div>
-            <h3 className="font-black text-lg text-slate-900 uppercase tracking-tight flex items-center gap-2">
-              <IndianRupee size={20} className="text-emerald-500" /> Bill Submission & Payment Tracker
-            </h3>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Track monthly bill receipts and payments from institutions.</p>
+
+        {/* ═══ Header & Filter Controls Bar ═══ */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs print:hidden space-y-3">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 shadow-2xs">
+                  <IndianRupee className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900 tracking-tight flex items-center gap-2">
+                    Unitwise Monthly Bill Tracking & Payments
+                  </h3>
+                  <p className="text-[11px] font-bold text-slate-500">
+                    Track payments received from NCC Units per month. Click any Unit row to expand institution-wise details.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Month Selector & Excel Export */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
+                <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="font-extrabold text-[11px] text-slate-500">Month:</span>
+                <input
+                  type="month"
+                  value={month}
+                  onChange={e => setMonth(e.target.value)}
+                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer"
+                />
+              </div>
+
+              {monthOptions.length > 0 && (
+                <select
+                  value={month}
+                  onChange={e => setMonth(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none cursor-pointer shadow-2xs"
+                  title="Quick Select Available Demand Month"
+                >
+                  {monthOptions.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              )}
+
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-black transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Export Unit Payments and Breakdown to Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Export Excel</span>
+              </button>
+            </div>
           </div>
-          <input 
-            type="month" value={month} onChange={e => setMonth(e.target.value)}
-            className="bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-sm text-slate-800 outline-none font-bold"
-          />
+
+          {/* Slicers & Search Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+            {/* Payment Status Tabs */}
+            <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
+              {[
+                { id: 'ALL', label: `All Units (${summary.unitsCount})` },
+                { id: 'PENDING', label: `Pending (${summary.pendingCount})` },
+                { id: 'PAID', label: `Paid (${summary.paidCount})` },
+                { id: 'PARTIAL', label: `Partial (${summary.partialCount})` }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                    statusFilter === tab.id
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Box & Expand All Button */}
+            <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search Unit name, code..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleToggleExpandAll}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                title={expandedUnitIds.size === filteredUnitPayments.length ? 'Collapse All' : 'Expand All'}
+              >
+                {expandedUnitIds.size === filteredUnitPayments.length && filteredUnitPayments.length > 0 ? (
+                  <>
+                    <ChevronUp className="w-3.5 h-3.5" />
+                    <span>Collapse All</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-3.5 h-3.5" />
+                    <span>Expand All</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xl print:shadow-none print:border-none print:bg-white">
-          <PrintHeader title="MONTHLY BILL SUBMISSION & PAYMENT STATUS" period={month} />
-          <div className="overflow-x-auto print:overflow-visible">
-            <table className="w-full text-left border-collapse min-w-[1200px] print:min-w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b-2 border-slate-200 print:bg-slate-200 print:border-black">
-                  <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Institution Details</th>
-                  <th className="px-4 py-4 text-xs font-black text-blue-600 uppercase text-center print:text-black border-l border-slate-200 print:border-black">System Auth Packets</th>
-                  <th className="px-4 py-4 text-xs font-black text-emerald-600 uppercase text-right print:text-black border-r border-slate-200 print:border-black">System Cost (₹)</th>
-                  <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black">Bill Submitted</th>
-                  <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black border-l border-slate-200 print:border-black">Billed Packets</th>
-                  <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase text-right print:text-black">Billed Amount</th>
-                  <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase text-center print:text-black border-l border-slate-200 print:border-black">Payment Status</th>
-                  <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase print:text-black">Remarks</th>
-                  {user?.role === 'ADMIN' && <th className="px-4 py-4 text-xs font-black text-slate-500 uppercase text-center print:hidden border-l border-slate-200">Action</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 print:divide-black">
-                {displayedInstitutions.map(inst => {
-                  const sysAgg = monthDemandsAgg[inst.id] || { packets: 0, amount: 0 };
-                  const billRecord = safeBills.find(b => b.institution_id === inst.id) || {};
-                  return (
-                    <BillTableRow
-                      key={inst.id}
-                      inst={inst}
-                      sysAgg={sysAgg}
-                      billRecord={billRecord}
-                      onSave={handleSaveBill}
-                      isAdmin={user?.role === 'ADMIN'}
-                    />
-                  );
-                })}
-              </tbody>
-            </table>
+        {/* ═══ 5 Top Summary Metric KPI Cards ═══ */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 print:grid-cols-5">
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Billed Units</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-black text-slate-900">{summary.unitsCount}</span>
+              <span className="text-[10px] font-bold text-slate-400">Units</span>
+            </div>
+            <div className="text-[10px] font-bold text-slate-500 mt-1">
+              Paid: {summary.paidCount} • Bal: {summary.pendingCount + summary.partialCount}
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+            <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 block mb-0.5">Total Packets</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-black text-blue-900">{summary.totalPkts.toLocaleString('en-IN')}</span>
+              <span className="text-[10px] font-bold text-blue-600">Pkts</span>
+            </div>
+            <div className="text-[10px] font-bold text-slate-400 mt-1">Supplied in {formatMonthLabel(month)}</div>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 block mb-0.5">Total Bill Cost</span>
+            <div className="text-xl font-black text-slate-900">₹{formatAmount(summary.totalAmt)}</div>
+            <div className="text-[10px] font-bold text-slate-400 mt-1">Gross supply valuation</div>
+          </div>
+
+          <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-200/90 shadow-2xs">
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 block mb-0.5">Paid Received</span>
+            <div className="text-xl font-black text-emerald-800">₹{formatAmount(summary.totalPaid)}</div>
+            <div className="text-[10px] font-bold text-emerald-600 mt-1">
+              {summary.totalAmt > 0 ? `${Math.round((summary.totalPaid / summary.totalAmt) * 100)}% Collected` : '0%'}
+            </div>
+          </div>
+
+          <div className={`p-3.5 rounded-2xl border shadow-2xs ${summary.totalBal > 0 ? 'bg-amber-50/70 border-amber-200/90' : 'bg-slate-50 border-slate-200'}`}>
+            <span className={`text-[10px] font-black uppercase tracking-wider block mb-0.5 ${summary.totalBal > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
+              Pending Balance
+            </span>
+            <div className={`text-xl font-black ${summary.totalBal > 0 ? 'text-amber-900' : 'text-slate-700'}`}>
+              ₹{formatAmount(summary.totalBal)}
+            </div>
+            <div className={`text-[10px] font-bold mt-1 ${summary.totalBal > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
+              {summary.totalBal > 0 ? 'Awaiting Payment' : 'All Clear'}
+            </div>
           </div>
         </div>
+
+        {/* ═══ Unitwise Monthly Master Table ═══ */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+          <PrintHeader title="UNITWISE MONTHLY REFRESHMENT BILL SUBMISSION & PAYMENT TRACKER" period={month} />
+          
+          {loadingUnits ? (
+            <div className="p-12 text-center text-slate-500 font-bold bg-white">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
+              Loading Unit payment records for {formatMonthLabel(month)}...
+            </div>
+          ) : filteredUnitPayments.length === 0 ? (
+            <div className="text-center py-16 bg-white p-6">
+              <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-base font-black text-slate-900 mb-1">No Unit Demands or Bills Found</h3>
+              <p className="text-xs text-slate-500 font-medium max-w-md mx-auto">
+                No refreshment demands were scheduled or delivered for NCC Units in {formatMonthLabel(month)}.
+                Try selecting another month from the picker above.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                  <tr>
+                    <th className="px-4 py-3.5 w-[24%]"># / NCC Unit Details</th>
+                    <th className="px-4 py-3.5 text-center w-[10%]">Packets</th>
+                    <th className="px-4 py-3.5 text-right w-[12%]">Total Bill (₹)</th>
+                    <th className="px-4 py-3.5 text-right w-[12%]">Paid (₹)</th>
+                    <th className="px-4 py-3.5 text-right w-[11%]">Balance (₹)</th>
+                    <th className="px-4 py-3.5 text-center w-[11%]">Payment Status</th>
+                    <th className="px-4 py-3.5 w-[14%]">Payment Details / Ref</th>
+                    {isAdmin && <th className="px-4 py-3.5 text-right w-[6%] print:hidden">Action</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {filteredUnitPayments.map((u, idx) => {
+                    const isExpanded = expandedUnitIds.has(u.unit_id);
+                    const isPaid = u.payment_status === 'PAID';
+                    const isPartial = u.payment_status === 'PARTIAL';
+                    const isPending = !isPaid && !isPartial;
+
+                    return (
+                      <React.Fragment key={u.unit_id}>
+                        {/* ─── Unit Master Row (Clickable to toggle expand) ─── */}
+                        <tr
+                          onClick={() => toggleExpandUnit(u.unit_id)}
+                          className={`cursor-pointer transition-colors group select-none ${
+                            isExpanded ? 'bg-blue-50/40 hover:bg-blue-50/70' : 'hover:bg-slate-50/80'
+                          }`}
+                        >
+                          {/* Col 1: Expand Chevron + Unit Name & Meta */}
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-start gap-2.5">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); toggleExpandUnit(u.unit_id); }}
+                                className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                                  isExpanded ? 'bg-blue-600 text-white shadow-2xs rotate-180' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                                title={isExpanded ? 'Collapse Institutions' : 'Expand Institutions'}
+                              >
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              </button>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h4 className="font-black text-xs sm:text-sm text-slate-900 tracking-tight group-hover:text-blue-700 transition-colors">
+                                    {u.unit_name}
+                                  </h4>
+                                  {u.unit_code && (
+                                    <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded text-[10px] font-mono font-bold border border-slate-200">
+                                      {u.unit_code}
+                                    </span>
+                                  )}
+                                  {u.ncc_group && (
+                                    <span className="px-1.5 py-0.2 bg-amber-50 text-amber-800 rounded text-[10px] font-extrabold border border-amber-200">
+                                      {u.ncc_group}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] font-bold text-slate-400 mt-0.5 flex items-center gap-2">
+                                  <span>{u.institutions_count} {u.institutions_count === 1 ? 'Institution' : 'Institutions'} Supplied</span>
+                                  <span>•</span>
+                                  <span className="text-blue-600 hover:underline">
+                                    {isExpanded ? 'Hide Schools ▲' : 'View Schools ▼'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Col 2: Supplied Packets */}
+                          <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                            <span className="text-xs font-black text-indigo-950 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-xl shadow-2xs inline-block">
+                              {Number(u.total_packets || 0).toLocaleString('en-IN')} Pkts
+                            </span>
+                          </td>
+
+                          {/* Col 3: Total Bill Amount (₹) */}
+                          <td className="px-4 py-3.5 text-right whitespace-nowrap font-black text-sm text-slate-900">
+                            ₹{formatAmount(u.total_amount)}
+                          </td>
+
+                          {/* Col 4: Paid Amount (₹) */}
+                          <td className="px-4 py-3.5 text-right whitespace-nowrap font-black text-sm text-emerald-700">
+                            ₹{formatAmount(u.paid_amount)}
+                          </td>
+
+                          {/* Col 5: Balance Amount (₹) */}
+                          <td className={`px-4 py-3.5 text-right whitespace-nowrap font-black text-sm ${u.balance_amount > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
+                            ₹{formatAmount(u.balance_amount)}
+                          </td>
+
+                          {/* Col 6: Payment Status Badge */}
+                          <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                            {isPaid ? (
+                              <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1 shadow-2xs">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>PAID</span>
+                              </span>
+                            ) : isPartial ? (
+                              <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1 shadow-2xs">
+                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                <span>PARTIAL</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-rose-50 text-rose-800 border border-rose-200 inline-flex items-center gap-1 shadow-2xs">
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                <span>PENDING</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Col 7: Payment Details / Ref */}
+                          <td className="px-4 py-3.5 text-xs">
+                            {u.payment_date || u.payment_ref ? (
+                              <div className="space-y-0.5">
+                                <div className="font-extrabold text-slate-800 flex items-center gap-1">
+                                  <span>{u.payment_mode || 'Bank Transfer'}</span>
+                                  {u.payment_date && <span className="text-[10px] text-slate-400 font-bold">({formatDDMMYYYY(u.payment_date)})</span>}
+                                </div>
+                                {u.payment_ref && (
+                                  <div className="font-mono text-[10px] font-bold text-blue-700 truncate max-w-[150px]" title={u.payment_ref}>
+                                    Ref: {u.payment_ref}
+                                  </div>
+                                )}
+                                {u.remarks && (
+                                  <div className="text-[10px] text-slate-500 font-medium truncate max-w-[150px]" title={u.remarks}>
+                                    {u.remarks}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 font-medium italic">Awaiting payment</span>
+                            )}
+                          </td>
+
+                          {/* Col 8: Admin Action (Register / Update Payment) */}
+                          {isAdmin && (
+                            <td className="px-4 py-3.5 text-right whitespace-nowrap print:hidden" onClick={e => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={(e) => handleOpenPaymentModal(u, e)}
+                                className={`px-3 py-1.5 rounded-xl font-black text-xs inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 ${
+                                  isPaid
+                                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+                                }`}
+                                title="Register or update payment received from this Unit"
+                              >
+                                <CreditCard className="w-3.5 h-3.5" />
+                                <span>{isPaid ? 'Edit' : 'Register'}</span>
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+
+                        {/* ─── Expandable Nested Row: Institution-wise Details ─── */}
+                        {isExpanded && (
+                          <tr className="bg-slate-50/70 border-y border-blue-100">
+                            <td colSpan={isAdmin ? 8 : 7} className="px-4 py-4 sm:px-8">
+                              <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-4 space-y-3">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                  <div className="flex items-center gap-2">
+                                    <School className="w-4 h-4 text-blue-600" />
+                                    <h5 className="font-black text-xs uppercase tracking-wider text-slate-900">
+                                      Institution Breakdown for {u.unit_name} — {u.month_label}
+                                    </h5>
+                                  </div>
+                                  <span className="text-[11px] font-bold text-slate-500">
+                                    {u.institutions.length} Institutions Supplied
+                                  </span>
+                                </div>
+
+                                {u.institutions.length === 0 ? (
+                                  <div className="text-center py-6 text-slate-400 font-bold text-xs">
+                                    No institutions recorded for this unit.
+                                  </div>
+                                ) : (
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                      <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                        <tr>
+                                          <th className="px-3 py-2 text-center w-12">S.No</th>
+                                          <th className="px-3 py-2">School / Institution & ANO Details</th>
+                                          <th className="px-3 py-2 text-center">Demands / Invoices</th>
+                                          <th className="px-3 py-2 text-center">Packets</th>
+                                          <th className="px-3 py-2 text-right">Amount (₹)</th>
+                                          <th className="px-3 py-2 text-center">Physical Bill Status</th>
+                                          <th className="px-3 py-2 text-center">Payment Status</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100 bg-white">
+                                        {u.institutions.map((inst, iIdx) => (
+                                          <tr key={inst.institution_id} className="hover:bg-slate-50/80 transition-colors">
+                                            <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-400">
+                                              {iIdx + 1}
+                                            </td>
+                                            <td className="px-3 py-2.5">
+                                              <div className="font-black text-xs text-slate-900 uppercase">
+                                                {inst.institution_name}
+                                              </div>
+                                              <div className="text-[10px] font-bold text-slate-500 mt-0.5">
+                                                ANO: {inst.ano_cto_name || 'Assigned ANO'} {inst.ano_cto_contact && `• 📞 ${inst.ano_cto_contact}`}
+                                              </div>
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center">
+                                              <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
+                                                {inst.demand_count} {inst.demand_count === 1 ? 'Demand' : 'Demands'}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center font-black text-slate-900">
+                                              {Number(inst.total_packets || 0).toLocaleString('en-IN')} Pkts
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right font-black text-emerald-700">
+                                              ₹{formatAmount(inst.total_amount)}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center">
+                                              {inst.bill_submitted ? (
+                                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                                  <span>Recd {inst.bill_submitted_date && `(${formatDDMMYYYY(inst.bill_submitted_date)})`}</span>
+                                                </span>
+                                              ) : (
+                                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
+                                                  <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                                  <span>Balance</span>
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center">
+                                              <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black border ${
+                                                isPaid || inst.payment_status === 'PAID'
+                                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                                              }`}>
+                                                {isPaid ? 'PAID' : (inst.payment_status || 'PENDING')}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                      <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-[11px]">
+                                        <tr>
+                                          <td colSpan={3} className="px-3 py-2 text-right uppercase tracking-wider text-slate-700">
+                                            Subtotal ({u.institutions.length} Institutions)
+                                          </td>
+                                          <td className="px-3 py-2 text-center font-black text-blue-700">
+                                            {Number(u.total_packets || 0).toLocaleString('en-IN')} Pkts
+                                          </td>
+                                          <td className="px-3 py-2 text-right font-black text-emerald-700">
+                                            ₹{formatAmount(u.total_amount)}
+                                          </td>
+                                          <td colSpan={2} className="px-3 py-2 text-center text-slate-400">
+                                            Unit Total
+                                          </td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+                {filteredUnitPayments.length > 0 && (
+                  <tfoot className="bg-slate-50 border-t-2 border-slate-300 print:bg-slate-100 font-black">
+                    <tr className="text-xs">
+                      <td className="px-4 py-3.5 text-right uppercase tracking-wider text-slate-800">
+                        Grand Total ({summary.unitsCount} Units)
+                      </td>
+                      <td className="px-4 py-3.5 text-center text-blue-700 text-sm">
+                        {summary.totalPkts.toLocaleString('en-IN')} Pkts
+                      </td>
+                      <td className="px-4 py-3.5 text-right text-slate-900 text-sm whitespace-nowrap">
+                        ₹{formatAmount(summary.totalAmt)}
+                      </td>
+                      <td className="px-4 py-3.5 text-right text-emerald-700 text-sm whitespace-nowrap">
+                        ₹{formatAmount(summary.totalPaid)}
+                      </td>
+                      <td className={`px-4 py-3.5 text-right text-sm whitespace-nowrap ${summary.totalBal > 0 ? 'text-amber-800' : 'text-slate-400'}`}>
+                        ₹{formatAmount(summary.totalBal)}
+                      </td>
+                      <td className="px-4 py-3.5 text-center text-xs text-slate-600">
+                        {summary.paidCount} Paid • {summary.pendingCount} Pending
+                      </td>
+                      <td colSpan={isAdmin ? 2 : 1} className="px-4 py-3.5"></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ═══ Admin Register / Update Payment Modal ═══ */}
+        {paymentModal.isOpen && paymentModal.unit && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-blue-700 to-indigo-800 px-6 py-4 text-white flex items-center justify-between">
+                <div>
+                  <h4 className="font-black text-base tracking-tight flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-emerald-300" />
+                    <span>Register Unit Payment</span>
+                  </h4>
+                  <p className="text-xs font-bold text-blue-100 mt-0.5">
+                    {paymentModal.unit.unit_name} ({formatMonthLabel(month)})
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClosePaymentModal}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Form */}
+              <form onSubmit={handleSaveUnitPayment} className="p-6 space-y-4">
+                {/* Metric Summary Banner */}
+                <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-slate-400 block">Total Bill</span>
+                    <span className="text-sm font-black text-slate-900">₹{formatAmount(paymentModal.unit.total_amount)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-slate-400 block">Packets</span>
+                    <span className="text-sm font-black text-blue-700">{paymentModal.unit.total_packets} Pkts</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-slate-400 block">Institutions</span>
+                    <span className="text-sm font-black text-slate-900">{paymentModal.unit.institutions_count}</span>
+                  </div>
+                </div>
+
+                {/* Quick Shortcuts */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentModal(prev => ({
+                      ...prev,
+                      formData: {
+                        ...prev.formData,
+                        payment_status: 'PAID',
+                        paid_amount: prev.unit.total_amount
+                      }
+                    }))}
+                    className="flex-1 py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-black transition-colors"
+                  >
+                    ✓ Full Payment (₹{formatAmount(paymentModal.unit.total_amount)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentModal(prev => ({
+                      ...prev,
+                      formData: {
+                        ...prev.formData,
+                        payment_status: 'PENDING',
+                        paid_amount: 0
+                      }
+                    }))}
+                    className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-black transition-colors"
+                  >
+                    Reset to Pending (₹0)
+                  </button>
+                </div>
+
+                {/* Status & Amount Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                      Payment Status *
+                    </label>
+                    <select
+                      value={paymentModal.formData.payment_status}
+                      onChange={e => {
+                        const nextStatus = e.target.value;
+                        setPaymentModal(prev => ({
+                          ...prev,
+                          formData: {
+                            ...prev.formData,
+                            payment_status: nextStatus,
+                            paid_amount: nextStatus === 'PAID' ? prev.unit.total_amount : (nextStatus === 'PENDING' ? 0 : prev.formData.paid_amount)
+                          }
+                        }));
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="PAID">PAID (Full)</option>
+                      <option value="PARTIAL">PARTIAL (Part Payment)</option>
+                      <option value="PENDING">PENDING (Unpaid)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                      Paid Amount (₹) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={paymentModal.unit.total_amount * 2}
+                      value={paymentModal.formData.paid_amount}
+                      onChange={e => setPaymentModal(prev => ({
+                        ...prev,
+                        formData: { ...prev.formData, paid_amount: e.target.value }
+                      }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Date & Payment Mode */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                      Payment Date
+                    </label>
+                    <input
+                      type="date"
+                      value={paymentModal.formData.payment_date}
+                      onChange={e => setPaymentModal(prev => ({
+                        ...prev,
+                        formData: { ...prev.formData, payment_date: e.target.value }
+                      }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                      Payment Mode
+                    </label>
+                    <select
+                      value={paymentModal.formData.payment_mode}
+                      onChange={e => setPaymentModal(prev => ({
+                        ...prev,
+                        formData: { ...prev.formData, payment_mode: e.target.value }
+                      }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="NEFT / RTGS (Bank Transfer)">NEFT / RTGS (Bank Transfer)</option>
+                      <option value="Cheque / Demand Draft">Cheque / Demand Draft</option>
+                      <option value="Government Treasury Voucher">Government Treasury Voucher</option>
+                      <option value="UPI / Online Transfer">UPI / Online Transfer</option>
+                      <option value="Cash / Other">Cash / Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Transaction / UTR Ref */}
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                    Payment Reference / UTR / Cheque No.
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. UTR1234567890 / Chq #889912"
+                    value={paymentModal.formData.payment_ref}
+                    onChange={e => setPaymentModal(prev => ({
+                      ...prev,
+                      formData: { ...prev.formData, payment_ref: e.target.value }
+                    }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Remarks / Notes */}
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                    Remarks / Auditor Notes
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Enter any reference notes or approval details..."
+                    value={paymentModal.formData.remarks}
+                    onChange={e => setPaymentModal(prev => ({
+                      ...prev,
+                      formData: { ...prev.formData, remarks: e.target.value }
+                    }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleClosePaymentModal}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingPayment}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {savingPayment ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Save & Register Payment</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
