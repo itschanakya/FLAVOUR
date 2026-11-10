@@ -130,11 +130,12 @@ async function upgradeInventorySchema(db) {
     'ALTER TABLE refreshment_items ADD COLUMN cost_price REAL DEFAULT 0.0',
     'ALTER TABLE refreshment_items ADD COLUMN last_restocked_at DATETIME NULL',
 
-    // institutions schedule enhancements
+    // institutions schedule enhancements & funding aspect
     "ALTER TABLE institutions ADD COLUMN first_demand_day VARCHAR(50) DEFAULT 'Wednesday'",
     "ALTER TABLE institutions ADD COLUMN first_demand_time VARCHAR(20) DEFAULT '08:00'",
     "ALTER TABLE institutions ADD COLUMN second_demand_day VARCHAR(50) DEFAULT 'Saturday'",
     "ALTER TABLE institutions ADD COLUMN second_demand_time VARCHAR(20) DEFAULT '08:00'",
+    "ALTER TABLE institutions ADD COLUMN institution_type VARCHAR(20) DEFAULT 'STATE'",
 
     // demands fulfillment mode expansion
     "ALTER TABLE demands ADD COLUMN delivery_mode VARCHAR(50) DEFAULT 'DRIVER'",
@@ -226,6 +227,7 @@ async function initializeSchema(db) {
       strength_3rd_year INTEGER DEFAULT 0,
       google_location TEXT,
       complete_address TEXT,
+      institution_type VARCHAR(20) DEFAULT 'STATE',
       first_demand_day VARCHAR(50) DEFAULT 'Wednesday',
       first_demand_time VARCHAR(20) DEFAULT '08:00',
       second_demand_day VARCHAR(50) DEFAULT 'Saturday',

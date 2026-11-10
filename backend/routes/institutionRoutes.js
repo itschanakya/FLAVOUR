@@ -78,6 +78,9 @@ router.post('/bulk', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (
         loginId = cleanSlug;
       }
 
+      const rawType = (row.institution_type || row['INSTITUTE TYPE'] || row['INSTITUTION TYPE'] || row.type || '').toString().trim().toUpperCase();
+      const instType = rawType === 'CENTRE' ? 'CENTRE' : 'STATE';
+
       try {
         // Check if institution already exists under this unit (case-insensitive name match)
         const existingInst = await db.get(
@@ -86,7 +89,7 @@ router.post('/bulk', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (
         );
 
         if (existingInst) {
-          // UPDATE institution strength and contact details
+          // UPDATE institution strength, contact details and funding type
           await db.run(
             `UPDATE institutions 
              SET ano_cto_name = COALESCE(?, ano_cto_name),
@@ -96,9 +99,10 @@ router.post('/bulk', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (
                  strength_2nd_year = ?,
                  strength_3rd_year = ?,
                  complete_address = CASE WHEN ? <> '' THEN ? ELSE complete_address END,
-                 google_location = CASE WHEN ? <> '' THEN ? ELSE google_location END
+                 google_location = CASE WHEN ? <> '' THEN ? ELSE google_location END,
+                 institution_type = CASE WHEN ? <> '' THEN ? ELSE institution_type END
              WHERE id = ?`,
-            [anoName, anoContact, pinCode, pinCode, s1, s2, s3, address, address, googleLoc, googleLoc, existingInst.id]
+            [anoName, anoContact, pinCode, pinCode, s1, s2, s3, address, address, googleLoc, googleLoc, instType, instType, existingInst.id]
           );
 
           // Update linked user if present
@@ -113,9 +117,9 @@ router.post('/bulk', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (
         } else {
           // INSERT new institution
           const instRes = await db.run(
-            `INSERT INTO institutions (unit_id, institution_name, ano_cto_name, ano_cto_contact, pin_code, strength_1st_year, strength_2nd_year, strength_3rd_year, google_location, complete_address)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [unit_id, instName, anoName, anoContact, pinCode, s1, s2, s3, googleLoc, address]
+            `INSERT INTO institutions (unit_id, institution_name, ano_cto_name, ano_cto_contact, pin_code, strength_1st_year, strength_2nd_year, strength_3rd_year, google_location, complete_address, institution_type)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [unit_id, instName, anoName, anoContact, pinCode, s1, s2, s3, googleLoc, address, instType]
           );
           const newInstId = instRes.lastID;
 
@@ -199,11 +203,12 @@ router.post('/', authenticateToken, authorizeRoles('UNIT'), async (req, res) => 
     const s1 = parseInt(strength_1st_year) || 0;
     const s2 = parseInt(strength_2nd_year) || 0;
     const s3 = parseInt(strength_3rd_year) || 0;
+    const instType = req.body.institution_type === 'CENTRE' ? 'CENTRE' : 'STATE';
 
     const instRes = await db.run(
-      `INSERT INTO institutions (unit_id, institution_name, ano_cto_name, ano_cto_contact, pin_code, strength_1st_year, strength_2nd_year, strength_3rd_year, google_location, complete_address)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [unit_id, institution_name, ano_cto_name, ano_cto_contact || '', pin_code || '', s1, s2, s3, google_location || '', complete_address || '']
+      `INSERT INTO institutions (unit_id, institution_name, ano_cto_name, ano_cto_contact, pin_code, strength_1st_year, strength_2nd_year, strength_3rd_year, google_location, complete_address, institution_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [unit_id, institution_name, ano_cto_name, ano_cto_contact || '', pin_code || '', s1, s2, s3, google_location || '', complete_address || '', instType]
     );
     const instId = instRes.lastID;
 
@@ -249,6 +254,11 @@ router.put('/:id', authenticateToken, authorizeRoles('UNIT', 'INSTITUTION', 'ADM
     const { institution_name, ano_cto_name, ano_cto_contact, pin_code, strength_1st_year, strength_2nd_year, strength_3rd_year, ano_cto_email, login_id, password, google_location, complete_address } = req.body;
     const db = await getDB();
 
+    // Self-healing migration: ensure column exists
+    try {
+      await db.run("ALTER TABLE institutions ADD COLUMN institution_type VARCHAR(20) DEFAULT 'STATE'");
+    } catch (_) {}
+
     // Verify ownership
     let inst;
     if (req.user.role === 'UNIT') {
@@ -274,10 +284,13 @@ router.put('/:id', authenticateToken, authorizeRoles('UNIT', 'INSTITUTION', 'ADM
     const s1 = strength_1st_year !== undefined ? parseInt(strength_1st_year) : inst.strength_1st_year;
     const s2 = strength_2nd_year !== undefined ? parseInt(strength_2nd_year) : inst.strength_2nd_year;
     const s3 = strength_3rd_year !== undefined ? parseInt(strength_3rd_year) : inst.strength_3rd_year;
+    const instType = req.body.institution_type !== undefined
+      ? (req.body.institution_type === 'CENTRE' ? 'CENTRE' : 'STATE')
+      : (inst.institution_type || 'STATE');
 
     await db.run(
       `UPDATE institutions 
-       SET institution_name = ?, ano_cto_name = ?, ano_cto_contact = ?, pin_code = ?, strength_1st_year = ?, strength_2nd_year = ?, strength_3rd_year = ?, google_location = ?, complete_address = ?
+       SET institution_name = ?, ano_cto_name = ?, ano_cto_contact = ?, pin_code = ?, strength_1st_year = ?, strength_2nd_year = ?, strength_3rd_year = ?, google_location = ?, complete_address = ?, institution_type = ?
        WHERE id = ?`,
       [
         institution_name || inst.institution_name,
@@ -289,6 +302,7 @@ router.put('/:id', authenticateToken, authorizeRoles('UNIT', 'INSTITUTION', 'ADM
         s3,
         google_location ?? inst.google_location,
         complete_address ?? inst.complete_address,
+        instType,
         req.params.id
       ]
     );
@@ -363,6 +377,31 @@ router.put('/:id', authenticateToken, authorizeRoles('UNIT', 'INSTITUTION', 'ADM
   } catch (error) {
     console.error('Update institution error:', error);
     res.status(500).json({ error: 'Failed to update institution.' });
+  }
+});
+
+// PATCH /api/institutions/:id/type - Quick toggle between STATE and CENTRE funding type
+router.patch('/:id/type', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (req, res) => {
+  try {
+    const { institution_type } = req.body;
+    const instType = institution_type === 'CENTRE' ? 'CENTRE' : 'STATE';
+    const db = await getDB();
+
+    // Self-healing migration: ensure column exists even if server was not restarted
+    try {
+      await db.run("ALTER TABLE institutions ADD COLUMN institution_type VARCHAR(20) DEFAULT 'STATE'");
+    } catch (_) {}
+
+    if (req.user.role === 'UNIT') {
+      const owned = await db.get('SELECT id FROM institutions WHERE id = ? AND unit_id = ?', [req.params.id, req.user.unit_id]);
+      if (!owned) return res.status(403).json({ error: 'Unauthorized to update this institution.' });
+    }
+
+    await db.run('UPDATE institutions SET institution_type = ? WHERE id = ?', [instType, req.params.id]);
+    res.json({ success: true, id: req.params.id, institution_type: instType });
+  } catch (error) {
+    console.error('Update institution type error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update institution funding type.' });
   }
 });
 

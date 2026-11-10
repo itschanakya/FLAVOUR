@@ -92,6 +92,7 @@ router.get('/', authenticateToken, async (req, res) => {
         END as ano_cto_name,
         COALESCE(i.complete_address, CASE WHEN d.delivery_venue IS NOT NULL AND d.delivery_venue NOT REGEXP '^[0-9]+$' AND LENGTH(d.delivery_venue) > 3 THEN d.delivery_venue ELSE NULL END, u.location, u.unit_name, 'Unit Battalion HQ') as complete_address,
         COALESCE(i.google_location, '') as google_location,
+        COALESCE(i.institution_type, 'STATE') as institution_type,
         u.unit_name, u.unit_code, u.ncc_group,
         CASE WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name) ELSE COALESCE(i.institution_name, u.unit_name) END as beneficiary_name,
         usr.name as raised_by_name,

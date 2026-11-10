@@ -11,6 +11,7 @@ export default function ManageInstitutions() {
 
   // Form fields
   const [instName, setInstName] = useState('');
+  const [instType, setInstType] = useState('STATE'); // STATE (Govt/Pvt) | CENTRE (APS/Sainik)
   const [anoName, setAnoName] = useState('');
   const [anoContact, setAnoContact] = useState('');
   const [anoEmail, setAnoEmail] = useState('');
@@ -28,6 +29,7 @@ export default function ManageInstitutions() {
   
   const [columnFilters, setColumnFilters] = useState({
     institution_name: '',
+    institution_type: '',
     pin_code: '',
     ano_cto_name: '',
     ano_email: '',
@@ -70,6 +72,7 @@ export default function ManageInstitutions() {
   const handleOpenCreate = () => {
     setEditingInst(null);
     setInstName('');
+    setInstType('STATE');
     setAnoName('');
     setAnoContact('');
     setAnoEmail('');
@@ -90,6 +93,7 @@ export default function ManageInstitutions() {
   const handleOpenEdit = (inst) => {
     setEditingInst(inst);
     setInstName(inst.institution_name);
+    setInstType(inst.institution_type === 'CENTRE' ? 'CENTRE' : 'STATE');
     setAnoName(inst.ano_cto_name);
     setAnoContact(inst.ano_cto_contact || '');
     setAnoEmail(inst.ano_email || '');
@@ -105,6 +109,57 @@ export default function ManageInstitutions() {
     setS3(inst.strength_3rd_year || 0);
     setError('');
     setShowModal(true);
+  };
+
+  // Quick 1-click toggle between STATE and CENTRE
+  const handleToggleType = async (inst, e) => {
+    if (e) e.stopPropagation();
+    const nextType = inst.institution_type === 'CENTRE' ? 'STATE' : 'CENTRE';
+    try {
+      let res = await fetch(`/api/institutions/${inst.id}/type`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ institution_type: nextType })
+      });
+
+      // If PATCH is 404 (e.g. backend running old code before restart), fallback to PUT /api/institutions/:id
+      if (res.status === 404) {
+        res = await fetch(`/api/institutions/${inst.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            institution_name: inst.institution_name,
+            ano_cto_name: inst.ano_cto_name,
+            ano_cto_contact: inst.ano_cto_contact,
+            pin_code: inst.pin_code,
+            strength_1st_year: inst.strength_1st_year,
+            strength_2nd_year: inst.strength_2nd_year,
+            strength_3rd_year: inst.strength_3rd_year,
+            google_location: inst.google_location,
+            complete_address: inst.complete_address,
+            institution_type: nextType
+          })
+        });
+      }
+
+      if (res.ok) {
+        setInstitutions(prev => prev.map(item => item.id === inst.id ? { ...item, institution_type: nextType } : item));
+        toast.success(`Updated to ${nextType === 'CENTRE' ? '🏛️ CENTRE FUNDED' : '🏢 STATE FUNDED'}`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const errMsg = data.error || 'Failed to update institute type. Please restart backend server.';
+        toast.error(errMsg);
+      }
+    } catch (err) {
+      console.error('Toggle type error:', err);
+      toast.error('Network error updating institute type');
+    }
   };
 
   const [deletingId, setDeletingId] = useState(null);
@@ -153,6 +208,7 @@ export default function ManageInstitutions() {
     const rows = institutions.length > 0
       ? institutions.map(inst => ({
           'INSTITUTION NAME': inst.institution_name || '',
+          'INSTITUTE TYPE': inst.institution_type || 'STATE',
           'PIN CODE': inst.pin_code || '',
           'ANO / CTO INCHARGE': inst.ano_cto_name || '',
           'ANO CONTACT': inst.ano_cto_contact || '',
@@ -168,6 +224,7 @@ export default function ManageInstitutions() {
       : [
           {
             'INSTITUTION NAME': 'APS SHANKAR VIHAR',
+            'INSTITUTE TYPE': 'CENTRE',
             'PIN CODE': '110010',
             'ANO / CTO INCHARGE': 'MUKESH RAUTELA (ANO)',
             'ANO CONTACT': '+91 9876543210',
@@ -184,7 +241,7 @@ export default function ManageInstitutions() {
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
     worksheet['!cols'] = [
-      { wch: 32 }, { wch: 12 }, { wch: 25 }, { wch: 18 }, { wch: 28 }, { wch: 20 },
+      { wch: 32 }, { wch: 16 }, { wch: 12 }, { wch: 25 }, { wch: 18 }, { wch: 28 }, { wch: 20 },
       { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 45 }, { wch: 30 }
     ];
     const workbook = XLSX.utils.book_new();
@@ -200,6 +257,7 @@ export default function ManageInstitutions() {
     const templateRows = [
       {
         'INSTITUTION NAME': 'ARMY PUBLIC SCHOOL SHANKAR VIHAR',
+        'INSTITUTE TYPE': 'CENTRE',
         'PIN CODE': '110010',
         'ANO / CTO INCHARGE': 'Lt. Rajesh Kumar',
         'ANO CONTACT': '+91 9876543210',
@@ -214,6 +272,7 @@ export default function ManageInstitutions() {
       },
       {
         'INSTITUTION NAME': 'DELHI PUBLIC SCHOOL RK PURAM',
+        'INSTITUTE TYPE': 'STATE',
         'PIN CODE': '110022',
         'ANO / CTO INCHARGE': 'Chief Officer A. K. Sharma',
         'ANO CONTACT': '+91 9811223344',
@@ -230,7 +289,7 @@ export default function ManageInstitutions() {
 
     const worksheet = XLSX.utils.json_to_sheet(templateRows);
     worksheet['!cols'] = [
-      { wch: 35 }, { wch: 12 }, { wch: 28 }, { wch: 18 }, { wch: 26 }, { wch: 18 },
+      { wch: 35 }, { wch: 16 }, { wch: 12 }, { wch: 28 }, { wch: 18 }, { wch: 26 }, { wch: 18 },
       { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 45 }, { wch: 30 }
     ];
     const workbook = XLSX.utils.book_new();
@@ -273,6 +332,8 @@ export default function ManageInstitutions() {
           };
 
           const instName = getVal(['INSTITUTION NAME', 'Institution Name', 'Institution', 'School Name', 'College Name', 'Name']);
+          const rawType = getVal(['INSTITUTE TYPE', 'Institute Type', 'INSTITUTION TYPE', 'Institution Type', 'Funding Type', 'Type']).toUpperCase();
+          const instType = rawType === 'CENTRE' ? 'CENTRE' : 'STATE';
           const pin = getVal(['PIN CODE', 'Pin Code', 'PIN', 'Pincode', 'Postal Code']).replace(/\D/g, '').slice(0, 6);
           const ano = getVal(['ANO / CTO INCHARGE', 'ANO / CTO Incharge', 'ANO Name', 'ANO / CTO Name', 'Incharge', 'ANO']);
           const contact = getVal(['ANO CONTACT', 'Ano Contact', 'Contact', 'Phone', 'Mobile', 'Contact Phone']);
@@ -287,6 +348,7 @@ export default function ManageInstitutions() {
           return {
             rowNum: idx + 2,
             institution_name: instName,
+            institution_type: instType,
             pin_code: pin,
             ano_cto_name: ano || 'ANO Incharge',
             ano_cto_contact: contact,
@@ -367,6 +429,7 @@ export default function ManageInstitutions() {
           },
           body: JSON.stringify({
             institution_name: instName,
+            institution_type: instType,
             ano_cto_name: anoName,
             ano_cto_contact: anoContact,
             pin_code: pinCode,
@@ -393,6 +456,7 @@ export default function ManageInstitutions() {
           },
           body: JSON.stringify({
             institution_name: instName,
+            institution_type: instType,
             ano_cto_name: anoName,
             ano_cto_contact: anoContact,
             ano_cto_email: anoEmail,
@@ -516,6 +580,20 @@ export default function ManageInstitutions() {
                 </th>
                 <th className="p-4">
                   <div className="flex flex-col gap-1">
+                    <span>Institute Type</span>
+                    <select
+                      value={columnFilters.institution_type}
+                      onChange={(e) => setColumnFilters({...columnFilters, institution_type: e.target.value})}
+                      className="p-1 text-[10px] font-bold border border-slate-200 rounded w-full bg-slate-50 cursor-pointer text-slate-700"
+                    >
+                      <option value="">All Types</option>
+                      <option value="STATE">🏢 State (Govt/Pvt)</option>
+                      <option value="CENTRE">🏛️ Centre (APS/Sainik)</option>
+                    </select>
+                  </div>
+                </th>
+                <th className="p-4">
+                  <div className="flex flex-col gap-1">
                     <span>PIN Code</span>
                     <input type="text" placeholder="Filter..." className="p-1 text-[10px] font-normal border border-slate-200 rounded w-full bg-slate-50" value={columnFilters.pin_code} onChange={(e) => setColumnFilters({...columnFilters, pin_code: e.target.value})} />
                   </div>
@@ -568,18 +646,19 @@ export default function ManageInstitutions() {
                   const matchPin = !columnFilters.pin_code || inst.pin_code?.toLowerCase().includes(columnFilters.pin_code.toLowerCase());
                   const matchAnoName = !columnFilters.ano_cto_name || inst.ano_cto_name?.toLowerCase().includes(columnFilters.ano_cto_name.toLowerCase());
                   const matchAnoEmail = !columnFilters.ano_email || inst.ano_email?.toLowerCase().includes(columnFilters.ano_email.toLowerCase()) || inst.login_id?.toLowerCase().includes(columnFilters.ano_email.toLowerCase());
+                  const matchType = !columnFilters.institution_type || (inst.institution_type || 'STATE') === columnFilters.institution_type;
                   const matchS1 = !columnFilters.strength_1st_year || String(inst.strength_1st_year).includes(columnFilters.strength_1st_year);
                   const matchS2 = !columnFilters.strength_2nd_year || String(inst.strength_2nd_year).includes(columnFilters.strength_2nd_year);
                   const matchS3 = !columnFilters.strength_3rd_year || String(inst.strength_3rd_year).includes(columnFilters.strength_3rd_year);
                   const matchTotal = !columnFilters.total_vacancy || String(total).includes(columnFilters.total_vacancy);
 
-                  return matchGlobalPin && matchInstName && matchPin && matchAnoName && matchAnoEmail && matchS1 && matchS2 && matchS3 && matchTotal;
+                  return matchGlobalPin && matchInstName && matchType && matchPin && matchAnoName && matchAnoEmail && matchS1 && matchS2 && matchS3 && matchTotal;
                 });
 
                 if (filteredInstitutions.length === 0) {
                   return (
                     <tr>
-                      <td colSpan="10" className="p-8 text-center text-slate-500 font-medium">
+                      <td colSpan="11" className="p-8 text-center text-slate-500 font-medium">
                         No institutions found matching the filters.
                       </td>
                     </tr>
@@ -588,12 +667,27 @@ export default function ManageInstitutions() {
 
                 return filteredInstitutions.map((inst, index) => {
                   const total = (inst.strength_1st_year || 0) + (inst.strength_2nd_year || 0) + (inst.strength_3rd_year || 0);
+                  const currentType = inst.institution_type === 'CENTRE' ? 'CENTRE' : 'STATE';
                   return (
                     <tr key={inst.id} className="hover:bg-white/50 transition-colors">
                       <td className="p-4 text-slate-500 font-bold">{index + 1}</td>
                       <td className="p-4 font-bold text-slate-900">
                         <div>{inst.institution_name}</div>
                         {inst.complete_address && <div className="text-xs text-slate-400 font-normal mt-0.5 max-w-[200px] truncate">{inst.complete_address}</div>}
+                      </td>
+                      <td className="p-4 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleType(inst, e)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black border shadow-2xs transition-all cursor-pointer hover:scale-105 active:scale-95 ${
+                            currentType === 'CENTRE'
+                              ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-200'
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                          }`}
+                          title="Click to toggle funding mode between STATE and CENTRE"
+                        >
+                          <span>{currentType === 'CENTRE' ? '🏛️ CENTRE' : '🏢 STATE'}</span>
+                        </button>
                       </td>
                       <td className="p-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 font-mono text-xs font-bold tracking-widest">
@@ -677,6 +771,47 @@ export default function ManageInstitutions() {
                   placeholder="e.g. St. Joseph University"
                   className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500"
                 />
+              </div>
+
+              {/* Institute Type / Funding Aspect */}
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Institute Type (Funding Aspect) <span className="text-rose-500">*</span>
+                  <span className="ml-2 text-[10px] font-normal text-slate-400">Determines physical billing & PCDA/State documentation route</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setInstType('STATE')}
+                    className={`p-2.5 rounded-xl border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                      instType === 'STATE'
+                        ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-200'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-900">🏢 STATE FUNDED</span>
+                      {instType === 'STATE' && <span className="text-[10px] font-black text-emerald-600">● Selected</span>}
+                    </div>
+                    <span className="text-[10px] text-slate-500 leading-tight">Govt Schools & Regular Pvt Schools (State Fund)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setInstType('CENTRE')}
+                    className={`p-2.5 rounded-xl border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                      instType === 'CENTRE'
+                        ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-200'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-indigo-900">🏛️ CENTRE FUNDED</span>
+                      {instType === 'CENTRE' && <span className="text-[10px] font-black text-indigo-600">● Selected</span>}
+                    </div>
+                    <span className="text-[10px] text-slate-500 leading-tight">Army Public School (APS), Sainik School (Centre / PCDA)</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -913,6 +1048,7 @@ export default function ManageInstitutions() {
                     <tr>
                       <th className="p-3">#</th>
                       <th className="p-3">Institution Name</th>
+                      <th className="p-3">Type</th>
                       <th className="p-3">PIN</th>
                       <th className="p-3">ANO Incharge</th>
                       <th className="p-3">ANO Contact / Email</th>
@@ -927,6 +1063,15 @@ export default function ManageInstitutions() {
                       <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
                         <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
                         <td className="p-3 font-bold text-slate-900">{row.institution_name}</td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            row.institution_type === 'CENTRE'
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}>
+                            {row.institution_type === 'CENTRE' ? '🏛️ CENTRE' : '🏢 STATE'}
+                          </span>
+                        </td>
                         <td className="p-3 font-mono text-slate-600">{row.pin_code || '—'}</td>
                         <td className="p-3 text-slate-800">{row.ano_cto_name}</td>
                         <td className="p-3 text-slate-500">

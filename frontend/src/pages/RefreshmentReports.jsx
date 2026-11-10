@@ -1342,6 +1342,8 @@ export default function RefreshmentReports({ defaultTab }) {
 
     // Institution filter
     const [instFilter, setInstFilter] = useState('All');
+    // Funding filter: ALL | STATE | CENTRE
+    const [fundingFilter, setFundingFilter] = useState('ALL');
     const [searchQuery, setSearchQuery] = useState('');
 
     const institutionsMap = useMemo(() => {
@@ -1360,14 +1362,18 @@ export default function RefreshmentReports({ defaultTab }) {
       return Array.from(unitNames).sort();
     }, [units, demands]);
 
-    // Available institutions under currently selected unit
+    // Available institutions under currently selected unit and funding mode
     const availableInstitutions = useMemo(() => {
       return (institutions || []).filter(inst => {
-        if (unitFilter === 'All') return true;
-        const instUnit = inst.unit_name || (units.find(u => u.id === inst.unit_id)?.unit_name);
-        return instUnit === unitFilter;
+        if (unitFilter !== 'All') {
+          const instUnit = inst.unit_name || (units.find(u => u.id === inst.unit_id)?.unit_name);
+          if (instUnit !== unitFilter) return false;
+        }
+        const instType = inst.institution_type || 'STATE';
+        if (fundingFilter !== 'ALL' && instType !== fundingFilter) return false;
+        return true;
       }).sort((a, b) => (a.institution_name || '').localeCompare(b.institution_name || ''));
-    }, [institutions, units, unitFilter]);
+    }, [institutions, units, unitFilter, fundingFilter]);
 
     // Auto-reset institution filter if not in available list
     useEffect(() => {
@@ -1450,6 +1456,10 @@ export default function RefreshmentReports({ defaultTab }) {
           if (String(d.institution_id) !== String(instFilter) && d.institution_name !== instFilter) return false;
         }
 
+        // Funding aspect filter: STATE vs CENTRE
+        const instType = d.institution_type || institutionsMap[d.institution_id]?.institution_type || 'STATE';
+        if (fundingFilter !== 'ALL' && instType !== fundingFilter) return false;
+
         // Keep CANCELLED and REJECTED in record with 0 qty/amount for complete audit trail
 
         // Search query
@@ -1465,7 +1475,7 @@ export default function RefreshmentReports({ defaultTab }) {
 
         return true;
       });
-    }, [demands, selectedMonth, selectedGroup, unitFilter, instFilter, searchQuery]);
+    }, [demands, selectedMonth, selectedGroup, unitFilter, instFilter, fundingFilter, searchQuery, institutionsMap]);
 
     // Group filtered demands by Institution
     const groupedByInstitution = useMemo(() => {
@@ -1475,11 +1485,13 @@ export default function RefreshmentReports({ defaultTab }) {
         const key = d.institution_name || (d.institution_id ? `Inst_${d.institution_id}` : 'Unknown Institution');
         const instData = institutionsMap[d.institution_id] || {};
         const addressStr = d.complete_address || instData.complete_address || d.google_location || instData.google_location || 'Delhi Cantonment, New Delhi';
+        const instType = d.institution_type || instData.institution_type || 'STATE';
 
         if (!groups[key]) {
           groups[key] = {
             id: d.institution_id,
             name: d.institution_name || 'Unknown Institution',
+            type: instType,
             address: addressStr,
             ano: d.ano_cto_name || instData.ano_cto_name || '-',
             unit_name: d.unit_name || instData.unit_name || '-',
@@ -1519,6 +1531,7 @@ export default function RefreshmentReports({ defaultTab }) {
           exportData.push({
             'S.NO': currentRow,
             'INSTITUTION WITH ADDRESS': `${inst.name}${inst.address ? ', ' + inst.address : ''}`,
+            'FUNDING TYPE': inst.type || 'STATE',
             'DATE OF SUPPLY': formatDDMMYYYY(d.demand_date),
             'DEMAND REF': d.demand_number || '',
             'UNIT': d.unit_name || inst.unit_name || '',
@@ -1539,6 +1552,11 @@ export default function RefreshmentReports({ defaultTab }) {
             s: { r: startRow, c: 1 },
             e: { r: currentRow - 1, c: 1 }
           });
+          // Merge column 2 (FUNDING TYPE) as well
+          merges.push({
+            s: { r: startRow, c: 2 },
+            e: { r: currentRow - 1, c: 2 }
+          });
         }
       });
 
@@ -1549,7 +1567,8 @@ export default function RefreshmentReports({ defaultTab }) {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Unitwise Monthly Summary');
       const safeUnitStr = unitFilter === 'All' ? 'All_Units' : unitFilter.replace(/[^a-zA-Z0-9]/g, '_');
-      XLSX.writeFile(workbook, `Unitwise_Monthly_Summary_${selectedMonth}_${safeUnitStr}.xlsx`);
+      const safeFundingStr = fundingFilter === 'ALL' ? '' : `_${fundingFilter}`;
+      XLSX.writeFile(workbook, `Unitwise_Monthly_Summary_${selectedMonth}_${safeUnitStr}${safeFundingStr}.xlsx`);
     };
 
     const monthDateObj = selectedMonth ? new Date(selectedMonth + '-01') : new Date();
@@ -1598,8 +1617,59 @@ export default function RefreshmentReports({ defaultTab }) {
             </div>
           </div>
 
-          {/* Filter Bar: Month, Unit, Institution, Search */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          {/* Quick Funding Mode Tabs (Separate documentation modes) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Documentation Mode:</span>
+              <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl gap-1">
+                <button
+                  type="button"
+                  onClick={() => setFundingFilter('ALL')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    fundingFilter === 'ALL'
+                      ? 'bg-white text-slate-900 shadow-2xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All Modes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFundingFilter('STATE')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    fundingFilter === 'STATE'
+                      ? 'bg-emerald-600 text-white shadow-2xs font-black'
+                      : 'text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                >
+                  <span>🏢 State Funded</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFundingFilter('CENTRE')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    fundingFilter === 'CENTRE'
+                      ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                      : 'text-indigo-700 hover:bg-indigo-50'
+                  }`}
+                >
+                  <span>🏛️ Centre Funded</span>
+                </button>
+              </div>
+            </div>
+            {fundingFilter !== 'ALL' && (
+              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${
+                fundingFilter === 'CENTRE'
+                  ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              }`}>
+                {fundingFilter === 'CENTRE' ? '🏛️ Army Public School / Sainik School Mode' : '🏢 State Govt & Regular Vacancy Mode'}
+              </span>
+            )}
+          </div>
+
+          {/* Filter Bar: Month, Unit, Funding Mode, Institution, Search */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
             {/* 1. Month Picker (Formatted like "May 2026") */}
             <div>
               <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
@@ -1636,7 +1706,23 @@ export default function RefreshmentReports({ defaultTab }) {
               </select>
             </div>
 
-            {/* 3. Institution Filter */}
+            {/* 3. Funding Aspect Filter */}
+            <div>
+              <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Funding Aspect
+              </label>
+              <select
+                value={fundingFilter}
+                onChange={(e) => setFundingFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-xs cursor-pointer"
+              >
+                <option value="ALL">🌐 All (State + Centre)</option>
+                <option value="STATE">🏢 State (Govt/Pvt)</option>
+                <option value="CENTRE">🏛️ Centre (APS/Sainik)</option>
+              </select>
+            </div>
+
+            {/* 4. Institution Filter */}
             <div>
               <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
                 Filter Institution
@@ -1653,7 +1739,7 @@ export default function RefreshmentReports({ defaultTab }) {
               </select>
             </div>
 
-            {/* 4. Search Filter */}
+            {/* 5. Search Filter */}
             <div>
               <label className="block text-slate-500 font-bold uppercase text-[10px] tracking-wider mb-1">
                 Search
@@ -1676,9 +1762,9 @@ export default function RefreshmentReports({ defaultTab }) {
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm print:shadow-none print:border-none print:bg-white print:overflow-visible print:w-full">
           {/* Print Page Header */}
           <PrintHeader
-            title={`MONTHLY REFRESHMENT SUMMARY - UNIT : ${activeUnitHeader}`}
+            title={`MONTHLY REFRESHMENT SUMMARY - UNIT : ${activeUnitHeader}${fundingFilter !== 'ALL' ? ` (${fundingFilter === 'CENTRE' ? 'CENTRE FUND' : 'STATE FUND'})` : ''}`}
             period={`MONTH : ${monthDisplayStr}`}
-            extraMeta={`TOTAL INSTITUTIONS: ${totalInstitutionsCount} • TOTAL DEMANDS: ${totalDemandsCount}`}
+            extraMeta={`TOTAL INSTITUTIONS: ${totalInstitutionsCount} • TOTAL DEMANDS: ${totalDemandsCount}${fundingFilter !== 'ALL' ? ` • FUND: ${fundingFilter}` : ''}`}
           />
 
           {/* Table Container */}
@@ -1736,7 +1822,16 @@ export default function RefreshmentReports({ defaultTab }) {
                                   rowSpan={demandCount}
                                   className="px-3.5 py-3 text-xs text-slate-900 border border-slate-200 print:border-black align-top bg-white print:bg-white min-w-[240px]"
                                 >
-                                  <div className="font-bold text-slate-900 uppercase text-xs tracking-tight">{inst.name}</div>
+                                  <div className="flex items-start justify-between gap-1.5">
+                                    <div className="font-bold text-slate-900 uppercase text-xs tracking-tight">{inst.name}</div>
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shrink-0 border ${
+                                      (inst.type || 'STATE') === 'CENTRE'
+                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    }`}>
+                                      {(inst.type || 'STATE') === 'CENTRE' ? '🏛️ CENTRE' : '🏢 STATE'}
+                                    </span>
+                                  </div>
                                   {inst.address && (
                                     <div className="text-xs text-slate-600 font-normal leading-snug mt-1">
                                       {inst.address}
@@ -3115,8 +3210,17 @@ export default function RefreshmentReports({ defaultTab }) {
                                               {iIdx + 1}
                                             </td>
                                             <td className="px-3 py-2.5">
-                                              <div className="font-black text-xs text-slate-900 uppercase">
-                                                {inst.institution_name}
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="font-black text-xs text-slate-900 uppercase">
+                                                  {inst.institution_name}
+                                                </span>
+                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase border shrink-0 ${
+                                                  inst.institution_type === 'CENTRE'
+                                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                }`}>
+                                                  {inst.institution_type === 'CENTRE' ? '🏛️ CENTRE' : '🏢 STATE'}
+                                                </span>
                                               </div>
                                               <div className="text-[10px] font-bold text-slate-500 mt-0.5">
                                                 ANO: {inst.ano_cto_name || 'Assigned ANO'} {inst.ano_cto_contact && `• 📞 ${inst.ano_cto_contact}`}
