@@ -30,6 +30,14 @@ export default function DocumentationPage() {
   const [receiptPreview, setReceiptPreview] = useState(null);
   const [invoicePreview, setInvoicePreview] = useState(null);
 
+  // Bulk Upload State
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkDocType, setBulkDocType] = useState('INVOICE'); // 'INVOICE' | 'RECEIPT'
+  const [bulkFiles, setBulkFiles] = useState([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+  const [bulkResultSummary, setBulkResultSummary] = useState(null);
+
   // Fetch delivered demands
   const fetchDeliveredDemands = useCallback(async () => {
     if (!token) return;
@@ -210,6 +218,153 @@ export default function DocumentationPage() {
     }
   };
 
+  const extractDemandKey = (fileName) => {
+    if (!fileName) return null;
+    const nameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
+    
+    // 1. Try full pattern: DEM-2026-182 or DEM_2026_182 or DEM2026182
+    const fullMatch = nameWithoutExt.match(/DEM[-_ ]?(\d{4}|\d{2})[-_ ]?(\d+)/i);
+    if (fullMatch) {
+      const year = fullMatch[1].length === 2 ? `20${fullMatch[1]}` : fullMatch[1];
+      const num = fullMatch[2];
+      return { full: `DEM-${year}-${num}`, num: parseInt(num, 10) };
+    }
+
+    // 2. Try year-num: 2026-182 or 2026_182
+    const yearNumMatch = nameWithoutExt.match(/\b(202\d)[-_ ]?(\d+)\b/);
+    if (yearNumMatch) {
+      return { full: `DEM-${yearNumMatch[1]}-${yearNumMatch[2]}`, num: parseInt(yearNumMatch[2], 10) };
+    }
+
+    // 3. Try isolated number: e.g. "Invoice_182", "182", "bill-182"
+    const numMatch = nameWithoutExt.match(/(?:^|[^0-9])(\d{1,4})(?:$|[^0-9])/);
+    if (numMatch) {
+      return { num: parseInt(numMatch[1], 10) };
+    }
+
+    return null;
+  };
+
+  const autoMatchFiles = (rawFiles) => {
+    const newItems = Array.from(rawFiles).map((file, idx) => {
+      const key = extractDemandKey(file.name);
+      let matchedDemand = null;
+
+      if (key?.full) {
+        matchedDemand = demands.find(d => (d.demand_number || '').toUpperCase() === key.full.toUpperCase());
+      }
+      if (!matchedDemand && key?.num) {
+        const candidates = demands.filter(d => {
+          const m = (d.demand_number || '').match(/(\d+)$/);
+          const dNum = m ? parseInt(m[1], 10) : d.id;
+          return dNum === key.num || d.id === key.num;
+        });
+        if (candidates.length === 1) matchedDemand = candidates[0];
+      }
+
+      return {
+        id: `${file.name}-${idx}-${Date.now()}-${Math.random()}`,
+        file,
+        name: file.name,
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        matchedDemandId: matchedDemand ? matchedDemand.id : '',
+        matchedDemandNumber: matchedDemand ? matchedDemand.demand_number : '',
+        matchedInstitution: matchedDemand ? matchedDemand.institution_name : '',
+        matchedPin: matchedDemand ? matchedDemand.pin_code : '',
+        isMatched: Boolean(matchedDemand)
+      };
+    });
+
+    setBulkFiles(prev => [...prev, ...newItems]);
+  };
+
+  const handleUpdateFileDemand = (fileId, newDemandId) => {
+    const selected = demands.find(d => String(d.id) === String(newDemandId));
+    setBulkFiles(prev => prev.map(f => {
+      if (f.id !== fileId) return f;
+      return {
+        ...f,
+        matchedDemandId: selected ? selected.id : '',
+        matchedDemandNumber: selected ? selected.demand_number : '',
+        matchedInstitution: selected ? selected.institution_name : '',
+        matchedPin: selected ? selected.pin_code : '',
+        isMatched: Boolean(selected)
+      };
+    }));
+  };
+
+  const handleRemoveBulkFile = (fileId) => {
+    setBulkFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  const handleExecuteBulkUpload = async () => {
+    const readyFiles = bulkFiles.filter(f => f.matchedDemandId);
+    if (readyFiles.length === 0) {
+      alert('No matched files to upload. Please match at least one file to a demand.');
+      return;
+    }
+
+    setBulkUploading(true);
+    setBulkResultSummary(null);
+    setBulkProgress({ current: 0, total: readyFiles.length });
+
+    const batchSize = 10;
+    let totalUpdated = 0;
+    let failedCount = 0;
+
+    try {
+      for (let i = 0; i < readyFiles.length; i += batchSize) {
+        const chunk = readyFiles.slice(i, i + batchSize);
+        const formData = new FormData();
+        const mappings = [];
+
+        chunk.forEach(item => {
+          formData.append('files', item.file);
+          mappings.push({
+            originalname: item.file.name,
+            demand_id: item.matchedDemandId,
+            doc_type: bulkDocType
+          });
+        });
+
+        formData.append('mappings', JSON.stringify(mappings));
+        formData.append('doc_type', bulkDocType);
+
+        const res = await fetch('/api/demands/bulk-upload-docs', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          totalUpdated += data.updated || chunk.length;
+        } else {
+          failedCount += chunk.length;
+        }
+
+        setBulkProgress({ current: Math.min(i + chunk.length, readyFiles.length), total: readyFiles.length });
+      }
+
+      setBulkResultSummary({
+        success: true,
+        updated: totalUpdated,
+        failed: failedCount
+      });
+
+      fetchDeliveredDemands();
+      setTimeout(() => {
+        setBulkModalOpen(false);
+        setBulkFiles([]);
+        setBulkUploading(false);
+        setBulkResultSummary(null);
+      }, 2000);
+    } catch (err) {
+      alert('Bulk upload error: ' + err.message);
+      setBulkUploading(false);
+    }
+  };
+
   const handleSendWhatsAppAlert = (dem) => {
     if (!dem) return;
     const phone = dem.ano_cto_contact || '';
@@ -252,6 +407,15 @@ export default function DocumentationPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setBulkModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Bulk upload invoices or receipts with auto-matching by Demand Reference Number"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Bulk Upload Docs</span>
+          </button>
           <Link
             to="/delivery"
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-2xs"
@@ -261,7 +425,7 @@ export default function DocumentationPage() {
           </Link>
           <button
             onClick={() => window.print()}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs shadow-xs transition-all flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-2xs"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print Manifest</span>
@@ -815,6 +979,265 @@ export default function DocumentationPage() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: BULK DOCUMENT UPLOAD */}
+      {bulkModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !bulkUploading) setBulkModalOpen(false);
+          }}
+        >
+          <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]">
+            {/* Header */}
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black">
+                  <Upload className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
+                    Bulk Document Upload
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-white">
+                      Auto-Match
+                    </span>
+                  </h3>
+                  <p className="text-xs text-blue-100 font-medium">
+                    Select multiple invoices or receipts. Files with demand reference (e.g., DEM-2026-182) will auto-match.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={bulkUploading}
+                onClick={() => setBulkModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Document Type Switcher */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-1">
+                  Step 1: Choose Document Type
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Select whether you are uploading vendor bills (invoices) or signed delivery receipts.
+                </span>
+              </div>
+              <div className="flex items-center bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setBulkDocType('INVOICE')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                    bulkDocType === 'INVOICE'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" /> Vendor Invoices (Bills)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkDocType('RECEIPT')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                    bulkDocType === 'RECEIPT'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <FileCheck className="w-3.5 h-3.5" /> Signed Receipts
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body / Dropzone */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+              {/* Dropzone */}
+              <label className="border-2 border-dashed border-blue-200 hover:border-blue-400 bg-blue-50/50 hover:bg-blue-50/80 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all text-center group">
+                <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <div className="text-xs font-black text-slate-800">
+                  Click or drag files here to upload in bulk
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 max-w-md">
+                  Supports multiple <strong>.pdf</strong>, <strong>.jpg</strong>, <strong>.jpeg</strong>, <strong>.png</strong> files. Filenames with demand ref (e.g. <span className="font-mono text-blue-700 bg-blue-100/70 px-1 rounded">DEM-2026-182.pdf</span> or <span className="font-mono text-blue-700 bg-blue-100/70 px-1 rounded">182.pdf</span>) auto-link.
+                </div>
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  disabled={bulkUploading}
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      autoMatchFiles(e.target.files);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </label>
+
+              {/* Match Summary Bar */}
+              {bulkFiles.length > 0 && (
+                <div className="flex items-center justify-between gap-2 p-3 bg-slate-100 rounded-2xl border border-slate-200">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-black text-slate-800">
+                      {bulkFiles.length} File{bulkFiles.length > 1 ? 's' : ''} Selected:
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      ✓ {bulkFiles.filter(f => f.isMatched).length} Auto-Matched
+                    </span>
+                    {bulkFiles.filter(f => !f.isMatched).length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200">
+                        ⚠️ {bulkFiles.filter(f => !f.isMatched).length} Need Manual Match
+                      </span>
+                    )}
+                  </div>
+                  {!bulkUploading && (
+                    <button
+                      type="button"
+                      onClick={() => setBulkFiles([])}
+                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Progress Bar when uploading */}
+              {bulkUploading && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between text-xs font-black text-blue-900">
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                      Uploading {bulkDocType === 'INVOICE' ? 'Invoices' : 'Receipts'} to Cloudinary...
+                    </span>
+                    <span>{bulkProgress.current} / {bulkProgress.total}</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2.5 overflow-hidden">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${bulkProgress.total > 0 ? (bulkProgress.current / bulkProgress.total) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Success Result Toast */}
+              {bulkResultSummary && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Successfully uploaded and linked {bulkResultSummary.updated} documents! Updating records...</span>
+                </div>
+              )}
+
+              {/* Files Table */}
+              {bulkFiles.length > 0 && (
+                <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-72 overflow-y-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-black sticky top-0 border-b border-slate-200">
+                      <tr>
+                        <th className="p-3">File Name</th>
+                        <th className="p-3">Matched Demand</th>
+                        <th className="p-3">Institution / Stop</th>
+                        <th className="p-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {bulkFiles.map((item) => (
+                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="p-3">
+                            <div className="font-bold text-slate-900 truncate max-w-[200px]" title={item.name}>
+                              {item.name}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono">{item.size}</span>
+                          </td>
+                          <td className="p-3">
+                            {item.isMatched ? (
+                              <span className="font-mono font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                {item.matchedDemandNumber}
+                              </span>
+                            ) : (
+                              <select
+                                value={item.matchedDemandId || ''}
+                                onChange={(e) => handleUpdateFileDemand(item.id, e.target.value)}
+                                className="p-1.5 bg-amber-50 border border-amber-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 max-w-[180px]"
+                              >
+                                <option value="">Select Demand...</option>
+                                {demands.map(d => (
+                                  <option key={d.id} value={d.id}>
+                                    {d.demand_number} ({d.institution_name})
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {item.matchedInstitution ? (
+                              <div>
+                                <div className="font-bold text-slate-800 truncate max-w-[200px]">{item.matchedInstitution}</div>
+                                {item.matchedPin && <span className="text-[10px] text-slate-500">PIN {item.matchedPin}</span>}
+                              </div>
+                            ) : (
+                              <span className="text-amber-600 font-semibold italic text-[11px]">Unmatched</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            {!bulkUploading && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveBulkFile(item.id)}
+                                className="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                title="Remove file from upload"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200/80 flex items-center justify-between gap-3">
+              <div className="text-xs text-slate-500 font-medium">
+                {bulkFiles.filter(f => f.matchedDemandId).length} of {bulkFiles.length} ready to upload
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={bulkUploading}
+                  onClick={() => setBulkModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkUploading || bulkFiles.filter(f => f.matchedDemandId).length === 0}
+                  onClick={handleExecuteBulkUpload}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                >
+                  {bulkUploading ? (
+                    <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Uploading...</>
+                  ) : (
+                    <><Upload className="w-3.5 h-3.5" /> Confirm & Upload ({bulkFiles.filter(f => f.matchedDemandId).length})</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

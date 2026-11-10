@@ -1056,6 +1056,120 @@ router.post('/:id/admin-reject', authenticateToken, authorizeRoles('ADMIN'), asy
   }
 });
 
+// POST /api/demands/bulk-upload-docs - ADMIN bulk uploads invoices or receipts
+router.post('/bulk-upload-docs', authenticateToken, authorizeRoles('ADMIN'), uploadReceipt.array('files', 100), async (req, res) => {
+  try {
+    const db = await getDB();
+    const files = req.files || [];
+    if (files.length === 0) {
+      return res.status(400).json({ error: 'No files provided for upload.' });
+    }
+
+    let mappings = [];
+    try {
+      mappings = req.body.mappings ? JSON.parse(req.body.mappings) : [];
+    } catch (e) {
+      mappings = [];
+    }
+
+    const defaultDocType = req.body.doc_type || 'INVOICE'; // 'INVOICE' | 'RECEIPT'
+    const results = [];
+    let updatedCount = 0;
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const mapping = mappings[i] || mappings.find(m => m.originalname === file.originalname) || {};
+      const demandId = mapping.demand_id;
+      const docType = mapping.doc_type || defaultDocType;
+
+      if (!demandId) {
+        results.push({
+          filename: file.originalname,
+          success: false,
+          error: 'No demand matched for this file.'
+        });
+        continue;
+      }
+
+      const demand = await db.get('SELECT * FROM demands WHERE id = ? AND is_deleted = 0', [demandId]);
+      if (!demand) {
+        results.push({
+          filename: file.originalname,
+          demand_id: demandId,
+          success: false,
+          error: 'Demand not found.'
+        });
+        continue;
+      }
+
+      const fileUrl = getFileUrl(file, 'receipts');
+      let receiptUrl = demand.delivery_receipt_url;
+      let invoiceUrl = demand.invoice_url;
+
+      if (docType === 'INVOICE') {
+        invoiceUrl = fileUrl;
+      } else {
+        receiptUrl = fileUrl;
+      }
+
+      const isFullyDocumented = Boolean(receiptUrl && invoiceUrl);
+      const newStatus = isFullyDocumented ? 'FULFILLED' : demand.status;
+
+      await db.run(
+        `UPDATE demands 
+         SET delivery_receipt_url = ?, 
+             invoice_url = ?, 
+             status = ?, 
+             fulfilled_by = CASE WHEN ? = 'FULFILLED' THEN ? ELSE fulfilled_by END,
+             fulfilled_at = CASE WHEN ? = 'FULFILLED' THEN ? ELSE fulfilled_at END
+         WHERE id = ?`,
+        [receiptUrl, invoiceUrl, newStatus, newStatus, req.user.id, newStatus, now, demandId]
+      );
+
+      // Activity log
+      await db.run(
+        'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          demandId, 
+          req.user.id, 
+          'DOC_UPLOAD', 
+          demand.status, 
+          newStatus, 
+          `Bulk uploaded ${docType === 'INVOICE' ? 'Invoice' : 'Delivery Receipt'} (${file.originalname}).`
+        ]
+      );
+
+      const updatedDemand = await db.get('SELECT * FROM demands WHERE id = ?', [demandId]);
+      const eventPayload = { ...updatedDemand, timestamp: Date.now() };
+      broadcastToAll('DEMAND_UPDATED', eventPayload);
+
+      updatedCount++;
+      results.push({
+        filename: file.originalname,
+        demand_id: demandId,
+        demand_number: demand.demand_number,
+        institution_name: demand.institution_name,
+        doc_type: docType,
+        url: fileUrl,
+        status: newStatus,
+        is_fully_documented: isFullyDocumented,
+        success: true
+      });
+    }
+
+    res.json({
+      success: true,
+      processed: files.length,
+      updated: updatedCount,
+      results
+    });
+  } catch (error) {
+    console.error('Bulk upload docs error:', error);
+    res.status(500).json({ error: 'Failed to process bulk document upload: ' + error.message });
+  }
+});
+
 // POST /api/demands/:id/fulfill - ADMIN marks DELIVERED demand as FULFILLED and uploads files
 router.post('/:id/fulfill', authenticateToken, authorizeRoles('ADMIN'), uploadReceipt.fields([{ name: 'receipt', maxCount: 1 }, { name: 'invoice', maxCount: 1 }]), async (req, res) => {
   try {
@@ -1080,21 +1194,29 @@ router.post('/:id/fulfill', authenticateToken, authorizeRoles('ADMIN'), uploadRe
       }
     }
 
-    if (!receiptUrl) {
-      return res.status(400).json({ error: 'Signed delivery receipt is mandatory for fulfillment.' });
+    if (!receiptUrl && !invoiceUrl) {
+      return res.status(400).json({ error: 'Please select a delivery receipt or vendor invoice to upload.' });
     }
 
+    const isFullyDocumented = Boolean(receiptUrl && invoiceUrl);
+    const newStatus = isFullyDocumented ? 'FULFILLED' : demand.status;
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
     await db.run(
-      `UPDATE demands SET status = 'FULFILLED', fulfilled_by = ?, fulfilled_at = ?, delivery_receipt_url = ?, invoice_url = ? WHERE id = ?`,
-      [req.user.id, now, receiptUrl, invoiceUrl, demandId]
+      `UPDATE demands 
+       SET status = ?, 
+           fulfilled_by = CASE WHEN ? = 'FULFILLED' THEN ? ELSE fulfilled_by END, 
+           fulfilled_at = CASE WHEN ? = 'FULFILLED' THEN ? ELSE fulfilled_at END, 
+           delivery_receipt_url = ?, 
+           invoice_url = ? 
+       WHERE id = ?`,
+      [newStatus, newStatus, req.user.id, newStatus, now, receiptUrl, invoiceUrl, demandId]
     );
 
     // Timeline Activity Log
     await db.run(
       'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
-      [demandId, req.user.id, 'STATUS_CHANGE', demand.status, 'FULFILLED', 'Demand marked as FULFILLED (documents uploaded).']
+      [demandId, req.user.id, 'DOC_UPLOAD', demand.status, newStatus, isFullyDocumented ? 'Demand marked as FULFILLED (all documents uploaded).' : 'Delivery document updated.']
     );
 
     const updatedDemand = await db.get('SELECT * FROM demands WHERE id = ?', [demandId]);
@@ -1105,11 +1227,18 @@ router.post('/:id/fulfill', authenticateToken, authorizeRoles('ADMIN'), uploadRe
     broadcastToRole('UNIT', 'DEMAND_UPDATED', eventPayload);
     broadcastToRole('ADMIN', 'DEMAND_UPDATED', eventPayload);
 
-    const msg = `Your demand ${demand.demand_number} was fulfilled and documents uploaded.`;
-    await db.run('INSERT INTO notifications (user_id, title, message, link_url) VALUES (?, ?, ?, ?)', [demand.raised_by, 'Demand Update', msg, '/my-demands']);
-    broadcastToUser(demand.raised_by, 'NEW_NOTIFICATION', { count: 1 });
+    if (isFullyDocumented) {
+      const msg = `Your demand ${demand.demand_number} was fulfilled and documents uploaded.`;
+      await db.run('INSERT INTO notifications (user_id, title, message, link_url) VALUES (?, ?, ?, ?)', [demand.raised_by, 'Demand Update', msg, '/my-demands']);
+      broadcastToUser(demand.raised_by, 'NEW_NOTIFICATION', { count: 1 });
+    }
 
-    res.json({ message: 'Demand successfully marked as FULFILLED.', status: 'FULFILLED', delivery_receipt_url: receiptUrl, invoice_url: invoiceUrl });
+    res.json({ 
+      message: isFullyDocumented ? 'Demand successfully marked as FULFILLED.' : 'Document uploaded successfully.', 
+      status: newStatus, 
+      delivery_receipt_url: receiptUrl, 
+      invoice_url: invoiceUrl 
+    });
   } catch (error) {
     console.error('Fulfill demand error:', error);
     res.status(500).json({ error: 'Failed to fulfill demand.' });
