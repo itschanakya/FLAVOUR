@@ -115,6 +115,17 @@ export default function RefreshmentReports({ defaultTab }) {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Re-fetch latest demands and institutions whenever tab is switched or window gains focus
+  useEffect(() => {
+    fetchData(true);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const onFocus = () => fetchData(true);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
   
   const fetchData = async (isBackground = false) => {
     try {
@@ -1456,9 +1467,9 @@ export default function RefreshmentReports({ defaultTab }) {
           if (String(d.institution_id) !== String(instFilter) && d.institution_name !== instFilter) return false;
         }
 
-        // Funding aspect filter: STATE vs CENTRE
-        const instType = d.institution_type || institutionsMap[d.institution_id]?.institution_type || 'STATE';
-        if (fundingFilter !== 'ALL' && instType !== fundingFilter) return false;
+        // Funding aspect filter: STATE vs CENTRE (master institutionsMap takes priority)
+        const currentInstType = institutionsMap[d.institution_id]?.institution_type || d.institution_type || 'STATE';
+        if (fundingFilter !== 'ALL' && currentInstType !== fundingFilter) return false;
 
         // Keep CANCELLED and REJECTED in record with 0 qty/amount for complete audit trail
 
@@ -1485,7 +1496,7 @@ export default function RefreshmentReports({ defaultTab }) {
         const key = d.institution_name || (d.institution_id ? `Inst_${d.institution_id}` : 'Unknown Institution');
         const instData = institutionsMap[d.institution_id] || {};
         const addressStr = d.complete_address || instData.complete_address || d.google_location || instData.google_location || 'Delhi Cantonment, New Delhi';
-        const instType = d.institution_type || instData.institution_type || 'STATE';
+        const instType = instData.institution_type || d.institution_type || 'STATE';
 
         if (!groups[key]) {
           groups[key] = {
@@ -1509,6 +1520,50 @@ export default function RefreshmentReports({ defaultTab }) {
       // Sort institutions alphabetically
       return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
     }, [filteredDemands, institutionsMap]);
+
+    // Real-time 1-click toggle handler directly in summary
+    const handleToggleFunding = async (inst) => {
+      const current = inst.type || institutionsMap[inst.id]?.institution_type || 'STATE';
+      const nextType = current === 'CENTRE' ? 'STATE' : 'CENTRE';
+
+      // 1. Instant Real-time optimistic update in local React state
+      setInstitutions(prev => (prev || []).map(i => (i.id === inst.id || i.institution_name === inst.name) ? { ...i, institution_type: nextType } : i));
+      setDemands(prev => (prev || []).map(d => (d.institution_id === inst.id || d.institution_name === inst.name) ? { ...d, institution_type: nextType } : d));
+
+      try {
+        let res = await fetch(`/api/institutions/${inst.id}/type`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ institution_type: nextType })
+        });
+
+        if (res.status === 404) {
+          res = await fetch(`/api/institutions/${inst.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              institution_name: inst.name,
+              institution_type: nextType
+            })
+          });
+        }
+
+        if (res.ok) {
+          toast.success(`${inst.name} is now ${nextType === 'CENTRE' ? '🏛️ CENTRE FUNDED' : '🏢 STATE FUNDED'}`);
+        } else {
+          toast.error('Failed to update funding type on server');
+        }
+      } catch (err) {
+        console.error('Toggle funding error:', err);
+        toast.error('Network error updating funding type');
+      }
+    };
 
     const totalDemandsCount = filteredDemands.length;
     const totalPacketsCount = filteredDemands.reduce((s, d) => s + (Number(d.total_quantity) || Number(d.quantity) || 0), 0);
@@ -1597,6 +1652,16 @@ export default function RefreshmentReports({ defaultTab }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fetchData(true)}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold uppercase text-[11px] tracking-wider rounded-xl transition-all border border-slate-300 flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+                title="Refresh latest demands & institutions from server"
+              >
+                <RefreshCw size={14} className={loading ? "animate-spin text-blue-600" : "text-slate-500"} />
+                <span>Sync Data</span>
+              </button>
+
               <button
                 type="button"
                 onClick={exportToExcel}
@@ -1824,13 +1889,18 @@ export default function RefreshmentReports({ defaultTab }) {
                                 >
                                   <div className="flex items-start justify-between gap-1.5">
                                     <div className="font-bold text-slate-900 uppercase text-xs tracking-tight">{inst.name}</div>
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shrink-0 border ${
-                                      (inst.type || 'STATE') === 'CENTRE'
-                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    }`}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleFunding(inst)}
+                                      className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shrink-0 border cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-2xs print:border-black ${
+                                        (inst.type || 'STATE') === 'CENTRE'
+                                          ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                      }`}
+                                      title="Click to toggle funding mode between STATE and CENTRE in real-time"
+                                    >
                                       {(inst.type || 'STATE') === 'CENTRE' ? '🏛️ CENTRE' : '🏢 STATE'}
-                                    </span>
+                                    </button>
                                   </div>
                                   {inst.address && (
                                     <div className="text-xs text-slate-600 font-normal leading-snug mt-1">
