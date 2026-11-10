@@ -807,27 +807,33 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       const gstRate = pRec?.gst_tds_rate !== undefined && pRec?.gst_tds_rate !== null ? Number(pRec.gst_tds_rate) : defaultGstRate;
       const itRate = pRec?.it_tds_rate !== undefined && pRec?.it_tds_rate !== null ? Number(pRec.it_tds_rate) : defaultItRate;
 
-      const gstTdsAmount = pRec?.gst_tds_amount !== undefined && pRec?.gst_tds_amount !== null
-        ? Number(pRec.gst_tds_amount)
-        : Math.round((grossAmount * gstRate / 100) * 100) / 100;
+      // Calculate statutory TDS deductions (default 2% GST TDS + 2% IT TDS)
+      const calculatedGstTds = Math.round((grossAmount * (gstRate || 2.0) / 100) * 100) / 100;
+      const calculatedItTds = Math.round((grossAmount * (itRate || 2.0) / 100) * 100) / 100;
 
-      const itTdsAmount = pRec?.it_tds_amount !== undefined && pRec?.it_tds_amount !== null
+      const gstTdsAmount = (pRec?.gst_tds_amount !== undefined && pRec?.gst_tds_amount !== null && Number(pRec.gst_tds_amount) > 0)
+        ? Number(pRec.gst_tds_amount)
+        : calculatedGstTds;
+
+      const itTdsAmount = (pRec?.it_tds_amount !== undefined && pRec?.it_tds_amount !== null && Number(pRec.it_tds_amount) > 0)
         ? Number(pRec.it_tds_amount)
-        : Math.round((grossAmount * itRate / 100) * 100) / 100;
+        : calculatedItTds;
 
       const otherDeductions = Number(pRec?.other_deductions || 0);
-      const totalDeductions = pRec?.total_deductions !== undefined && pRec?.total_deductions !== null
+      const calculatedTotalDeductions = Math.round((gstTdsAmount + itTdsAmount + otherDeductions) * 100) / 100;
+
+      const totalDeductions = (pRec?.total_deductions !== undefined && pRec?.total_deductions !== null && Number(pRec.total_deductions) > 0)
         ? Number(pRec.total_deductions)
-        : Math.round((gstTdsAmount + itTdsAmount + otherDeductions) * 100) / 100;
+        : calculatedTotalDeductions;
 
       const expectedNetCredit = Math.max(0, Math.round((grossAmount - totalDeductions) * 100) / 100);
 
       const isPaid = pRec?.payment_status === 'PAID';
       const isSubmittedToPcda = Number(pRec?.submitted_to_pcda || 0) === 1 || pRec?.payment_status === 'SUBMITTED_TO_PCDA';
 
-      const netCreditAmount = pRec?.net_credit_amount !== undefined && pRec?.net_credit_amount !== null && Number(pRec.net_credit_amount) > 0
+      const netCreditAmount = (pRec?.net_credit_amount !== undefined && pRec?.net_credit_amount !== null && Number(pRec.net_credit_amount) > 0)
         ? Number(pRec.net_credit_amount)
-        : (isPaid ? Number(pRec?.paid_amount || expectedNetCredit) : expectedNetCredit);
+        : (isPaid && Number(pRec?.paid_amount) > 0 ? Number(pRec.paid_amount) : expectedNetCredit);
 
       const paidAmount = Number(pRec?.paid_amount || 0);
       const paymentStatus = isPaid ? 'PAID' : (isSubmittedToPcda ? 'SUBMITTED_TO_PCDA' : 'PENDING');
@@ -885,7 +891,7 @@ router.post('/unit-pcda-submit', authenticateToken, authorizeRoles('UNIT', 'ADMI
     const db = await getDB();
     await ensureBillColumns(db);
     const unitId = req.user.role === 'UNIT' ? req.user.unit_id : req.body.unit_id;
-    const { month, submission_date, letter_ref, remarks } = req.body;
+    const { month, submission_date, letter_ref, remarks, gross_amount, gst_tds_amount, it_tds_amount, total_deductions, net_credit_amount } = req.body;
 
     if (!unitId || !month) {
       return res.status(400).json({ error: 'unit_id and month are required.' });
@@ -897,6 +903,12 @@ router.post('/unit-pcda-submit', authenticateToken, authorizeRoles('UNIT', 'ADMI
       [unitId, month]
     );
 
+    const gross = Number(gross_amount) || 0;
+    const gstTds = Number(gst_tds_amount) || (gross > 0 ? Math.round((gross * 2 / 100) * 100) / 100 : 0);
+    const itTds = Number(it_tds_amount) || (gross > 0 ? Math.round((gross * 2 / 100) * 100) / 100 : 0);
+    const totDeduct = Number(total_deductions) || (gstTds + itTds);
+    const netCredit = Number(net_credit_amount) || (gross > 0 ? Math.max(0, gross - totDeduct) : 0);
+
     if (existing) {
       const nextStatus = existing.payment_status === 'PAID' ? 'PAID' : 'SUBMITTED_TO_PCDA';
       await db.run(
@@ -904,19 +916,36 @@ router.post('/unit-pcda-submit', authenticateToken, authorizeRoles('UNIT', 'ADMI
          SET submitted_to_pcda = 1,
              pcda_submission_date = ?,
              pcda_letter_ref = ?,
+             gross_amount = CASE WHEN ? > 0 THEN ? ELSE gross_amount END,
+             gst_tds_amount = CASE WHEN ? > 0 THEN ? ELSE gst_tds_amount END,
+             it_tds_amount = CASE WHEN ? > 0 THEN ? ELSE it_tds_amount END,
+             total_deductions = CASE WHEN ? > 0 THEN ? ELSE total_deductions END,
+             net_credit_amount = CASE WHEN ? > 0 THEN ? ELSE net_credit_amount END,
              remarks = COALESCE(?, remarks),
              payment_status = ?,
              updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
-        [subDate, letter_ref || null, remarks || null, nextStatus, existing.id]
+        [
+          subDate, letter_ref || null,
+          gross, gross,
+          gstTds, gstTds,
+          itTds, itTds,
+          totDeduct, totDeduct,
+          netCredit, netCredit,
+          remarks || null, nextStatus, existing.id
+        ]
       );
     } else {
       await db.run(
         `INSERT INTO unit_monthly_payments (
            unit_id, month, submitted_to_pcda, pcda_submission_date,
-           pcda_letter_ref, remarks, payment_status
-         ) VALUES (?, ?, 1, ?, ?, ?, 'SUBMITTED_TO_PCDA')`,
-        [unitId, month, subDate, letter_ref || null, remarks || null]
+           pcda_letter_ref, gross_amount, gst_tds_amount, it_tds_amount,
+           total_deductions, net_credit_amount, remarks, payment_status
+         ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'SUBMITTED_TO_PCDA')`,
+        [
+          unitId, month, subDate, letter_ref || null,
+          gross, gstTds, itTds, totDeduct, netCredit, remarks || null
+        ]
       );
     }
 

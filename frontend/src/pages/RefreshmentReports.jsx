@@ -2452,6 +2452,84 @@ export default function RefreshmentReports({ defaultTab }) {
       }
     });
 
+    // 12 calendar month definitions for the Jan to Dec slicer
+    const MONTH_NAMES = [
+      { key: '01', short: 'JAN', name: 'January' },
+      { key: '02', short: 'FEB', name: 'February' },
+      { key: '03', short: 'MAR', name: 'March' },
+      { key: '04', short: 'APR', name: 'April' },
+      { key: '05', short: 'MAY', name: 'May' },
+      { key: '06', short: 'JUN', name: 'June' },
+      { key: '07', short: 'JUL', name: 'July' },
+      { key: '08', short: 'AUG', name: 'August' },
+      { key: '09', short: 'SEP', name: 'September' },
+      { key: '10', short: 'OCT', name: 'October' },
+      { key: '11', short: 'NOV', name: 'November' },
+      { key: '12', short: 'DEC', name: 'December' }
+    ];
+
+    const selectedYear = useMemo(() => {
+      if (month && /^\d{4}-\d{2}$/.test(month)) {
+        return parseInt(month.split('-')[0], 10);
+      }
+      return new Date().getFullYear();
+    }, [month]);
+
+    const monthsWithData = useMemo(() => {
+      const setM = new Set();
+      (demands || []).forEach(d => {
+        if (d.demand_date && d.status !== 'CANCELLED' && d.status !== 'REJECTED') {
+          const ym = String(d.demand_date).slice(0, 7);
+          if (/^\d{4}-\d{2}$/.test(ym)) setM.add(ym);
+        }
+      });
+      return setM;
+    }, [demands]);
+
+    const availableYears = useMemo(() => {
+      const years = new Set([selectedYear, new Date().getFullYear(), 2025, 2026, 2027]);
+      monthsWithData.forEach(ym => {
+        const y = parseInt(ym.split('-')[0], 10);
+        if (!isNaN(y)) years.add(y);
+      });
+      return Array.from(years).sort();
+    }, [selectedYear, monthsWithData]);
+
+    const handleYearChange = (newYear) => {
+      const currentMonthPart = month && /^\d{4}-\d{2}$/.test(month) ? month.split('-')[1] : '11';
+      setMonth(`${newYear}-${currentMonthPart}`);
+    };
+
+    // Helper to calculate exact statutory TDS deductions (2% GST TDS + 2% IT TDS)
+    const getUnitDeductions = (u) => {
+      const gross = Number(u.gross_amount || u.total_amount || 0);
+      const gstRate = Number(u.gst_tds_rate) || 2.0;
+      const itRate = Number(u.it_tds_rate) || 2.0;
+      const calculatedGst = Math.round((gross * gstRate / 100) * 100) / 100;
+      const calculatedIt = Math.round((gross * itRate / 100) * 100) / 100;
+
+      const gstTds = Number(u.gst_tds_amount) > 0 ? Number(u.gst_tds_amount) : calculatedGst;
+      const itTds = Number(u.it_tds_amount) > 0 ? Number(u.it_tds_amount) : calculatedIt;
+      const other = Number(u.other_deductions || 0);
+      const calculatedTotal = Math.round((gstTds + itTds + other) * 100) / 100;
+      const totalDeduct = Number(u.total_deductions) > 0 ? Number(u.total_deductions) : calculatedTotal;
+      const expectedNet = Math.max(0, Math.round((gross - totalDeduct) * 100) / 100);
+      const netCredit = Number(u.net_credit_amount) > 0
+        ? Number(u.net_credit_amount)
+        : (u.payment_status === 'PAID' && Number(u.paid_amount) > 0 ? Number(u.paid_amount) : expectedNet);
+
+      return {
+        gross,
+        gstRate,
+        itRate,
+        gstTds,
+        itTds,
+        other,
+        totalDeduct,
+        netCredit
+      };
+    };
+
     // Month options derived from demands
     const monthOptions = useMemo(() => {
       const setM = new Set();
@@ -2566,7 +2644,7 @@ export default function RefreshmentReports({ defaultTab }) {
       });
     }, [unitPayments, selectedGroup, statusFilter, searchQuery]);
 
-    // Overall summary metrics including statutory TDS
+    // Overall summary metrics including statutory TDS (accurately computed for all units)
     const summary = useMemo(() => {
       let unitsCount = 0;
       let totalPkts = 0;
@@ -2581,15 +2659,16 @@ export default function RefreshmentReports({ defaultTab }) {
       let pendingCount = 0;
 
       filteredUnitPayments.forEach(u => {
-        if (u.total_packets > 0 || u.gross_amount > 0 || u.paid_amount > 0) {
+        const d = getUnitDeductions(u);
+        if (u.total_packets > 0 || d.gross > 0 || u.paid_amount > 0) {
           unitsCount += 1;
         }
         totalPkts += Number(u.total_packets || 0);
-        totalGross += Number(u.gross_amount || u.total_amount || 0);
-        totalGstTds += Number(u.gst_tds_amount || 0);
-        totalItTds += Number(u.it_tds_amount || 0);
-        totalDeductions += Number(u.total_deductions || 0);
-        totalNetCredit += Number(u.net_credit_amount || u.expected_net_credit || 0);
+        totalGross += d.gross;
+        totalGstTds += d.gstTds;
+        totalItTds += d.itTds;
+        totalDeductions += d.totalDeduct;
+        totalNetCredit += d.netCredit;
         totalPaidReceived += Number(u.paid_amount || 0);
 
         if (u.payment_status === 'PAID') {
@@ -2650,12 +2729,18 @@ export default function RefreshmentReports({ defaultTab }) {
       if (!pcdaModal.unit) return;
       setSavingAction(true);
       try {
+        const d = getUnitDeductions(pcdaModal.unit);
         const payload = {
           unit_id: pcdaModal.unit.unit_id,
           month,
           submission_date: pcdaModal.formData.submission_date,
           letter_ref: pcdaModal.formData.letter_ref,
-          remarks: pcdaModal.formData.remarks
+          remarks: pcdaModal.formData.remarks,
+          gross_amount: d.gross,
+          gst_tds_amount: d.gstTds,
+          it_tds_amount: d.itTds,
+          total_deductions: d.totalDeduct,
+          net_credit_amount: d.netCredit
         };
         const res = await fetch('/api/refreshment-bills/unit-pcda-submit', {
           method: 'POST',
@@ -2684,12 +2769,12 @@ export default function RefreshmentReports({ defaultTab }) {
     // ═══ Handlers for Admin View Details & Bank Credit Verification Modal ═══
     const handleOpenAdminDetailModal = (unit, e) => {
       if (e) e.stopPropagation();
-      const expectedNet = unit.expected_net_credit || Math.max(0, (unit.gross_amount || unit.total_amount) - (unit.total_deductions || 0));
+      const d = getUnitDeductions(unit);
       setAdminDetailModal({
         isOpen: true,
         unit,
         formData: {
-          paid_amount: unit.net_credit_amount > 0 ? unit.net_credit_amount : expectedNet,
+          paid_amount: unit.net_credit_amount > 0 ? unit.net_credit_amount : d.netCredit,
           payment_date: unit.payment_date || new Date().toISOString().split('T')[0],
           payment_mode: unit.payment_mode || 'NEFT / RTGS (Bank Transfer)',
           payment_ref: unit.payment_ref || '',
@@ -2756,18 +2841,22 @@ export default function RefreshmentReports({ defaultTab }) {
       if (!adminDetailModal.unit) return;
       setSavingAction(true);
       try {
+        const d = getUnitDeductions(adminDetailModal.unit);
+        const otherDed = Number(adminDetailModal.formData.other_deductions) || 0;
+        const totDed = d.gstTds + d.itTds + otherDed;
         const payload = {
           unit_id: adminDetailModal.unit.unit_id,
           month,
-          gross_amount: adminDetailModal.unit.gross_amount || adminDetailModal.unit.total_amount,
+          gross_amount: d.gross,
           paid_amount: Number(adminDetailModal.formData.paid_amount) || 0,
           payment_date: adminDetailModal.formData.payment_date,
           payment_mode: adminDetailModal.formData.payment_mode,
           payment_ref: adminDetailModal.formData.payment_ref,
           payment_advice_url: adminDetailModal.formData.payment_advice_url,
-          other_deductions: Number(adminDetailModal.formData.other_deductions) || 0,
-          gst_tds_amount: adminDetailModal.unit.gst_tds_amount,
-          it_tds_amount: adminDetailModal.unit.it_tds_amount,
+          other_deductions: otherDed,
+          gst_tds_amount: d.gstTds,
+          it_tds_amount: d.itTds,
+          total_deductions: totDed,
           remarks: adminDetailModal.formData.remarks
         };
         const res = await fetch('/api/refreshment-bills/verify-vendor-credit', {
@@ -2803,6 +2892,7 @@ export default function RefreshmentReports({ defaultTab }) {
 
       const rows = [];
       filteredUnitPayments.forEach((u, uIdx) => {
+        const d = getUnitDeductions(u);
         rows.push({
           'Record Type': 'UNIT SUMMARY',
           'S.No': uIdx + 1,
@@ -2812,14 +2902,14 @@ export default function RefreshmentReports({ defaultTab }) {
           'Month': u.month_label,
           'Institutions Count': u.institutions_count,
           'Total Packets': u.total_packets,
-          'Gross Bill (₹)': u.gross_amount || u.total_amount,
-          'GST TDS Rate (%)': `${u.gst_tds_rate || 2}%`,
-          'GST TDS Amount (₹)': u.gst_tds_amount || 0,
-          'IT TDS Rate (%)': `${u.it_tds_rate || 2}%`,
-          'IT TDS Amount (₹)': u.it_tds_amount || 0,
-          'Other Deductions (₹)': u.other_deductions || 0,
-          'Total Deductions (₹)': u.total_deductions || 0,
-          'Net Credit (₹)': u.net_credit_amount || u.expected_net_credit || 0,
+          'Gross Bill (₹)': d.gross,
+          'GST TDS Rate (%)': `${d.gstRate}%`,
+          'GST TDS Amount (₹)': d.gstTds,
+          'IT TDS Rate (%)': `${d.itRate}%`,
+          'IT TDS Amount (₹)': d.itTds,
+          'Other Deductions (₹)': d.other,
+          'Total Deductions (₹)': d.totalDeduct,
+          'Net Credit (₹)': d.netCredit,
           'PCDA Submitted': u.submitted_to_pcda ? 'YES' : 'NO',
           'PCDA Submission Date': u.pcda_submission_date ? formatDDMMYYYY(u.pcda_submission_date) : '-',
           'PCDA Letter Ref': u.pcda_letter_ref || '-',
@@ -2873,7 +2963,90 @@ export default function RefreshmentReports({ defaultTab }) {
 
     return (
       <div className="space-y-4 animate-in fade-in duration-300">
+        {/* ═══ Print Page Controls (Orientation & Paper Size) ═══ */}
         <PrintControls />
+
+        {/* ═══ Interactive 12-Month Slicer (JAN to DEC) + Year Slicer (Hidden during print) ═══ */}
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs print:hidden space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-black border border-blue-200/80 shadow-2xs">
+                <Calendar size={16} />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block leading-tight">
+                  MONTHLY BILLING SLICER
+                </span>
+                <h4 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight flex items-center gap-1.5">
+                  <span>{formatMonthLabel(month)}</span>
+                  <span className="text-[10px] font-bold text-slate-400">({filteredUnitPayments.length} Units)</span>
+                </h4>
+              </div>
+            </div>
+
+            {/* Year Selector with Quick Navigation */}
+            <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
+              <button
+                type="button"
+                onClick={() => handleYearChange(selectedYear - 1)}
+                className="w-7 h-7 rounded-lg hover:bg-white text-slate-600 hover:text-blue-700 flex items-center justify-center font-black text-xs transition-colors cursor-pointer"
+                title={`Switch to ${selectedYear - 1}`}
+              >
+                ◀
+              </button>
+              <select
+                value={selectedYear}
+                onChange={(e) => handleYearChange(Number(e.target.value))}
+                className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer px-1.5 py-0.5"
+              >
+                {availableYears.map(yr => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => handleYearChange(selectedYear + 1)}
+                className="w-7 h-7 rounded-lg hover:bg-white text-slate-600 hover:text-blue-700 flex items-center justify-center font-black text-xs transition-colors cursor-pointer"
+                title={`Switch to ${selectedYear + 1}`}
+              >
+                ▶
+              </button>
+            </div>
+          </div>
+
+          {/* 12 Horizontal Month Tabs (JAN to DEC) */}
+          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5 pt-1">
+            {MONTH_NAMES.map(m => {
+              const ym = `${selectedYear}-${m.key}`;
+              const isSelected = month === ym;
+              const hasData = monthsWithData.has(ym);
+
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setMonth(ym)}
+                  className={`py-2 px-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 active:scale-95 ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-600 scale-[1.03]'
+                      : hasData
+                        ? 'bg-blue-50/70 hover:bg-blue-100 text-blue-900 border border-blue-200 font-extrabold shadow-2xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200/80 font-bold'
+                  }`}
+                  title={`${m.name} ${selectedYear}${hasData ? ' (Refreshment Demands Available)' : ' (No demands)'}`}
+                >
+                  <span className="tracking-tight">{m.short}</span>
+                  {hasData && (
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-300' : 'bg-emerald-500'}`}
+                      title="Demands data present"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* ═══ Header & Filter Controls Bar ═══ */}
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs print:hidden space-y-3">
@@ -2894,7 +3067,7 @@ export default function RefreshmentReports({ defaultTab }) {
               </div>
             </div>
 
-            {/* Month Selector & Excel Export */}
+            {/* Action Buttons: Sync Data, Export Excel & Print Report */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
                 <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
@@ -2922,12 +3095,32 @@ export default function RefreshmentReports({ defaultTab }) {
 
               <button
                 type="button"
+                onClick={() => fetchUnitPayments()}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold uppercase text-[11px] tracking-wider rounded-xl transition-all border border-slate-300 flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+                title="Sync latest Unit payments from server"
+              >
+                <RefreshCw size={14} className={loadingUnits ? "animate-spin text-blue-600" : "text-slate-500"} />
+                <span>Sync Data</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleExportExcel}
-                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-black transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md shadow-emerald-600/25 border border-emerald-400/40 flex items-center gap-1.5 cursor-pointer active:scale-95"
                 title="Export Unit Payments and Breakdown to Excel"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <FileSpreadsheet size={15} className="text-emerald-200 shrink-0" />
                 <span>Export Excel</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="px-4 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-400 text-white font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md shadow-blue-600/25 border border-blue-400/40 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Print Official Unitwise Monthly Bill & Payment Report"
+              >
+                <Printer size={15} className="text-sky-200 shrink-0" />
+                <span>Print Report</span>
               </button>
             </div>
           </div>
@@ -3050,8 +3243,12 @@ export default function RefreshmentReports({ defaultTab }) {
         </div>
 
         {/* ═══ Unitwise Monthly Master Table ═══ */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-          <PrintHeader title="UNITWISE MONTHLY REFRESHMENT BILL SUBMISSION & PAYMENT TRACKER" period={month} />
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden print:border-none print:shadow-none">
+          <PrintHeader
+            title="UNITWISE MONTHLY REFRESHMENT BILL SUBMISSION & PAYMENT TRACKER"
+            period={`MONTH: ${formatMonthLabel(month)} | NCC GROUP: ${selectedGroup === 'All' ? 'ALL GROUPS' : selectedGroup}`}
+            extraMeta={`TOTAL UNITS: ${summary.unitsCount} | TOTAL PACKETS: ${summary.totalPkts.toLocaleString('en-IN')}`}
+          />
           
           {loadingUnits ? (
             <div className="p-12 text-center text-slate-500 font-bold bg-white">
@@ -3064,27 +3261,28 @@ export default function RefreshmentReports({ defaultTab }) {
               <h3 className="text-base font-black text-slate-900 mb-1">No Unit Demands or Bills Found</h3>
               <p className="text-xs text-slate-500 font-medium max-w-md mx-auto">
                 No refreshment demands were scheduled or delivered for NCC Units in {formatMonthLabel(month)}.
-                Try selecting another month from the picker above.
+                Try selecting another month from the month slicer above.
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto print:overflow-visible">
-              <table className="w-full text-left text-sm border-collapse">
-                <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap">
+              <table className="w-full text-left text-sm border-collapse print:text-black print:border print:border-black">
+                <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap print:bg-slate-100 print:text-black">
                   <tr>
-                    <th className="px-3 py-3.5 w-[20%]"># / NCC Unit Details</th>
-                    <th className="px-2 py-3.5 text-center w-[7%]">Packets</th>
-                    <th className="px-3 py-3.5 text-right w-[11%]">Gross Bill (₹)</th>
-                    <th className="px-2 py-3.5 text-right w-[9%] text-rose-700">GST TDS ({filteredUnitPayments[0]?.gst_tds_rate || 2}%)</th>
-                    <th className="px-2 py-3.5 text-right w-[9%] text-rose-700">IT TDS ({filteredUnitPayments[0]?.it_tds_rate || 2}%)</th>
-                    <th className="px-2 py-3.5 text-right w-[9%] text-rose-800">Total Deduct</th>
-                    <th className="px-3 py-3.5 text-right w-[11%] text-emerald-800">Net Credit (₹)</th>
-                    <th className="px-3 py-3.5 text-center w-[12%]">PCDA / Bank Status</th>
+                    <th className="px-3 py-3.5 w-[20%] print:border print:border-black"># / NCC Unit Details</th>
+                    <th className="px-2 py-3.5 text-center w-[7%] print:border print:border-black">Packets</th>
+                    <th className="px-3 py-3.5 text-right w-[11%] print:border print:border-black">Gross Bill (₹)</th>
+                    <th className="px-2 py-3.5 text-right w-[9%] text-rose-700 print:text-black print:border print:border-black">GST TDS ({filteredUnitPayments[0]?.gst_tds_rate || 2}%)</th>
+                    <th className="px-2 py-3.5 text-right w-[9%] text-rose-700 print:text-black print:border print:border-black">IT TDS ({filteredUnitPayments[0]?.it_tds_rate || 2}%)</th>
+                    <th className="px-2 py-3.5 text-right w-[9%] text-rose-800 print:text-black print:border print:border-black">Total Deduct</th>
+                    <th className="px-3 py-3.5 text-right w-[11%] text-emerald-800 print:text-black print:border print:border-black">Net Credit (₹)</th>
+                    <th className="px-3 py-3.5 text-center w-[12%] print:border print:border-black">PCDA / Bank Status</th>
                     <th className="px-3 py-3.5 text-right w-[10%] print:hidden">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {filteredUnitPayments.map((u, idx) => {
+                    const d = getUnitDeductions(u);
                     const isExpanded = expandedUnitIds.has(u.unit_id);
                     const isPaid = u.payment_status === 'PAID';
                     const isSubmittedToPcda = Number(u.submitted_to_pcda || 0) === 1 || u.payment_status === 'SUBMITTED_TO_PCDA';
@@ -3100,12 +3298,12 @@ export default function RefreshmentReports({ defaultTab }) {
                           }`}
                         >
                           {/* Col 1: Expand Chevron + Unit Name & Meta */}
-                          <td className="px-3 py-3.5">
+                          <td className="px-3 py-3.5 print:border print:border-black">
                             <div className="flex items-start gap-2">
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); toggleExpandUnit(u.unit_id); }}
-                                className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                                className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all print:hidden ${
                                   isExpanded ? 'bg-blue-600 text-white shadow-2xs rotate-180' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
                                 title={isExpanded ? 'Collapse Institutions' : 'Expand Institutions'}
@@ -3115,24 +3313,24 @@ export default function RefreshmentReports({ defaultTab }) {
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <h4 className="font-black text-xs sm:text-sm text-slate-900 tracking-tight group-hover:text-blue-700 transition-colors">
+                                  <h4 className="font-black text-xs sm:text-sm text-slate-900 print:text-black tracking-tight group-hover:text-blue-700 transition-colors">
                                     {u.unit_name}
                                   </h4>
                                   {u.unit_code && (
-                                    <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded text-[10px] font-mono font-bold border border-slate-200">
+                                    <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 print:text-black rounded text-[10px] font-mono font-bold border border-slate-200">
                                       {u.unit_code}
                                     </span>
                                   )}
                                   {u.ncc_group && (
-                                    <span className="px-1.5 py-0.2 bg-amber-50 text-amber-800 rounded text-[10px] font-extrabold border border-amber-200">
+                                    <span className="px-1.5 py-0.2 bg-amber-50 text-amber-800 print:text-black rounded text-[10px] font-extrabold border border-amber-200">
                                       {u.ncc_group}
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[11px] font-bold text-slate-400 mt-0.5 flex items-center gap-2">
+                                <div className="text-[11px] font-bold text-slate-400 print:text-slate-600 mt-0.5 flex items-center gap-2">
                                   <span>{u.institutions_count} {u.institutions_count === 1 ? 'Institution' : 'Institutions'} Supplied</span>
-                                  <span>•</span>
-                                  <span className="text-blue-600 hover:underline">
+                                  <span className="print:hidden">•</span>
+                                  <span className="text-blue-600 hover:underline print:hidden">
                                     {isExpanded ? 'Hide Schools ▲' : 'View Schools ▼'}
                                   </span>
                                 </div>
@@ -3141,47 +3339,47 @@ export default function RefreshmentReports({ defaultTab }) {
                           </td>
 
                           {/* Col 2: Supplied Packets */}
-                          <td className="px-2 py-3.5 text-center whitespace-nowrap">
-                            <span className="text-xs font-black text-indigo-950 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-xl shadow-2xs inline-block">
+                          <td className="px-2 py-3.5 text-center whitespace-nowrap print:border print:border-black">
+                            <span className="text-xs font-black text-indigo-950 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-xl shadow-2xs inline-block print:bg-transparent print:border-none print:text-black">
                               {Number(u.total_packets || 0).toLocaleString('en-IN')} Pkts
                             </span>
                           </td>
 
                           {/* Col 3: Gross Bill Amount (₹) */}
-                          <td className="px-3 py-3.5 text-right whitespace-nowrap font-black text-xs sm:text-sm text-slate-900">
-                            ₹{formatAmount(u.gross_amount || u.total_amount)}
+                          <td className="px-3 py-3.5 text-right whitespace-nowrap font-black text-xs sm:text-sm text-slate-900 print:text-black print:border print:border-black">
+                            ₹{formatAmount(d.gross)}
                           </td>
 
                           {/* Col 4: GST TDS (2%) */}
-                          <td className="px-2 py-3.5 text-right whitespace-nowrap font-black text-xs text-rose-700">
-                            -₹{formatAmount(u.gst_tds_amount)}
+                          <td className="px-2 py-3.5 text-right whitespace-nowrap font-black text-xs text-rose-700 print:text-black print:border print:border-black">
+                            -₹{formatAmount(d.gstTds)}
                           </td>
 
                           {/* Col 5: IT TDS (2%) */}
-                          <td className="px-2 py-3.5 text-right whitespace-nowrap font-black text-xs text-rose-700">
-                            -₹{formatAmount(u.it_tds_amount)}
+                          <td className="px-2 py-3.5 text-right whitespace-nowrap font-black text-xs text-rose-700 print:text-black print:border print:border-black">
+                            -₹{formatAmount(d.itTds)}
                           </td>
 
                           {/* Col 6: Total Deductions (₹) */}
-                          <td className="px-2 py-3.5 text-right whitespace-nowrap font-black text-xs text-rose-800 bg-rose-50/30">
-                            -₹{formatAmount(u.total_deductions)}
+                          <td className="px-2 py-3.5 text-right whitespace-nowrap font-black text-xs text-rose-800 bg-rose-50/30 print:bg-transparent print:text-black print:border print:border-black">
+                            -₹{formatAmount(d.totalDeduct)}
                           </td>
 
                           {/* Col 7: Net Vendor Credit (₹) */}
-                          <td className="px-3 py-3.5 text-right whitespace-nowrap font-black text-xs sm:text-sm text-emerald-700 bg-emerald-50/30">
-                            ₹{formatAmount(u.net_credit_amount || u.expected_net_credit)}
+                          <td className="px-3 py-3.5 text-right whitespace-nowrap font-black text-xs sm:text-sm text-emerald-700 bg-emerald-50/30 print:bg-transparent print:text-black print:border print:border-black">
+                            ₹{formatAmount(d.netCredit)}
                           </td>
 
                           {/* Col 8: PCDA / Bank Status Badge & Ref */}
-                          <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                          <td className="px-3 py-3.5 text-center whitespace-nowrap print:border print:border-black">
                             {isPaid ? (
                               <div className="space-y-1">
-                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1 shadow-2xs">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1 shadow-2xs print:bg-transparent print:text-black">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 print:hidden" />
                                   <span>CREDITED (PAID)</span>
                                 </span>
                                 {u.payment_ref && (
-                                  <div className="text-[10px] font-mono font-bold text-slate-600 truncate max-w-[130px] mx-auto" title={u.payment_ref}>
+                                  <div className="text-[10px] font-mono font-bold text-slate-600 print:text-black truncate max-w-[130px] mx-auto" title={u.payment_ref}>
                                     UTR: {u.payment_ref}
                                   </div>
                                 )}
@@ -3191,7 +3389,7 @@ export default function RefreshmentReports({ defaultTab }) {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={e => e.stopPropagation()}
-                                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 hover:underline"
+                                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 hover:underline print:hidden"
                                     title="View Payment Advice"
                                   >
                                     <Paperclip className="w-3 h-3 text-emerald-600" />
@@ -3201,28 +3399,28 @@ export default function RefreshmentReports({ defaultTab }) {
                               </div>
                             ) : isSubmittedToPcda ? (
                               <div className="space-y-1">
-                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-blue-50 text-blue-800 border border-blue-200 inline-flex items-center gap-1 shadow-2xs">
-                                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-blue-50 text-blue-800 border border-blue-200 inline-flex items-center gap-1 shadow-2xs print:bg-transparent print:text-black">
+                                  <Clock className="w-3.5 h-3.5 text-blue-600 print:hidden" />
                                   <span>SUBMITTED TO PCDA</span>
                                 </span>
                                 {u.pcda_submission_date && (
-                                  <div className="text-[10px] font-bold text-slate-500">
+                                  <div className="text-[10px] font-bold text-slate-500 print:text-black">
                                     Date: {formatDDMMYYYY(u.pcda_submission_date)}
                                   </div>
                                 )}
                                 {u.pcda_letter_ref && (
-                                  <div className="text-[10px] font-mono font-bold text-blue-700 truncate max-w-[130px] mx-auto" title={u.pcda_letter_ref}>
+                                  <div className="text-[10px] font-mono font-bold text-blue-700 print:text-black truncate max-w-[130px] mx-auto" title={u.pcda_letter_ref}>
                                     Ref: {u.pcda_letter_ref}
                                   </div>
                                 )}
                               </div>
                             ) : (
                               <div className="space-y-1">
-                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1 shadow-2xs">
-                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1 shadow-2xs print:bg-transparent print:text-black">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 print:hidden" />
                                   <span>PENDING PCDA</span>
                                 </span>
-                                <div className="text-[10px] font-bold text-slate-400">Bill at Unit</div>
+                                <div className="text-[10px] font-bold text-slate-400 print:text-black">Bill at Unit</div>
                               </div>
                             )}
                           </td>
@@ -3385,30 +3583,30 @@ export default function RefreshmentReports({ defaultTab }) {
                   })}
                 </tbody>
                 {filteredUnitPayments.length > 0 && (
-                  <tfoot className="bg-slate-50 border-t-2 border-slate-300 print:bg-slate-100 font-black">
+                  <tfoot className="bg-slate-50 border-t-2 border-slate-300 print:bg-slate-100 print:border-black font-black">
                     <tr className="text-xs">
-                      <td className="px-3 py-3.5 text-right uppercase tracking-wider text-slate-800">
+                      <td className="px-3 py-3.5 text-right uppercase tracking-wider text-slate-800 print:border print:border-black print:text-black">
                         Grand Total ({summary.unitsCount} Units)
                       </td>
-                      <td className="px-2 py-3.5 text-center text-blue-700 text-xs sm:text-sm">
+                      <td className="px-2 py-3.5 text-center text-blue-700 print:text-black print:border print:border-black text-xs sm:text-sm">
                         {summary.totalPkts.toLocaleString('en-IN')} Pkts
                       </td>
-                      <td className="px-3 py-3.5 text-right text-slate-900 text-xs sm:text-sm whitespace-nowrap">
+                      <td className="px-3 py-3.5 text-right text-slate-900 print:text-black print:border print:border-black text-xs sm:text-sm whitespace-nowrap">
                         ₹{formatAmount(summary.totalGross)}
                       </td>
-                      <td className="px-2 py-3.5 text-right text-rose-700 text-xs sm:text-sm whitespace-nowrap">
+                      <td className="px-2 py-3.5 text-right text-rose-700 print:text-black print:border print:border-black text-xs sm:text-sm whitespace-nowrap">
                         -₹{formatAmount(summary.totalGstTds)}
                       </td>
-                      <td className="px-2 py-3.5 text-right text-rose-700 text-xs sm:text-sm whitespace-nowrap">
+                      <td className="px-2 py-3.5 text-right text-rose-700 print:text-black print:border print:border-black text-xs sm:text-sm whitespace-nowrap">
                         -₹{formatAmount(summary.totalItTds)}
                       </td>
-                      <td className="px-2 py-3.5 text-right text-rose-800 text-xs sm:text-sm whitespace-nowrap bg-rose-50/30">
+                      <td className="px-2 py-3.5 text-right text-rose-800 print:text-black print:border print:border-black text-xs sm:text-sm whitespace-nowrap bg-rose-50/30 print:bg-transparent">
                         -₹{formatAmount(summary.totalDeductions)}
                       </td>
-                      <td className="px-3 py-3.5 text-right text-emerald-700 text-xs sm:text-sm whitespace-nowrap bg-emerald-50/30">
+                      <td className="px-3 py-3.5 text-right text-emerald-700 print:text-black print:border print:border-black text-xs sm:text-sm whitespace-nowrap bg-emerald-50/30 print:bg-transparent">
                         ₹{formatAmount(summary.totalNetCredit)}
                       </td>
-                      <td className="px-3 py-3.5 text-center text-xs text-slate-600">
+                      <td className="px-3 py-3.5 text-center text-xs text-slate-600 print:text-black print:border print:border-black">
                         {summary.paidCount} Paid • {summary.submittedCount} Sub • {summary.pendingCount} Bal
                       </td>
                       <td className="px-3 py-3.5 print:hidden"></td>
