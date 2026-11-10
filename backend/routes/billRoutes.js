@@ -588,14 +588,27 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
     unitQuery += ' ORDER BY unit_name ASC';
     const units = await db.all(unitQuery, unitParams);
 
-    // 2. Fetch demands for the month
+    // 2. Fetch demands for the month with calculated packets and amounts from demand_items
     const demandsQuery = `
       SELECT
         d.id, d.demand_number, d.demand_date, d.status, d.invoice_no, d.invoice_date,
-        d.total_quantity, d.total_amount, d.institution_id, d.unit_id,
-        i.institution_name, i.ano_cto_name, i.ano_cto_contact, i.pin_code
+        d.institution_id, d.unit_id,
+        COALESCE(i.institution_name, 'Battalion Direct Demand') as institution_name,
+        COALESCE(i.ano_cto_name, '') as ano_cto_name,
+        COALESCE(i.ano_cto_contact, '') as ano_cto_contact,
+        COALESCE(i.pin_code, '') as pin_code,
+        COALESCE(di_agg.total_quantity, 0) as total_quantity,
+        COALESCE(di_agg.total_amount, 0) as total_amount
       FROM demands d
-      JOIN institutions i ON d.institution_id = i.id
+      LEFT JOIN institutions i ON d.institution_id = i.id
+      LEFT JOIN (
+        SELECT 
+          demand_id,
+          SUM(quantity) as total_quantity,
+          SUM(quantity * unit_price_snapshot) as total_amount
+        FROM demand_items
+        GROUP BY demand_id
+      ) di_agg ON di_agg.demand_id = d.id
       WHERE d.is_deleted = 0
         AND d.status NOT IN ('CANCELLED', 'REJECTED')
         AND LEFT(d.demand_date, 7) = ?
@@ -648,9 +661,10 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       uEntry.total_packets += q;
       uEntry.total_amount += a;
 
-      if (!uEntry.institutions_map[d.institution_id]) {
-        const bRec = instBillMap[d.institution_id];
-        uEntry.institutions_map[d.institution_id] = {
+      const instKey = d.institution_id || `direct_${d.unit_id}`;
+      if (!uEntry.institutions_map[instKey]) {
+        const bRec = d.institution_id ? instBillMap[d.institution_id] : null;
+        uEntry.institutions_map[instKey] = {
           institution_id: d.institution_id,
           institution_name: d.institution_name,
           ano_cto_name: d.ano_cto_name || '',
@@ -665,7 +679,7 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
           payment_status: bRec?.payment_status || 'PENDING'
         };
       }
-      const instEntry = uEntry.institutions_map[d.institution_id];
+      const instEntry = uEntry.institutions_map[instKey];
       instEntry.total_packets += q;
       instEntry.total_amount += a;
       instEntry.demand_count += 1;

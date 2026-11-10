@@ -2266,6 +2266,16 @@ export default function RefreshmentReports({ defaultTab }) {
       });
     }, [demands]);
 
+    // Automatically synchronize month so it always points to an available month with data
+    useEffect(() => {
+      if (monthOptions.length > 0) {
+        const hasCurrent = monthOptions.some(m => m.value === month);
+        if (!hasCurrent) {
+          setMonth(monthOptions[0].value);
+        }
+      }
+    }, [monthOptions, month]);
+
     // Fetch Unit payments from backend
     const fetchUnitPayments = async () => {
       if (!month) return;
@@ -2279,7 +2289,12 @@ export default function RefreshmentReports({ defaultTab }) {
           const data = await res.json();
           setUnitPayments(Array.isArray(data) ? data : []);
         } else {
-          toast.error('Failed to load Unit payment records.');
+          let errMsg = 'Failed to load Unit payment records.';
+          try {
+            const errJson = await res.json();
+            if (errJson?.error) errMsg = errJson.error;
+          } catch (e) {}
+          toast.error(errMsg);
           setUnitPayments([]);
         }
       } catch (err) {
