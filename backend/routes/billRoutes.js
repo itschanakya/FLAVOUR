@@ -35,11 +35,12 @@ async function ensureBillColumns(db) {
         registered_by INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (unit_id) REFERENCES units(id),
-        UNIQUE(unit_id, month)
+        UNIQUE KEY uq_unit_month (unit_id, month)
       )
     `);
-  } catch (e) {}
+  } catch (e) {
+    console.warn('ensure unit_monthly_payments error:', e.message);
+  }
   billColsVerified = true;
 }
 
@@ -572,8 +573,8 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       return res.status(400).json({ error: 'Month parameter (YYYY-MM) is required.' });
     }
 
-    // 1. Fetch units
-    let unitQuery = 'SELECT id, unit_name, unit_code, location, ncc_group FROM units WHERE is_deleted = 0';
+    // 1. Fetch units (Note: units table does not have is_deleted column)
+    let unitQuery = 'SELECT id, unit_name, unit_code, location, ncc_group FROM units WHERE 1=1';
     const unitParams = [];
     if (req.user.role === 'UNIT') {
       unitQuery += ' AND id = ?';
@@ -616,23 +617,35 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
     `;
     const demands = await db.all(demandsQuery, [month]);
 
-    // 3. Fetch unit_monthly_payments for the month
-    const unitPayments = await db.all(
-      'SELECT * FROM unit_monthly_payments WHERE month = ?',
-      [month]
-    );
+    // 3. Fetch unit_monthly_payments for the month (safely handled if table freshly created)
+    let unitPayments = [];
+    try {
+      unitPayments = await db.all(
+        'SELECT * FROM unit_monthly_payments WHERE month = ?',
+        [month]
+      );
+    } catch (e) {
+      console.warn('unit_monthly_payments select fallback:', e.message);
+      unitPayments = [];
+    }
     const paymentMap = {};
-    unitPayments.forEach(p => {
+    (unitPayments || []).forEach(p => {
       paymentMap[p.unit_id] = p;
     });
 
     // 4. Fetch refreshment_bills for the month
-    const instBills = await db.all(
-      'SELECT * FROM refreshment_bills WHERE month = ?',
-      [month]
-    );
+    let instBills = [];
+    try {
+      instBills = await db.all(
+        'SELECT * FROM refreshment_bills WHERE month = ?',
+        [month]
+      );
+    } catch (e) {
+      console.warn('refreshment_bills select fallback:', e.message);
+      instBills = [];
+    }
     const instBillMap = {};
-    instBills.forEach(b => {
+    (instBills || []).forEach(b => {
       instBillMap[b.institution_id] = b;
     });
 
@@ -731,7 +744,7 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
     res.json(result);
   } catch (error) {
     console.error('Fetch unit payments error:', error);
-    res.status(500).json({ error: 'Failed to retrieve unit payments.' });
+    res.status(500).json({ error: error.message || 'Failed to retrieve unit payments.' });
   }
 });
 
