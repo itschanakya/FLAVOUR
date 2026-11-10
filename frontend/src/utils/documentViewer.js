@@ -21,3 +21,4 @@ export function getDocumentImageUrl(url) {
   }
   return url;
 }
+
