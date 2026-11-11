@@ -1964,7 +1964,13 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       onClick={(e) => { e.stopPropagation(); handleOpenAssign(dem); }}
                                       className="flex-1 py-1.5 px-3 border border-blue-200 text-blue-700 font-bold text-xs rounded-xl bg-blue-50 flex items-center justify-center gap-1.5 transition-all hover:bg-blue-100 truncate"
                                     >
-                                      <Truck className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{dem.delivery_partner_name}</span>
+                                      <Truck className="w-3.5 h-3.5 shrink-0 text-blue-600" />
+                                      <span className="truncate">
+                                        <span className="font-black text-slate-900 uppercase">{dem.delivery_partner_name}</span>
+                                        {dem.delivery_partner_vehicle && dem.delivery_partner_vehicle !== dem.delivery_partner_name && (
+                                          <span className="font-extrabold text-slate-600 uppercase"> - {dem.delivery_partner_vehicle}</span>
+                                        )}
+                                      </span>
                                     </button>
                                   ) : (
                                     <button
@@ -1999,7 +2005,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                       onClick={(e) => { e.stopPropagation(); handleUpdateStatus(dem.id, 'ARRIVED'); }}
                                       className="flex-1 py-1.5 px-3 border border-indigo-400 text-white font-black text-xs rounded-xl bg-indigo-500 flex items-center justify-center gap-1.5 shadow-xs hover:bg-indigo-600 transition-all active:scale-95 truncate"
                                     >
-                                      <MapPin className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">In at Gate</span>
+                                      <MapPin className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">At Gate</span>
                                     </button>
                                   ) : (
                                     <span className="flex-1 py-1.5 px-3 border border-amber-200 text-amber-700 font-black text-xs rounded-xl bg-amber-50 flex items-center justify-center gap-1.5 shadow-sm truncate cursor-default">
@@ -2216,7 +2222,14 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                     DELIVERY PARTNER
                   </div>
                   <div className="text-sm font-black text-slate-900 mt-1 truncate">
-                    {selectedDemandForSummary.delivery_partner_name || '+ Assign Driver'}
+                    {selectedDemandForSummary.delivery_partner_name ? (
+                      <>
+                        <span className="uppercase">{selectedDemandForSummary.delivery_partner_name}</span>
+                        {selectedDemandForSummary.delivery_partner_vehicle && (
+                          <span className="text-xs font-bold text-slate-600 uppercase"> - {selectedDemandForSummary.delivery_partner_vehicle}</span>
+                        )}
+                      </>
+                    ) : '+ Assign Driver'}
                   </div>
                   <div className="text-[10px] font-bold text-slate-500 mt-0.5">
                     {selectedDemandForSummary.delivery_partner_name ? 'Click to change' : 'Not assigned yet'}
@@ -2293,7 +2306,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                     className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1"
                     title="Mark arrived at institution gate"
                   >
-                    <MapPin className="w-3.5 h-3.5" /> In at Gate
+                    <MapPin className="w-3.5 h-3.5" /> At Gate
                   </button>
                   <button
                     type="button"
