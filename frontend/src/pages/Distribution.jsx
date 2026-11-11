@@ -192,7 +192,14 @@ export default function Distribution() {
   const transferTargets = useMemo(() => {
     const cars = partners
       .filter(p => p.is_active !== 0 && !['PORTER', 'SELF_SERVICE'].includes(p.vehicle_type))
-      .map(p => ({ key: 'D:' + p.id, mode: 'DRIVER', partnerId: p.id, title: p.vehicle_no || 'CAR', sub: p.name, phone: p.phone }));
+      .map(p => ({
+        key: 'D:' + p.id,
+        mode: 'DRIVER',
+        partnerId: p.id,
+        title: p.name ? `${p.name} - ${p.vehicle_no || 'CAR'}` : (p.vehicle_no || 'CAR'),
+        sub: p.vehicle_model || 'Delivery Vehicle',
+        phone: p.phone
+      }));
     return [
       ...cars,
       { key: 'PORTER', mode: 'PORTER', partnerId: null, title: 'PORTER', sub: 'Handled by Porter' },
@@ -249,7 +256,10 @@ export default function Distribution() {
   };
 
   const shareList = (partner, stops) => {
-    let text = `🚚 *DISTRIBUTION LIST - ${partner.name}*\n📅 ${fmtDate(selectedDate)} (${dayName(selectedDate)})\n\n`;
+    const titleName = partner.name
+      ? (partner.vehicle_no && partner.vehicle_no !== partner.name ? `${partner.name} - ${partner.vehicle_no}` : partner.name)
+      : (partner.vehicle_no || 'DRIVER');
+    let text = `🚚 *DISTRIBUTION LIST - ${titleName}*\n📅 ${fmtDate(selectedDate)} (${dayName(selectedDate)})\n\n`;
     stops.forEach((s, i) => {
       text += `${i + 1}. *${s.institution_name}* - ${s.total_quantity || 0} Pkts\n   PIN ${s.pin_code}\n   ${mapsUrl(s)}\n`;
     });
@@ -378,8 +388,12 @@ export default function Distribution() {
                 <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
                   <Truck className="w-4 h-4" />
                 </div>
-                <span className="font-black text-sm text-slate-900 whitespace-nowrap">{partner.vehicle_no || '-'}</span>
-                <span className="text-[11px] font-semibold text-slate-600 whitespace-nowrap">{partner.name}</span>
+                <span className="font-black text-sm text-slate-900 whitespace-nowrap uppercase">
+                  {partner.name || 'DRIVER'}
+                  {partner.vehicle_no && partner.vehicle_no !== partner.name ? (
+                    <span className="font-extrabold text-slate-600"> - {partner.vehicle_no}</span>
+                  ) : ''}
+                </span>
                 {partner.phone && (
                   <a href={`tel:${partner.phone}`} className="text-[11px] text-blue-600 font-bold flex items-center gap-0.5 whitespace-nowrap">
                     <Phone className="w-3 h-3" />{partner.phone}
