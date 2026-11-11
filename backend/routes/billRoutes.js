@@ -1196,8 +1196,6 @@ router.post('/unit-payments', authenticateToken, authorizeRoles('ADMIN'), async 
          AND COALESCE(i.institution_type, 'STATE') = ?`,
       [unit_id, month, effectiveFunding]
     );
-      [unit_id, month]
-    );
 
     for (const inst of instRows) {
       const bExists = await db.get(
