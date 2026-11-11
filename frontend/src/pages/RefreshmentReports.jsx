@@ -2696,9 +2696,123 @@ export default function RefreshmentReports({ defaultTab }) {
       }
     };
 
+    // Lookup map of master institutions for instant live type resolution
+    const trackerInstitutionsMap = useMemo(() => {
+      const map = {};
+      (institutions || []).forEach(inst => {
+        if (inst && inst.id) {
+          map[inst.id] = inst;
+        }
+      });
+      return map;
+    }, [institutions]);
+
+    // Check if an institution is Centre funded (APS / Sainik School)
+    const isCentreInst = (inst) => {
+      const masterType = trackerInstitutionsMap[inst.institution_id]?.institution_type;
+      if (masterType === 'CENTRE') return true;
+      if (inst.institution_type === 'CENTRE') return true;
+      const name = (inst.institution_name || trackerInstitutionsMap[inst.institution_id]?.institution_name || '').toUpperCase();
+      if (name.includes('ARMY PUBLIC SCHOOL') || name.startsWith('APS ') || name.includes('SAINIK SCHOOL')) {
+        return true;
+      }
+      return false;
+    };
+
+    // Ensure every unit is properly split into TWO distinct rows (STATE and CENTRE) with their own calculations
+    const processedUnitPayments = useMemo(() => {
+      const result = [];
+
+      (unitPayments || []).forEach(u => {
+        const allInsts = u.institutions || [];
+        const stateInsts = allInsts.filter(inst => !isCentreInst(inst));
+        const centreInsts = allInsts.filter(inst => isCentreInst(inst));
+
+        // If the backend already provided a single-aspect slice (funding_type already explicitly tagged)
+        // and its institutions are already purely of that aspect:
+        if ((u.funding_type === 'STATE' && centreInsts.length === 0) || (u.funding_type === 'CENTRE' && stateInsts.length === 0)) {
+          result.push(u);
+          return;
+        }
+
+        // Otherwise (unsplit merged unit or mixed institutions), split into STATE and CENTRE rows:
+        const stateGross = stateInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
+        const statePkts = stateInsts.reduce((s, i) => s + (Number(i.total_packets) || 0), 0);
+        const centreGross = centreInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
+        const centrePkts = centreInsts.reduce((s, i) => s + (Number(i.total_packets) || 0), 0);
+
+        const gstRate = Number(u.gst_tds_rate) || 2.0;
+        const itRate = Number(u.it_tds_rate) || 2.0;
+
+        // 1. STATE Row
+        if (stateInsts.length > 0 || centreInsts.length === 0) {
+          const calcGst = Math.round(stateGross * gstRate / 100 * 100) / 100;
+          const calcIt = Math.round(stateGross * itRate / 100 * 100) / 100;
+          const totDed = Math.round((calcGst + calcIt) * 100) / 100;
+          const netCred = Math.max(0, Math.round((stateGross - totDed) * 100) / 100);
+
+          result.push({
+            ...u,
+            id: `${u.unit_id}_STATE`,
+            row_key: `${u.unit_id}_STATE`,
+            funding_type: 'STATE',
+            funding_label: 'STATE FUND',
+            institutions: stateInsts,
+            institutions_count: stateInsts.length,
+            total_packets: statePkts,
+            total_amount: stateGross,
+            gross_amount: stateGross,
+            gst_tds_rate: gstRate,
+            gst_tds_amount: calcGst,
+            it_tds_rate: itRate,
+            it_tds_amount: calcIt,
+            total_deductions: totDed,
+            net_credit_amount: netCred,
+            submitted_to_pcda: u.submitted_to_pcda || 0,
+            pcda_submission_date: u.pcda_submission_date || null,
+            pcda_letter_ref: u.pcda_letter_ref || '',
+            payment_status: u.payment_status || 'PENDING'
+          });
+        }
+
+        // 2. CENTRE Row (APS / Sainik Schools)
+        if (centreInsts.length > 0) {
+          const calcGst = Math.round(centreGross * gstRate / 100 * 100) / 100;
+          const calcIt = Math.round(centreGross * itRate / 100 * 100) / 100;
+          const totDed = Math.round((calcGst + calcIt) * 100) / 100;
+          const netCred = Math.max(0, Math.round((centreGross - totDed) * 100) / 100);
+
+          result.push({
+            ...u,
+            id: `${u.unit_id}_CENTRE`,
+            row_key: `${u.unit_id}_CENTRE`,
+            funding_type: 'CENTRE',
+            funding_label: 'CENTRE FUND',
+            institutions: centreInsts,
+            institutions_count: centreInsts.length,
+            total_packets: centrePkts,
+            total_amount: centreGross,
+            gross_amount: centreGross,
+            gst_tds_rate: gstRate,
+            gst_tds_amount: calcGst,
+            it_tds_rate: itRate,
+            it_tds_amount: calcIt,
+            total_deductions: totDed,
+            net_credit_amount: netCred,
+            submitted_to_pcda: 0,
+            pcda_submission_date: null,
+            pcda_letter_ref: '',
+            payment_status: 'PENDING'
+          });
+        }
+      });
+
+      return result;
+    }, [unitPayments, trackerInstitutionsMap]);
+
     // Filter by search query, funding aspect & payment status
     const filteredUnitPayments = useMemo(() => {
-      return (unitPayments || []).filter(u => {
+      return (processedUnitPayments || []).filter(u => {
         // Funding aspect filter: ALL | STATE | CENTRE
         if (fundingFilter !== 'ALL') {
           const rowFund = u.funding_type || 'STATE';
@@ -2730,7 +2844,7 @@ export default function RefreshmentReports({ defaultTab }) {
 
         return true;
       });
-    }, [unitPayments, selectedGroup, statusFilter, searchQuery, fundingFilter]);
+    }, [processedUnitPayments, selectedGroup, statusFilter, searchQuery, fundingFilter]);
 
     // Overall summary metrics including statutory TDS (accurately computed for all units)
     const summary = useMemo(() => {
