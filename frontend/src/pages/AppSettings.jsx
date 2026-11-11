@@ -6,7 +6,7 @@ import {
   Search, Edit3, ShieldAlert, X, ShoppingBag, Users, MapPin, ExternalLink,
   Truck, Plus, Trash2, Phone, ShieldCheck, Wifi, Eye, EyeOff, Boxes,
   Gauge, AlertCircle, Info, Navigation, Scale, Compass, Map, CalendarDays, History,
-  Download, Upload, RotateCcw, DatabaseBackup, Lock, ShieldOff, FileJson, Layers, ClipboardList, Clock
+  Download, Upload, RotateCcw, DatabaseBackup, Lock, ShieldOff, FileJson, Layers, ClipboardList, Clock, IndianRupee
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManageCatalog from './ManageCatalog';
