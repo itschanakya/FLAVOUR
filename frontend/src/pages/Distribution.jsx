@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import {
   Truck, ChevronLeft, ChevronRight, MapPin, ArrowUp, ArrowDown, Navigation, Phone, Calendar,
-  Package, RefreshCw, CheckCircle2, Clock, Share2, ArrowLeftRight, X, CheckSquare, Square
+  Package, RefreshCw, CheckCircle2, Clock, Share2, ArrowLeftRight, X, CheckSquare, Square, Printer
 } from 'lucide-react';
 
 const dateKey = (d) => (typeof d === 'string' ? d.split('T')[0] : '');
@@ -107,6 +107,12 @@ export default function Distribution() {
 
   const localToday = () => {
     const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+  };
+
+  const localTomorrow = () => {
+    const n = new Date();
+    n.setDate(n.getDate() + 1);
     return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
   };
 
@@ -271,6 +277,362 @@ export default function Distribution() {
     window.open(url, '_blank');
   };
 
+  const printPartnerManifest = (partner, stops) => {
+    if (!stops || stops.length === 0) return;
+    const printWindow = window.open('', '_blank', 'width=900,height=1000');
+    if (!printWindow) {
+      alert('Please allow popups to print delivery run sheet.');
+      return;
+    }
+
+    const totalPackets = stops.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
+    const dateFormatted = fmtDate(selectedDate);
+    const weekday = dayName(selectedDate);
+    const driverTitle = partner.name || 'DRIVER';
+    const vehicleTitle = partner.vehicle_no || 'CAR';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <title>Delivery Run Sheet - ${driverTitle} (${vehicleTitle}) - ${dateFormatted}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 8mm 8mm 10mm 8mm;
+            }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              color: #0f172a;
+              background: #ffffff;
+              margin: 0;
+              padding: 0;
+              font-size: 11px;
+              line-height: 1.3;
+            }
+            .header-bar {
+              border-bottom: 2px solid #0f172a;
+              padding-bottom: 8px;
+              margin-bottom: 10px;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+            }
+            .org-title {
+              font-size: 16px;
+              font-weight: 900;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              color: #0f172a;
+              margin: 0;
+            }
+            .doc-subtitle {
+              font-size: 11px;
+              font-weight: 700;
+              color: #475569;
+              text-transform: uppercase;
+              letter-spacing: 0.3px;
+              margin-top: 2px;
+            }
+            .meta-box {
+              text-align: right;
+              font-size: 10px;
+              color: #475569;
+            }
+            .meta-box strong {
+              color: #0f172a;
+              font-size: 11px;
+            }
+            .summary-grid {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 8px;
+              background-color: #f8fafc;
+              border: 1px solid #cbd5e1;
+              border-radius: 6px;
+              padding: 8px 12px;
+              margin-bottom: 12px;
+            }
+            .summary-col label {
+              display: block;
+              font-size: 9px;
+              font-weight: 800;
+              color: #64748b;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              margin-bottom: 2px;
+            }
+            .summary-col .val {
+              font-size: 12px;
+              font-weight: 900;
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 12px;
+            }
+            th, td {
+              border: 1px solid #94a3b8;
+              padding: 6px 7px;
+              text-align: left;
+              vertical-align: middle;
+            }
+            th {
+              background-color: #e2e8f0;
+              color: #0f172a;
+              font-weight: 800;
+              font-size: 9.5px;
+              text-transform: uppercase;
+              letter-spacing: 0.4px;
+            }
+            tr:nth-child(even) {
+              background-color: #f8fafc;
+            }
+            .seq-cell {
+              text-align: center;
+              font-weight: 900;
+              font-size: 12px;
+              width: 32px;
+              background-color: #f1f5f9;
+            }
+            .inst-title {
+              font-weight: 800;
+              font-size: 11px;
+              color: #0f172a;
+            }
+            .inst-addr {
+              font-size: 9px;
+              color: #475569;
+              margin-top: 1px;
+            }
+            .pkts-cell {
+              text-align: center;
+              font-weight: 900;
+              font-size: 12px;
+              color: #0f172a;
+              background-color: #eff6ff;
+              width: 65px;
+            }
+            .pin-cell {
+              text-align: center;
+              font-weight: 800;
+              font-size: 10px;
+              width: 65px;
+            }
+            .unit-cell {
+              text-align: center;
+              font-weight: 700;
+              font-size: 10px;
+              width: 75px;
+            }
+            .contact-cell {
+              font-size: 9.5px;
+              width: 125px;
+            }
+            .contact-name {
+              font-weight: 700;
+              color: #1e293b;
+            }
+            .contact-phone {
+              color: #1d4ed8;
+              font-weight: 700;
+            }
+            .sign-cell {
+              width: 110px;
+              height: 40px;
+              background-color: #ffffff;
+              text-align: center;
+              vertical-align: bottom;
+              padding-bottom: 2px;
+            }
+            .sign-prompt {
+              font-size: 8px;
+              color: #94a3b8;
+              border-top: 1px dashed #cbd5e1;
+              padding-top: 2px;
+            }
+            .total-row {
+              background-color: #0f172a !important;
+              color: #ffffff !important;
+              font-weight: 900;
+              font-size: 11px;
+            }
+            .total-row td {
+              border-color: #0f172a;
+              color: #ffffff !important;
+            }
+            .footer-signatures {
+              margin-top: 18px;
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 20px;
+              page-break-inside: avoid;
+            }
+            .sign-box {
+              border-top: 1.5px solid #0f172a;
+              padding-top: 4px;
+              text-align: center;
+              font-size: 9.5px;
+              font-weight: 800;
+              color: #334155;
+            }
+            .sign-box .note {
+              font-size: 8px;
+              color: #64748b;
+              margin-top: 2px;
+              font-weight: normal;
+            }
+            .screen-action-bar {
+              margin-bottom: 12px;
+              padding: 8px 12px;
+              background: #eff6ff;
+              border: 1px solid #bfdbfe;
+              border-radius: 6px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .print-button {
+              background: #2563eb;
+              color: white;
+              border: none;
+              padding: 6px 16px;
+              border-radius: 4px;
+              font-weight: 800;
+              font-size: 12px;
+              cursor: pointer;
+            }
+            @media print {
+              .screen-action-bar {
+                display: none !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="screen-action-bar">
+            <span>🖨️ <strong>Portrait Delivery Run Sheet Ready</strong> (A4 Format)</span>
+            <button class="print-button" onclick="window.print()">Print / Save PDF</button>
+          </div>
+
+          <div class="header-bar">
+            <div>
+              <h1 class="org-title">NCC Refreshment Supply & Distribution</h1>
+              <div class="doc-subtitle">Daily Delivery Run Sheet & Gate Pass • Driver Route Manifest</div>
+            </div>
+            <div class="meta-box">
+              <div>Delivery Date: <strong>${dateFormatted} (${weekday})</strong></div>
+              <div>Generated: <strong>${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</strong></div>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <div class="summary-col">
+              <label>Assigned Driver</label>
+              <div class="val">${driverTitle}</div>
+            </div>
+            <div class="summary-col">
+              <label>Vehicle / Car No</label>
+              <div class="val">${vehicleTitle}</div>
+            </div>
+            <div class="summary-col">
+              <label>Total Stops</label>
+              <div class="val">${stops.length} Institutions</div>
+            </div>
+            <div class="summary-col">
+              <label>Total Refreshment Load</label>
+              <div class="val">${totalPackets.toLocaleString('en-IN')} Packets</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 32px; text-align: center;">#</th>
+                <th>Institution Name & Address</th>
+                <th style="width: 65px; text-align: center;">PIN</th>
+                <th style="width: 75px; text-align: center;">Unit</th>
+                <th style="width: 65px; text-align: center;">Packets</th>
+                <th style="width: 125px;">ANO / Contact</th>
+                <th style="width: 110px; text-align: center;">Receiver Sign & Stamp</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${stops.map((s, idx) => {
+                const pkts = Number(s.total_quantity) || 0;
+                const addr = s.complete_address ? `<div class="inst-addr">${s.complete_address}</div>` : '';
+                const anoName = s.ano_cto_name ? `<div class="contact-name">${s.ano_cto_name}</div>` : '<div class="contact-name">ANO / Caretaker</div>';
+                const anoPhone = s.ano_cto_contact ? `<div class="contact-phone">📞 ${s.ano_cto_contact}</div>` : '';
+                const unitBadge = s.unit_code || s.unit_name || '—';
+                return `
+                  <tr>
+                    <td class="seq-cell">${idx + 1}</td>
+                    <td>
+                      <div class="inst-title">${s.institution_name}</div>
+                      ${addr}
+                    </td>
+                    <td class="pin-cell">${s.pin_code || '—'}</td>
+                    <td class="unit-cell">${unitBadge}</td>
+                    <td class="pkts-cell">${pkts}</td>
+                    <td class="contact-cell">
+                      ${anoName}
+                      ${anoPhone}
+                    </td>
+                    <td class="sign-cell">
+                      <div class="sign-prompt">Sign & Stamp</div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+              <tr class="total-row">
+                <td colspan="4" style="text-align: right; padding-right: 12px; font-weight: 900;">
+                  TOTAL VALUATION / REFRESHMENT LOAD (${stops.length} STOPS):
+                </td>
+                <td class="pkts-cell" style="background-color: #1e293b !important; color: #ffffff !important; font-size: 13px;">
+                  ${totalPackets.toLocaleString('en-IN')}
+                </td>
+                <td colspan="2" style="font-size: 9.5px; font-weight: 700; padding-left: 8px;">
+                  Full Batch Handover Verified
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="footer-signatures">
+            <div class="sign-box">
+              Driver Route Clearance (${driverTitle})
+              <div class="note">Packets counted & accepted for delivery</div>
+            </div>
+            <div class="sign-box">
+              Warehouse Dispatch Manager
+              <div class="note">Dispatched as per daily demand manifest</div>
+            </div>
+            <div class="sign-box">
+              Central Gate Security
+              <div class="note">Vehicle out-time & gate pass verified</div>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 400);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   if (loading) {
     return <div className="p-12 text-center font-bold text-slate-500">Loading distribution...</div>;
   }
@@ -338,10 +700,26 @@ export default function Distribution() {
             <ChevronRight className="w-4 h-4" />
           </button>
           <button
+            type="button"
             onClick={() => setSelectedDate(localToday())}
-            className="px-3 py-1.5 rounded-xl text-xs font-black bg-slate-900 text-white"
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              selectedDate === localToday()
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
           >
             Today
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDate(localTomorrow())}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              selectedDate === localTomorrow()
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+            }`}
+          >
+            Tomorrow
           </button>
           {days.length > 0 && (
             <button
@@ -410,7 +788,16 @@ export default function Distribution() {
                   title="Select all stops of this car"
                   >
                   <CheckSquare className="w-3 h-3" /> All
+                </button>
 
+                <button
+                  type="button"
+                  onClick={() => printPartnerManifest(partner, stops)}
+                  disabled={stops.length === 0}
+                  className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-[10px] font-black flex items-center gap-1 shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
+                  title="Print portrait delivery run sheet for this driver"
+                >
+                  <Printer className="w-3 h-3" /> Print
                 </button>
 
                 <button
