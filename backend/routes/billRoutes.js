@@ -922,19 +922,18 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       };
     };
 
-    // 6. Shape final response: Generate TWO rows per Unit (One for STATE and One for CENTRE)
+    // 6. Shape final response: Generate TWO rows per Unit (One for STATE and One for CENTRE) when both have activity
     const result = [];
     Object.values(unitDataMap).forEach(u => {
-      const masterCountsForUnit = unitMasterCounts[u.unit_id] || { STATE: 0, CENTRE: 0 };
       const hasStateDemands = u.state_packets > 0 || Object.keys(u.state_institutions_map).length > 0;
       const hasCentreDemands = u.centre_packets > 0 || Object.keys(u.centre_institutions_map).length > 0;
       const hasStatePayment = !!paymentMap[`${u.unit_id}_STATE`] || !!paymentMap[u.unit_id];
       const hasCentrePayment = !!paymentMap[`${u.unit_id}_CENTRE`];
 
-      // Include STATE row if unit has state demands, state payment, or registered state institutions
-      const includeState = hasStateDemands || hasStatePayment || masterCountsForUnit.STATE > 0 || (!hasCentreDemands && !hasCentrePayment);
-      // Include CENTRE row if unit has centre demands, centre payment, or registered centre institutions (APS/Sainik)
-      const includeCentre = hasCentreDemands || hasCentrePayment || masterCountsForUnit.CENTRE > 0;
+      // Include STATE row if unit has state demands, state payment, or (when no centre activity) to represent the unit
+      const includeState = hasStateDemands || hasStatePayment || (!hasCentreDemands && !hasCentrePayment);
+      // Include CENTRE row ONLY if unit has actual centre demands or centre payment in this month
+      const includeCentre = hasCentreDemands || hasCentrePayment;
 
       if (includeState) {
         result.push(buildSlice(u, 'STATE', u.state_institutions_map, u.state_packets, u.state_amount));
@@ -944,7 +943,9 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       }
     });
 
-    res.json(result);
+    // Ensure no blank 0-packet / 0-institution row is returned when real rows exist
+    const cleanedResult = result.filter(r => (Number(r.total_packets) > 0 || Number(r.institutions_count) > 0 || Number(r.paid_amount) > 0 || r.payment_status === 'PAID'));
+    res.json(cleanedResult.length > 0 ? cleanedResult : result);
   } catch (error) {
     console.error('Fetch unit payments error:', error);
     res.status(500).json({ error: error.message || 'Failed to retrieve unit payments.' });

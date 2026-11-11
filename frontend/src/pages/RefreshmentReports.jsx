@@ -116,16 +116,10 @@ export default function RefreshmentReports({ defaultTab }) {
     fetchData();
   }, []);
 
-  // Re-fetch latest demands and institutions whenever tab is switched or window gains focus
+  // Re-fetch latest demands and institutions whenever activeTab changes
   useEffect(() => {
     fetchData(true);
   }, [activeTab]);
-
-  useEffect(() => {
-    const onFocus = () => fetchData(true);
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, []);
   
   const fetchData = async (isBackground = false) => {
     try {
@@ -2629,20 +2623,17 @@ export default function RefreshmentReports({ defaultTab }) {
       });
     }, [demands]);
 
-    // Automatically synchronize month so it always points to an available month with data
+    // Set initial month once when available if not yet set
     useEffect(() => {
-      if (monthOptions.length > 0) {
-        const hasCurrent = monthOptions.some(m => m.value === month);
-        if (!hasCurrent) {
-          setMonth(monthOptions[0].value);
-        }
+      if (!month && monthOptions.length > 0) {
+        setMonth(monthOptions[0].value);
       }
-    }, [monthOptions, month]);
+    }, [monthOptions]);
 
     // Fetch Unit payments from backend
-    const fetchUnitPayments = async () => {
+    const fetchUnitPayments = async (showFullSpinner = false) => {
       if (!month) return;
-      setLoadingUnits(true);
+      if (showFullSpinner || unitPayments.length === 0) setLoadingUnits(true);
       try {
         const qGroup = selectedGroup !== 'All' ? `&ncc_group=${encodeURIComponent(selectedGroup)}` : '';
         const res = await fetch(`/api/refreshment-bills/unit-payments?month=${encodeURIComponent(month)}${qGroup}`, {
@@ -2658,12 +2649,9 @@ export default function RefreshmentReports({ defaultTab }) {
             if (errJson?.error) errMsg = errJson.error;
           } catch (e) {}
           toast.error(errMsg);
-          setUnitPayments([]);
         }
       } catch (err) {
         console.error('Fetch unit payments error:', err);
-        toast.error('Network error loading Unit payment records.');
-        setUnitPayments([]);
       } finally {
         setLoadingUnits(false);
       }
@@ -2721,98 +2709,132 @@ export default function RefreshmentReports({ defaultTab }) {
       return false;
     };
 
-    // Ensure every unit is properly split into TWO distinct rows (STATE and CENTRE) with their own calculations
+    // Ensure every unit is properly split into distinct rows (STATE and CENTRE) without any fake/blank 0-packet rows
     const processedUnitPayments = useMemo(() => {
       const result = [];
+      const seenKeys = new Set();
 
       (unitPayments || []).forEach(u => {
         const allInsts = u.institutions || [];
         const stateInsts = allInsts.filter(inst => !isCentreInst(inst));
         const centreInsts = allInsts.filter(inst => isCentreInst(inst));
 
-        // If backend already tagged it and institutions are pure:
+        // If backend already returned pure tagged slices:
         if (u.funding_type === 'CENTRE' && stateInsts.length === 0) {
-          result.push(u);
-          return;
-        }
-        if (u.funding_type === 'STATE' && centreInsts.length === 0 && u.unit_id !== 1) {
-          result.push(u);
+          const hasData = (Number(u.total_packets) > 0 || centreInsts.length > 0 || Number(u.institutions_count) > 0);
+          if (!hasData) return;
+          const key = `${u.unit_id}_CENTRE`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            result.push({
+              ...u,
+              id: key,
+              row_key: key,
+              funding_type: 'CENTRE',
+              funding_label: 'CENTRE FUND'
+            });
+          }
           return;
         }
 
-        // Otherwise (unsplit merged unit or mixed institutions, or Unit 1), split into STATE and CENTRE rows:
-        const stateGross = stateInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
-        const statePkts = stateInsts.reduce((s, i) => s + (Number(i.total_packets) || 0), 0);
-        const centreGross = centreInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
-        const centrePkts = centreInsts.reduce((s, i) => s + (Number(i.total_packets) || 0), 0);
+        if (u.funding_type === 'STATE' && centreInsts.length === 0) {
+          const hasData = (Number(u.total_packets) > 0 || stateInsts.length > 0 || Number(u.institutions_count) > 0);
+          if (!hasData) return;
+          const key = `${u.unit_id}_STATE`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            result.push({
+              ...u,
+              id: key,
+              row_key: key,
+              funding_type: 'STATE',
+              funding_label: 'STATE FUND'
+            });
+          }
+          return;
+        }
 
+        // If mixed institutions:
         const gstRate = Number(u.gst_tds_rate) || 2.0;
         const itRate = Number(u.it_tds_rate) || 2.0;
 
-        // 1. STATE Row
-        if (stateInsts.length > 0 || centreInsts.length === 0 || u.unit_id === 1) {
+        // 1. STATE Row (only if state institutions exist)
+        if (stateInsts.length > 0) {
+          const stateGross = stateInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
+          const statePkts = stateInsts.reduce((s, i) => s + (Number(i.total_packets) || 0), 0);
           const calcGst = Math.round(stateGross * gstRate / 100 * 100) / 100;
           const calcIt = Math.round(stateGross * itRate / 100 * 100) / 100;
           const totDed = Math.round((calcGst + calcIt) * 100) / 100;
           const netCred = Math.max(0, Math.round((stateGross - totDed) * 100) / 100);
 
-          result.push({
-            ...u,
-            id: `${u.unit_id}_STATE`,
-            row_key: `${u.unit_id}_STATE`,
-            funding_type: 'STATE',
-            funding_label: 'STATE FUND',
-            institutions: stateInsts,
-            institutions_count: stateInsts.length,
-            total_packets: statePkts,
-            total_amount: stateGross,
-            gross_amount: stateGross,
-            gst_tds_rate: gstRate,
-            gst_tds_amount: calcGst,
-            it_tds_rate: itRate,
-            it_tds_amount: calcIt,
-            total_deductions: totDed,
-            net_credit_amount: netCred,
-            submitted_to_pcda: u.submitted_to_pcda || 0,
-            pcda_submission_date: u.pcda_submission_date || null,
-            pcda_letter_ref: u.pcda_letter_ref || '',
-            payment_status: u.payment_status || 'PENDING'
-          });
+          const key = `${u.unit_id}_STATE`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            result.push({
+              ...u,
+              id: key,
+              row_key: key,
+              funding_type: 'STATE',
+              funding_label: 'STATE FUND',
+              institutions: stateInsts,
+              institutions_count: stateInsts.length,
+              total_packets: statePkts,
+              total_amount: stateGross,
+              gross_amount: stateGross,
+              gst_tds_rate: gstRate,
+              gst_tds_amount: calcGst,
+              it_tds_rate: itRate,
+              it_tds_amount: calcIt,
+              total_deductions: totDed,
+              net_credit_amount: netCred,
+              submitted_to_pcda: u.submitted_to_pcda || 0,
+              pcda_submission_date: u.pcda_submission_date || null,
+              pcda_letter_ref: u.pcda_letter_ref || '',
+              payment_status: u.payment_status || 'PENDING'
+            });
+          }
         }
 
-        // 2. CENTRE Row (APS / Sainik Schools)
-        if (centreInsts.length > 0 || u.unit_id === 1) {
+        // 2. CENTRE Row (APS / Sainik Schools) - ONLY IF centre institutions exist!
+        if (centreInsts.length > 0) {
+          const centreGross = centreInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
+          const centrePkts = centreInsts.reduce((s, i) => s + (Number(i.total_packets) || 0), 0);
           const calcGst = Math.round(centreGross * gstRate / 100 * 100) / 100;
           const calcIt = Math.round(centreGross * itRate / 100 * 100) / 100;
           const totDed = Math.round((calcGst + calcIt) * 100) / 100;
           const netCred = Math.max(0, Math.round((centreGross - totDed) * 100) / 100);
 
-          result.push({
-            ...u,
-            id: `${u.unit_id}_CENTRE`,
-            row_key: `${u.unit_id}_CENTRE`,
-            funding_type: 'CENTRE',
-            funding_label: 'CENTRE FUND',
-            institutions: centreInsts,
-            institutions_count: centreInsts.length,
-            total_packets: centrePkts,
-            total_amount: centreGross,
-            gross_amount: centreGross,
-            gst_tds_rate: gstRate,
-            gst_tds_amount: calcGst,
-            it_tds_rate: itRate,
-            it_tds_amount: calcIt,
-            total_deductions: totDed,
-            net_credit_amount: netCred,
-            submitted_to_pcda: 0,
-            pcda_submission_date: null,
-            pcda_letter_ref: '',
-            payment_status: 'PENDING'
-          });
+          const key = `${u.unit_id}_CENTRE`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            result.push({
+              ...u,
+              id: key,
+              row_key: key,
+              funding_type: 'CENTRE',
+              funding_label: 'CENTRE FUND',
+              institutions: centreInsts,
+              institutions_count: centreInsts.length,
+              total_packets: centrePkts,
+              total_amount: centreGross,
+              gross_amount: centreGross,
+              gst_tds_rate: gstRate,
+              gst_tds_amount: calcGst,
+              it_tds_rate: itRate,
+              it_tds_amount: calcIt,
+              total_deductions: totDed,
+              net_credit_amount: netCred,
+              submitted_to_pcda: 0,
+              pcda_submission_date: null,
+              pcda_letter_ref: '',
+              payment_status: 'PENDING'
+            });
+          }
         }
       });
 
-      return result;
+      // Filter out any blank row with 0 packets AND 0 institutions
+      return result.filter(r => (Number(r.total_packets) > 0 || Number(r.institutions_count) > 0 || Number(r.total_amount) > 0));
     }, [unitPayments, trackerInstitutionsMap]);
 
     // Filter by search query, funding aspect & payment status
