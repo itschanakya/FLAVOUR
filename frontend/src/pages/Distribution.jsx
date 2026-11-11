@@ -309,17 +309,38 @@ export default function Distribution() {
             }
             body {
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              color: #0f172a;
+              color: #000000;
               background: #ffffff;
               margin: 0;
               padding: 0;
               font-size: 11px;
               line-height: 1.3;
             }
+            .screen-action-bar {
+              margin-bottom: 12px;
+              padding: 8px 12px;
+              background: #ffffff;
+              border: 1.5px solid #000000;
+              border-radius: 4px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-weight: 700;
+            }
+            .print-button {
+              background: #000000;
+              color: #ffffff;
+              border: none;
+              padding: 6px 18px;
+              border-radius: 4px;
+              font-weight: 900;
+              font-size: 12px;
+              cursor: pointer;
+            }
             .header-bar {
-              border-bottom: 2px solid #0f172a;
-              padding-bottom: 8px;
-              margin-bottom: 10px;
+              border-bottom: 2px solid #000000;
+              padding-bottom: 6px;
+              margin-bottom: 8px;
               display: flex;
               justify-content: space-between;
               align-items: flex-end;
@@ -329,41 +350,43 @@ export default function Distribution() {
               font-weight: 900;
               text-transform: uppercase;
               letter-spacing: 0.5px;
-              color: #0f172a;
+              color: #000000;
               margin: 0;
             }
             .doc-subtitle {
-              font-size: 11px;
-              font-weight: 700;
-              color: #475569;
+              font-size: 10.5px;
+              font-weight: 800;
+              color: #000000;
               text-transform: uppercase;
-              letter-spacing: 0.3px;
+              letter-spacing: 0.4px;
               margin-top: 2px;
             }
             .meta-box {
               text-align: right;
               font-size: 10px;
-              color: #475569;
+              color: #000000;
+              font-weight: 600;
             }
             .meta-box strong {
-              color: #0f172a;
+              color: #000000;
               font-size: 11px;
+              font-weight: 900;
             }
             .summary-grid {
               display: grid;
               grid-template-columns: repeat(4, 1fr);
               gap: 8px;
-              background-color: #f8fafc;
-              border: 1px solid #cbd5e1;
-              border-radius: 6px;
-              padding: 8px 12px;
-              margin-bottom: 12px;
+              background-color: #ffffff;
+              border: 1.5px solid #000000;
+              border-radius: 4px;
+              padding: 6px 10px;
+              margin-bottom: 10px;
             }
             .summary-col label {
               display: block;
-              font-size: 9px;
+              font-size: 8.5px;
               font-weight: 800;
-              color: #64748b;
+              color: #000000;
               text-transform: uppercase;
               letter-spacing: 0.5px;
               margin-bottom: 2px;
@@ -371,82 +394,82 @@ export default function Distribution() {
             .summary-col .val {
               font-size: 12px;
               font-weight: 900;
-              color: #0f172a;
+              color: #000000;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 12px;
+              margin-bottom: 10px;
             }
             th, td {
-              border: 1px solid #94a3b8;
-              padding: 6px 7px;
+              border: 1px solid #000000;
+              padding: 5px 6px;
               text-align: left;
               vertical-align: middle;
+              color: #000000;
             }
             th {
-              background-color: #e2e8f0;
-              color: #0f172a;
-              font-weight: 800;
+              background-color: #f2f2f2;
+              color: #000000;
+              font-weight: 900;
               font-size: 9.5px;
               text-transform: uppercase;
               letter-spacing: 0.4px;
-            }
-            tr:nth-child(even) {
-              background-color: #f8fafc;
+              border: 1.5px solid #000000;
             }
             .seq-cell {
               text-align: center;
               font-weight: 900;
-              font-size: 12px;
-              width: 32px;
-              background-color: #f1f5f9;
+              font-size: 11.5px;
+              width: 30px;
+              background-color: #ffffff;
             }
             .inst-title {
-              font-weight: 800;
+              font-weight: 900;
               font-size: 11px;
-              color: #0f172a;
+              color: #000000;
             }
             .inst-addr {
-              font-size: 9px;
-              color: #475569;
+              font-size: 8.5px;
+              color: #000000;
               margin-top: 1px;
             }
             .pkts-cell {
               text-align: center;
               font-weight: 900;
               font-size: 12px;
-              color: #0f172a;
-              background-color: #eff6ff;
-              width: 65px;
+              color: #000000;
+              background-color: #ffffff;
+              width: 60px;
             }
             .pin-cell {
               text-align: center;
-              font-weight: 800;
+              font-weight: 900;
               font-size: 10px;
               width: 65px;
             }
             .unit-cell {
               text-align: center;
-              font-weight: 700;
+              font-weight: 800;
               font-size: 10px;
               width: 75px;
             }
             .contact-cell {
-              font-size: 9.5px;
-              width: 125px;
+              font-size: 9px;
+              width: 120px;
+              color: #000000;
             }
             .contact-name {
-              font-weight: 700;
-              color: #1e293b;
+              font-weight: 800;
+              color: #000000;
             }
             .contact-phone {
-              color: #1d4ed8;
-              font-weight: 700;
+              color: #000000;
+              font-weight: 800;
             }
             .sign-cell {
               width: 110px;
-              height: 40px;
+              height: 38px;
               background-color: #ffffff;
               text-align: center;
               vertical-align: bottom;
@@ -454,71 +477,67 @@ export default function Distribution() {
             }
             .sign-prompt {
               font-size: 8px;
-              color: #94a3b8;
-              border-top: 1px dashed #cbd5e1;
+              font-weight: 700;
+              color: #000000;
+              border-top: 1px dashed #000000;
               padding-top: 2px;
             }
             .total-row {
-              background-color: #0f172a !important;
-              color: #ffffff !important;
+              background-color: #f2f2f2 !important;
+              color: #000000 !important;
               font-weight: 900;
               font-size: 11px;
             }
             .total-row td {
-              border-color: #0f172a;
-              color: #ffffff !important;
+              border-top: 2px solid #000000;
+              border-bottom: 3px double #000000;
+              border-left: 1px solid #000000;
+              border-right: 1px solid #000000;
+              color: #000000 !important;
             }
             .footer-signatures {
-              margin-top: 18px;
+              margin-top: 14px;
               display: grid;
               grid-template-columns: repeat(3, 1fr);
               gap: 20px;
               page-break-inside: avoid;
             }
             .sign-box {
-              border-top: 1.5px solid #0f172a;
+              border-top: 1.5px solid #000000;
               padding-top: 4px;
               text-align: center;
               font-size: 9.5px;
-              font-weight: 800;
-              color: #334155;
+              font-weight: 900;
+              color: #000000;
             }
             .sign-box .note {
               font-size: 8px;
-              color: #64748b;
+              color: #000000;
               margin-top: 2px;
-              font-weight: normal;
-            }
-            .screen-action-bar {
-              margin-bottom: 12px;
-              padding: 8px 12px;
-              background: #eff6ff;
-              border: 1px solid #bfdbfe;
-              border-radius: 6px;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-            }
-            .print-button {
-              background: #2563eb;
-              color: white;
-              border: none;
-              padding: 6px 16px;
-              border-radius: 4px;
-              font-weight: 800;
-              font-size: 12px;
-              cursor: pointer;
+              font-weight: 600;
             }
             @media print {
               .screen-action-bar {
                 display: none !important;
+              }
+              body {
+                color: #000000 !important;
+                background: #ffffff !important;
+              }
+              * {
+                color: #000000 !important;
+                border-color: #000000 !important;
+              }
+              th, .total-row, .total-row td {
+                background-color: #f2f2f2 !important;
+                color: #000000 !important;
               }
             }
           </style>
         </head>
         <body>
           <div class="screen-action-bar">
-            <span>🖨️ <strong>Portrait Delivery Run Sheet Ready</strong> (A4 Format)</span>
+            <span>🖨️ <strong>Pure Black & White Portrait Delivery Run Sheet</strong> (A4 Format)</span>
             <button class="print-button" onclick="window.print()">Print / Save PDF</button>
           </div>
 
@@ -555,12 +574,12 @@ export default function Distribution() {
           <table>
             <thead>
               <tr>
-                <th style="width: 32px; text-align: center;">#</th>
+                <th style="width: 30px; text-align: center;">#</th>
                 <th>Institution Name & Address</th>
                 <th style="width: 65px; text-align: center;">PIN</th>
                 <th style="width: 75px; text-align: center;">Unit</th>
-                <th style="width: 65px; text-align: center;">Packets</th>
-                <th style="width: 125px;">ANO / Contact</th>
+                <th style="width: 60px; text-align: center;">Packets</th>
+                <th style="width: 120px;">ANO / Contact</th>
                 <th style="width: 110px; text-align: center;">Receiver Sign & Stamp</th>
               </tr>
             </thead>
@@ -569,7 +588,7 @@ export default function Distribution() {
                 const pkts = Number(s.total_quantity) || 0;
                 const addr = s.complete_address ? `<div class="inst-addr">${s.complete_address}</div>` : '';
                 const anoName = s.ano_cto_name ? `<div class="contact-name">${s.ano_cto_name}</div>` : '<div class="contact-name">ANO / Caretaker</div>';
-                const anoPhone = s.ano_cto_contact ? `<div class="contact-phone">📞 ${s.ano_cto_contact}</div>` : '';
+                const anoPhone = s.ano_cto_contact ? `<div class="contact-phone">Tel: ${s.ano_cto_contact}</div>` : '';
                 const unitBadge = s.unit_code || s.unit_name || '—';
                 return `
                   <tr>
@@ -592,14 +611,14 @@ export default function Distribution() {
                 `;
               }).join('')}
               <tr class="total-row">
-                <td colspan="4" style="text-align: right; padding-right: 12px; font-weight: 900;">
-                  TOTAL VALUATION / REFRESHMENT LOAD (${stops.length} STOPS):
+                <td colspan="4" style="text-align: right; padding-right: 10px; font-weight: 900;">
+                  TOTAL REFRESHMENT LOAD (${stops.length} STOPS):
                 </td>
-                <td class="pkts-cell" style="background-color: #1e293b !important; color: #ffffff !important; font-size: 13px;">
+                <td class="pkts-cell" style="font-weight: 900; font-size: 13px;">
                   ${totalPackets.toLocaleString('en-IN')}
                 </td>
-                <td colspan="2" style="font-size: 9.5px; font-weight: 700; padding-left: 8px;">
-                  Full Batch Handover Verified
+                <td colspan="2" style="font-size: 9.5px; font-weight: 800; padding-left: 8px;">
+                  Verified & Dispatched in Full
                 </td>
               </tr>
             </tbody>
