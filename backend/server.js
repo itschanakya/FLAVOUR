@@ -12,14 +12,11 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 // Security Headers: XSS protection, anti-clickjacking, disable X-Powered-By header
+// Note: contentSecurityPolicy is disabled so that dynamic print popup windows, inline scripts,
+// and Cloudinary CDN assets can load seamlessly across all browsers.
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
-  contentSecurityPolicy: {
-    directives: {
-      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      "img-src": ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https:"]
-    }
-  }
+  contentSecurityPolicy: false
 }));
 
 // Rate limiting disabled as not yet required for local testing/development

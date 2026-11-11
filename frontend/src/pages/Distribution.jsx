@@ -291,6 +291,7 @@ export default function Distribution() {
     const driverTitle = partner.name || 'DRIVER';
     const vehicleTitle = partner.vehicle_no || 'CAR';
 
+    printWindow.document.open();
     printWindow.document.write(`
       <!DOCTYPE html>
       <html lang="en">
@@ -538,7 +539,10 @@ export default function Distribution() {
         <body>
           <div class="screen-action-bar">
             <span>🖨️ <strong>Pure Black & White Portrait Delivery Run Sheet</strong> (A4 Format)</span>
-            <button class="print-button" onclick="window.print()">Print / Save PDF</button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span style="font-size: 10px; font-weight: normal; color: #444;">(Shortcut: Ctrl + P)</span>
+              <button id="printManifestBtn" class="print-button" type="button" onclick="window.focus(); window.print();">Print / Save PDF</button>
+            </div>
           </div>
 
           <div class="header-bar">
@@ -640,16 +644,59 @@ export default function Distribution() {
           </div>
 
           <script>
-            window.onload = function() {
-              setTimeout(function() {
+            function triggerPrint() {
+              try {
+                window.focus();
                 window.print();
-              }, 400);
-            };
+              } catch (err) {
+                console.error('Print trigger error:', err);
+              }
+            }
+            var btn = document.getElementById('printManifestBtn');
+            if (btn) {
+              btn.addEventListener('click', triggerPrint);
+            }
+            window.addEventListener('load', function() {
+              setTimeout(triggerPrint, 300);
+            });
+            setTimeout(triggerPrint, 500);
           </script>
         </body>
       </html>
     `);
     printWindow.document.close();
+
+    // Directly bind and trigger print from opener window for resilient execution across all browsers
+    setTimeout(() => {
+      try {
+        if (printWindow && !printWindow.closed) {
+          const doc = printWindow.document;
+          const btn = doc ? doc.getElementById('printManifestBtn') : null;
+          if (btn) {
+            btn.onclick = function() {
+              try {
+                printWindow.focus();
+                printWindow.print();
+              } catch (err) {
+                console.error(err);
+              }
+            };
+            btn.addEventListener('click', function() {
+              try {
+                printWindow.focus();
+                printWindow.print();
+              } catch (err) {
+                console.error(err);
+              }
+            });
+          }
+          printWindow.focus();
+          printWindow.print();
+        }
+      } catch (err) {
+        console.warn('Opener direct print trigger:', err);
+      }
+    }, 400);
   };
 
   if (loading) {
