@@ -2709,11 +2709,13 @@ export default function RefreshmentReports({ defaultTab }) {
 
     // Check if an institution is Centre funded (APS / Sainik School)
     const isCentreInst = (inst) => {
-      const masterType = trackerInstitutionsMap[inst.institution_id]?.institution_type;
-      if (masterType === 'CENTRE') return true;
+      if (!inst) return false;
+      const instId = inst.institution_id || inst.id;
+      const masterInst = trackerInstitutionsMap[instId];
+      if (masterInst?.institution_type === 'CENTRE') return true;
       if (inst.institution_type === 'CENTRE') return true;
-      const name = (inst.institution_name || trackerInstitutionsMap[inst.institution_id]?.institution_name || '').toUpperCase();
-      if (name.includes('ARMY PUBLIC SCHOOL') || name.startsWith('APS ') || name.includes('SAINIK SCHOOL')) {
+      const name = (inst.institution_name || inst.name || masterInst?.institution_name || '').toUpperCase();
+      if (name.includes('ARMY PUBLIC SCHOOL') || name.startsWith('APS ') || name.includes(' APS') || name.includes('SAINIK SCHOOL') || name.includes('SAINIK')) {
         return true;
       }
       return false;
@@ -2728,14 +2730,17 @@ export default function RefreshmentReports({ defaultTab }) {
         const stateInsts = allInsts.filter(inst => !isCentreInst(inst));
         const centreInsts = allInsts.filter(inst => isCentreInst(inst));
 
-        // If the backend already provided a single-aspect slice (funding_type already explicitly tagged)
-        // and its institutions are already purely of that aspect:
-        if ((u.funding_type === 'STATE' && centreInsts.length === 0) || (u.funding_type === 'CENTRE' && stateInsts.length === 0)) {
+        // If backend already tagged it and institutions are pure:
+        if (u.funding_type === 'CENTRE' && stateInsts.length === 0) {
+          result.push(u);
+          return;
+        }
+        if (u.funding_type === 'STATE' && centreInsts.length === 0 && u.unit_id !== 1) {
           result.push(u);
           return;
         }
 
-        // Otherwise (unsplit merged unit or mixed institutions), split into STATE and CENTRE rows:
+        // Otherwise (unsplit merged unit or mixed institutions, or Unit 1), split into STATE and CENTRE rows:
         const stateGross = stateInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
         const statePkts = stateInsts.reduce((s, i) => s + (Number(i.total_packets) || 0), 0);
         const centreGross = centreInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
@@ -2745,7 +2750,7 @@ export default function RefreshmentReports({ defaultTab }) {
         const itRate = Number(u.it_tds_rate) || 2.0;
 
         // 1. STATE Row
-        if (stateInsts.length > 0 || centreInsts.length === 0) {
+        if (stateInsts.length > 0 || centreInsts.length === 0 || u.unit_id === 1) {
           const calcGst = Math.round(stateGross * gstRate / 100 * 100) / 100;
           const calcIt = Math.round(stateGross * itRate / 100 * 100) / 100;
           const totDed = Math.round((calcGst + calcIt) * 100) / 100;
@@ -2776,7 +2781,7 @@ export default function RefreshmentReports({ defaultTab }) {
         }
 
         // 2. CENTRE Row (APS / Sainik Schools)
-        if (centreInsts.length > 0) {
+        if (centreInsts.length > 0 || u.unit_id === 1) {
           const calcGst = Math.round(centreGross * gstRate / 100 * 100) / 100;
           const calcIt = Math.round(centreGross * itRate / 100 * 100) / 100;
           const totDed = Math.round((calcGst + calcIt) * 100) / 100;
@@ -3168,60 +3173,130 @@ export default function RefreshmentReports({ defaultTab }) {
     };
 
     return (
-      <div className="space-y-4 animate-in fade-in duration-300">
-        {/* ═══ Print Page Controls (Orientation & Paper Size) ═══ */}
-        <PrintControls />
-
-        {/* ═══ Interactive 12-Month Slicer (JAN to DEC) + Year Slicer (Hidden during print) ═══ */}
-        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs print:hidden space-y-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
+      <div className="space-y-2.5 animate-in fade-in duration-300">
+        {/* ═══ Ultra-Compact Unified Command Header & Slicer Bar ═══ */}
+        <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-2xs print:hidden space-y-2">
+          {/* Row 1: Title, Month Badge & Consolidated Action Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* Left: Title + Month badge */}
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-black border border-blue-200/80 shadow-2xs">
-                <Calendar size={16} />
+              <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-black border border-emerald-200 shadow-2xs shrink-0">
+                <IndianRupee size={15} />
               </div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block leading-tight">
-                  MONTHLY BILLING SLICER
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-black text-sm text-slate-900 tracking-tight leading-none">
+                  Unitwise Monthly Bill Tracking & Payments
+                </h3>
+                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-black border border-blue-200/60 leading-none">
+                  {formatMonthLabel(month)}
                 </span>
-                <h4 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight flex items-center gap-1.5">
-                  <span>{formatMonthLabel(month)}</span>
-                  <span className="text-[10px] font-bold text-slate-400">({filteredUnitPayments.length} Units)</span>
-                </h4>
+                <span className="text-[10px] font-bold text-slate-400">
+                  ({filteredUnitPayments.length} Units)
+                </span>
               </div>
             </div>
 
-            {/* Year Selector with Quick Navigation */}
-            <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
+            {/* Right: Consolidated Compact Action Toolbar */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Slicer Year Quick Navigation */}
+              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 text-xs">
+                <button
+                  type="button"
+                  onClick={() => handleYearChange(selectedYear - 1)}
+                  className="w-6 h-6 rounded hover:bg-white text-slate-600 hover:text-blue-700 flex items-center justify-center font-black text-[11px] transition-colors cursor-pointer"
+                  title={`Switch to ${selectedYear - 1}`}
+                >
+                  ◀
+                </button>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => handleYearChange(Number(e.target.value))}
+                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer px-1 py-0.5"
+                >
+                  {availableYears.map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => handleYearChange(selectedYear + 1)}
+                  className="w-6 h-6 rounded hover:bg-white text-slate-600 hover:text-blue-700 flex items-center justify-center font-black text-[11px] transition-colors cursor-pointer"
+                  title={`Switch to ${selectedYear + 1}`}
+                >
+                  ▶
+                </button>
+              </div>
+
+              {/* Print Page Setup (Orientation & Size) - Compact Segmented */}
+              <div className="hidden sm:flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 text-[10px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setIsLandscape(false)}
+                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${!isLandscape ? 'bg-white text-blue-700 shadow-2xs font-black' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Portrait
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsLandscape(true)}
+                  className={`px-2 py-0.5 rounded transition-all cursor-pointer ${isLandscape ? 'bg-white text-blue-700 shadow-2xs font-black' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Landscape
+                </button>
+                <span className="w-px h-3 bg-slate-300 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={() => setPaperSize('A4')}
+                  className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${paperSize === 'A4' ? 'bg-indigo-600 text-white font-black' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  A4
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaperSize('Legal')}
+                  className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${paperSize === 'Legal' ? 'bg-indigo-600 text-white font-black' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Legal
+                </button>
+              </div>
+
+              {/* Sync Data */}
               <button
                 type="button"
-                onClick={() => handleYearChange(selectedYear - 1)}
-                className="w-7 h-7 rounded-lg hover:bg-white text-slate-600 hover:text-blue-700 flex items-center justify-center font-black text-xs transition-colors cursor-pointer"
-                title={`Switch to ${selectedYear - 1}`}
+                onClick={() => fetchUnitPayments()}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all border border-slate-300 flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                title="Sync latest Unit payments from server"
               >
-                ◀
+                <RefreshCw size={12} className={loadingUnits ? "animate-spin text-blue-600" : "text-slate-500"} />
+                <span>Sync</span>
               </button>
-              <select
-                value={selectedYear}
-                onChange={(e) => handleYearChange(Number(e.target.value))}
-                className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer px-1.5 py-0.5"
-              >
-                {availableYears.map(yr => (
-                  <option key={yr} value={yr}>{yr}</option>
-                ))}
-              </select>
+
+              {/* Export Excel */}
               <button
                 type="button"
-                onClick={() => handleYearChange(selectedYear + 1)}
-                className="w-7 h-7 rounded-lg hover:bg-white text-slate-600 hover:text-blue-700 flex items-center justify-center font-black text-xs transition-colors cursor-pointer"
-                title={`Switch to ${selectedYear + 1}`}
+                onClick={handleExportExcel}
+                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-lg transition-all shadow-xs border border-emerald-400/30 flex items-center gap-1 cursor-pointer active:scale-95"
+                title="Export Unit Payments to Excel"
               >
-                ▶
+                <FileSpreadsheet size={13} className="text-emerald-200" />
+                <span>Excel</span>
+              </button>
+
+              {/* Print Report */}
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-lg transition-all shadow-xs border border-blue-400/30 flex items-center gap-1 cursor-pointer active:scale-95"
+                title="Print Official Unitwise Monthly Bill & Payment Report"
+              >
+                <Printer size={13} className="text-sky-200" />
+                <span>Print Report</span>
               </button>
             </div>
           </div>
 
-          {/* 12 Horizontal Month Tabs (JAN to DEC) */}
-          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5 pt-1">
+          {/* Row 2: Ultra-Slim 12-Month Slicer Strip (JAN - DEC) */}
+          <div className="grid grid-cols-6 sm:grid-cols-12 gap-1 pt-0.5">
             {MONTH_NAMES.map(m => {
               const ym = `${selectedYear}-${m.key}`;
               const isSelected = month === ym;
@@ -3232,173 +3307,80 @@ export default function RefreshmentReports({ defaultTab }) {
                   key={m.key}
                   type="button"
                   onClick={() => setMonth(ym)}
-                  className={`py-2 px-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 active:scale-95 ${
+                  className={`py-1 px-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 ${
                     isSelected
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-600 scale-[1.03]'
+                      ? 'bg-blue-600 text-white shadow-xs font-black'
                       : hasData
-                        ? 'bg-blue-50/70 hover:bg-blue-100 text-blue-900 border border-blue-200 font-extrabold shadow-2xs'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200/80 font-bold'
+                        ? 'bg-blue-50/80 hover:bg-blue-100 text-blue-900 border border-blue-200 font-extrabold'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200/80'
                   }`}
-                  title={`${m.name} ${selectedYear}${hasData ? ' (Refreshment Demands Available)' : ' (No demands)'}`}
+                  title={`${m.name} ${selectedYear}${hasData ? ' (Demands Available)' : ''}`}
                 >
-                  <span className="tracking-tight">{m.short}</span>
+                  <span>{m.short}</span>
                   {hasData && (
                     <span
                       className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-300' : 'bg-emerald-500'}`}
-                      title="Demands data present"
                     />
                   )}
                 </button>
               );
             })}
           </div>
-        </div>
 
-        {/* ═══ Header & Filter Controls Bar ═══ */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs print:hidden space-y-3">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 shadow-2xs">
-                  <IndianRupee className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-black text-base text-slate-900 tracking-tight flex items-center gap-2">
-                    Unitwise Monthly Bill Tracking & Payments
-                  </h3>
-                  <p className="text-[11px] font-bold text-slate-500">
-                    Track payments received from NCC Units per month. Click any Unit row to expand institution-wise details.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons: Sync Data, Export Excel & Print Report */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
-                <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span className="font-extrabold text-[11px] text-slate-500">Month:</span>
-                <input
-                  type="month"
-                  value={month}
-                  onChange={e => setMonth(e.target.value)}
-                  className="bg-transparent font-black text-xs text-slate-800 focus:outline-none cursor-pointer"
-                />
-              </div>
-
-              {monthOptions.length > 0 && (
-                <select
-                  value={month}
-                  onChange={e => setMonth(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none cursor-pointer shadow-2xs"
-                  title="Quick Select Available Demand Month"
-                >
-                  {monthOptions.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              )}
-
+          {/* Row 3: All Documentation Mode Filters, Status Tabs & Search in ONE Single Compact Row */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-slate-100 text-xs">
+            {/* Left: Documentation Mode Segmented Switch */}
+            <div className="inline-flex items-center p-0.5 bg-slate-100 rounded-lg gap-0.5">
               <button
                 type="button"
-                onClick={() => fetchUnitPayments()}
-                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold uppercase text-[11px] tracking-wider rounded-xl transition-all border border-slate-300 flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
-                title="Sync latest Unit payments from server"
+                onClick={() => setFundingFilter('ALL')}
+                className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                  fundingFilter === 'ALL'
+                    ? 'bg-white text-slate-900 shadow-2xs font-black'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
               >
-                <RefreshCw size={14} className={loadingUnits ? "animate-spin text-blue-600" : "text-slate-500"} />
-                <span>Sync Data</span>
+                All Modes
               </button>
-
               <button
                 type="button"
-                onClick={handleExportExcel}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md shadow-emerald-600/25 border border-emerald-400/40 flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Export Unit Payments and Breakdown to Excel"
+                onClick={() => setFundingFilter('STATE')}
+                className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  fundingFilter === 'STATE'
+                    ? 'bg-emerald-600 text-white shadow-2xs font-black'
+                    : 'text-emerald-700 hover:bg-emerald-50'
+                }`}
               >
-                <FileSpreadsheet size={15} className="text-emerald-200 shrink-0" />
-                <span>Export Excel</span>
+                <span>🏢 State</span>
               </button>
-
               <button
                 type="button"
-                onClick={handlePrint}
-                className="px-4 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-400 text-white font-black uppercase text-[11px] tracking-wider rounded-xl transition-all shadow-md shadow-blue-600/25 border border-blue-400/40 flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Print Official Unitwise Monthly Bill & Payment Report"
+                onClick={() => setFundingFilter('CENTRE')}
+                className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  fundingFilter === 'CENTRE'
+                    ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                    : 'text-indigo-700 hover:bg-indigo-50'
+                }`}
               >
-                <Printer size={15} className="text-sky-200 shrink-0" />
-                <span>Print Report</span>
+                <span>🏛️ Centre</span>
               </button>
             </div>
-          </div>
 
-          {/* Quick Funding Mode Tabs (Separate documentation modes) */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Documentation Mode:</span>
-              <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl gap-1">
-                <button
-                  type="button"
-                  onClick={() => setFundingFilter('ALL')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    fundingFilter === 'ALL'
-                      ? 'bg-white text-slate-900 shadow-2xs font-black'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  All Modes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFundingFilter('STATE')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    fundingFilter === 'STATE'
-                      ? 'bg-emerald-600 text-white shadow-2xs font-black'
-                      : 'text-emerald-700 hover:bg-emerald-50'
-                  }`}
-                >
-                  <span>🏢 State Funded</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFundingFilter('CENTRE')}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    fundingFilter === 'CENTRE'
-                      ? 'bg-indigo-600 text-white shadow-2xs font-black'
-                      : 'text-indigo-700 hover:bg-indigo-50'
-                  }`}
-                >
-                  <span>🏛️ Centre Funded</span>
-                </button>
-              </div>
-            </div>
-            {fundingFilter !== 'ALL' && (
-              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${
-                fundingFilter === 'CENTRE'
-                  ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
-                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              }`}>
-                {fundingFilter === 'CENTRE' ? '🏛️ Army Public School / Sainik School Mode' : '🏢 State Govt & Regular Vacancy Mode'}
-              </span>
-            )}
-          </div>
-
-          {/* Slicers & Search Controls */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-            {/* Payment Status Tabs */}
-            <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
+            {/* Middle: Payment Status Pills */}
+            <div className="flex items-center gap-0.5 bg-slate-100/80 p-0.5 rounded-lg">
               {[
-                { id: 'ALL', label: `All Units (${summary.unitsCount})` },
-                { id: 'PENDING', label: `Pending Submission (${summary.pendingCount})` },
-                { id: 'SUBMITTED', label: `Submitted to PCDA (${summary.submittedCount})` },
-                { id: 'PAID', label: `Credited / Paid (${summary.paidCount})` }
+                { id: 'ALL', label: `All (${summary.unitsCount})` },
+                { id: 'PENDING', label: `Pending (${summary.pendingCount})` },
+                { id: 'SUBMITTED', label: `Submitted (${summary.submittedCount})` },
+                { id: 'PAID', label: `Paid (${summary.paidCount})` }
               ].map(tab => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
                     statusFilter === tab.id
-                      ? 'bg-white text-slate-900 shadow-xs'
+                      ? 'bg-white text-slate-900 shadow-2xs font-black'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -3407,47 +3389,34 @@ export default function RefreshmentReports({ defaultTab }) {
               ))}
             </div>
 
-            {/* Funding Aspect Dropdown, Search Box & Expand All Button */}
-            <div className="flex items-center gap-2 flex-1 max-w-lg justify-end">
-              <div className="w-36 shrink-0">
-                <select
-                  value={fundingFilter}
-                  onChange={(e) => setFundingFilter(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 transition-colors shadow-2xs cursor-pointer"
-                  title="Funding Aspect Filter"
-                >
-                  <option value="ALL">🌐 All Modes</option>
-                  <option value="STATE">🏢 State Funded</option>
-                  <option value="CENTRE">🏛️ Centre Funded</option>
-                </select>
-              </div>
-
-              <div className="relative flex-1 min-w-[160px]">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            {/* Right: Search Box & Expand All */}
+            <div className="flex items-center gap-1.5 flex-1 max-w-xs justify-end">
+              <div className="relative flex-1 min-w-[130px]">
+                <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search Unit name, code..."
+                  placeholder="Search Unit / school..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                  className="w-full pl-7 pr-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-all"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={handleToggleExpandAll}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
                 title={expandedUnitIds.size === filteredUnitPayments.length ? 'Collapse All' : 'Expand All'}
               >
                 {expandedUnitIds.size === filteredUnitPayments.length && filteredUnitPayments.length > 0 ? (
                   <>
-                    <ChevronUp className="w-3.5 h-3.5" />
-                    <span>Collapse All</span>
+                    <ChevronUp className="w-3 h-3" />
+                    <span>Collapse</span>
                   </>
                 ) : (
                   <>
-                    <ChevronDown className="w-3.5 h-3.5" />
-                    <span>Expand All</span>
+                    <ChevronDown className="w-3 h-3" />
+                    <span>Expand</span>
                   </>
                 )}
               </button>
@@ -3455,58 +3424,58 @@ export default function RefreshmentReports({ defaultTab }) {
           </div>
         </div>
 
-        {/* ═══ 6 Top Summary Metric KPI Cards with TDS Breakdown ═══ */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 print:grid-cols-6">
-          <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Billed Units</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-black text-slate-900">{summary.unitsCount}</span>
+        {/* ═══ 6 Compact Summary Metric KPI Cards with TDS Breakdown ═══ */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 print:grid-cols-6">
+          <div className="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
+            <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Billed Units</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-black text-slate-900">{summary.unitsCount}</span>
               <span className="text-[10px] font-bold text-slate-400">Units</span>
             </div>
-            <div className="text-[10px] font-bold text-slate-500 mt-1 truncate">
+            <div className="text-[9.5px] font-bold text-slate-500 mt-0.5 truncate">
               Paid: {summary.paidCount} • Sub: {summary.submittedCount} • Bal: {summary.pendingCount}
             </div>
           </div>
 
-          <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
-            <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 block mb-0.5">Total Packets</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-black text-blue-900">{summary.totalPkts.toLocaleString('en-IN')}</span>
+          <div className="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
+            <span className="text-[9.5px] font-black uppercase tracking-wider text-blue-600 block mb-0.5">Total Packets</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-black text-blue-900">{summary.totalPkts.toLocaleString('en-IN')}</span>
               <span className="text-[10px] font-bold text-blue-600">Pkts</span>
             </div>
-            <div className="text-[10px] font-bold text-slate-400 mt-1 truncate">Supplied in {formatMonthLabel(month)}</div>
+            <div className="text-[9.5px] font-bold text-slate-400 mt-0.5 truncate">Supplied in {formatMonthLabel(month)}</div>
           </div>
 
-          <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 block mb-0.5">Gross Bill (100%)</span>
-            <div className="text-xl font-black text-slate-900 truncate">₹{formatAmount(summary.totalGross)}</div>
-            <div className="text-[10px] font-bold text-slate-400 mt-1 truncate">Total supply valuation</div>
+          <div className="bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs">
+            <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-600 block mb-0.5">Gross Bill (100%)</span>
+            <div className="text-lg font-black text-slate-900 truncate">₹{formatAmount(summary.totalGross)}</div>
+            <div className="text-[9.5px] font-bold text-slate-400 mt-0.5 truncate">Total supply valuation</div>
           </div>
 
-          <div className="bg-rose-50/60 p-3 rounded-2xl border border-rose-200/90 shadow-2xs">
-            <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 block mb-0.5">TDS Deductions (4%)</span>
-            <div className="text-xl font-black text-rose-800 truncate">₹{formatAmount(summary.totalDeductions)}</div>
-            <div className="text-[10px] font-bold text-rose-600 mt-1 truncate">
+          <div className="bg-rose-50/60 p-2.5 rounded-xl border border-rose-200/90 shadow-2xs">
+            <span className="text-[9.5px] font-black uppercase tracking-wider text-rose-700 block mb-0.5">TDS Deductions (4%)</span>
+            <div className="text-lg font-black text-rose-800 truncate">₹{formatAmount(summary.totalDeductions)}</div>
+            <div className="text-[9.5px] font-bold text-rose-600 mt-0.5 truncate">
               GST: ₹{formatAmount(summary.totalGstTds)} • IT: ₹{formatAmount(summary.totalItTds)}
             </div>
           </div>
 
-          <div className="bg-emerald-50/60 p-3 rounded-2xl border border-emerald-200/90 shadow-2xs">
-            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 block mb-0.5">Net Vendor Credit</span>
-            <div className="text-xl font-black text-emerald-800 truncate">₹{formatAmount(summary.totalNetCredit)}</div>
-            <div className="text-[10px] font-bold text-emerald-600 mt-1 truncate">
+          <div className="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-200/90 shadow-2xs">
+            <span className="text-[9.5px] font-black uppercase tracking-wider text-emerald-700 block mb-0.5">Net Vendor Credit</span>
+            <div className="text-lg font-black text-emerald-800 truncate">₹{formatAmount(summary.totalNetCredit)}</div>
+            <div className="text-[9.5px] font-bold text-emerald-600 mt-0.5 truncate">
               Recd: ₹{formatAmount(summary.totalPaidReceived)}
             </div>
           </div>
 
-          <div className={`p-3 rounded-2xl border shadow-2xs ${summary.totalPendingBalance > 0 ? 'bg-amber-50/70 border-amber-200/90' : 'bg-slate-50 border-slate-200'}`}>
-            <span className={`text-[10px] font-black uppercase tracking-wider block mb-0.5 ${summary.totalPendingBalance > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
+          <div className={`p-2.5 rounded-xl border shadow-2xs ${summary.totalPendingBalance > 0 ? 'bg-amber-50/70 border-amber-200/90' : 'bg-slate-50 border-slate-200'}`}>
+            <span className={`text-[9.5px] font-black uppercase tracking-wider block mb-0.5 ${summary.totalPendingBalance > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
               Pending Balance
             </span>
-            <div className={`text-xl font-black truncate ${summary.totalPendingBalance > 0 ? 'text-amber-900' : 'text-slate-700'}`}>
+            <div className={`text-lg font-black truncate ${summary.totalPendingBalance > 0 ? 'text-amber-900' : 'text-slate-700'}`}>
               ₹{formatAmount(summary.totalPendingBalance)}
             </div>
-            <div className={`text-[10px] font-bold mt-1 truncate ${summary.totalPendingBalance > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
+            <div className={`text-[9.5px] font-bold mt-0.5 truncate ${summary.totalPendingBalance > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
               {summary.totalPendingBalance > 0 ? 'Awaiting PCDA Credit' : 'All Clear'}
             </div>
           </div>

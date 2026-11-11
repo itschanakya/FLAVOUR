@@ -746,10 +746,10 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       masterCounts = await db.all(`
         SELECT unit_id, COALESCE(institution_type, 'STATE') as institution_type, COUNT(*) as cnt
         FROM institutions
-        WHERE is_deleted = 0
         GROUP BY unit_id, institution_type
       `);
     } catch (e) {
+      console.warn('masterCounts select fallback:', e.message);
       masterCounts = [];
     }
     const unitMasterCounts = {};
