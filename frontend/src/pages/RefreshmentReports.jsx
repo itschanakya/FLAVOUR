@@ -2674,13 +2674,13 @@ export default function RefreshmentReports({ defaultTab }) {
     }, [month, selectedGroup]);
 
     // Toggle expand for a unit row
-    const toggleExpandUnit = (unitId) => {
+    const toggleExpandUnit = (rowKey) => {
       setExpandedUnitIds(prev => {
         const next = new Set(prev);
-        if (next.has(unitId)) {
-          next.delete(unitId);
+        if (next.has(rowKey)) {
+          next.delete(rowKey);
         } else {
-          next.add(unitId);
+          next.add(rowKey);
         }
         return next;
       });
@@ -2688,40 +2688,23 @@ export default function RefreshmentReports({ defaultTab }) {
 
     // Expand all / collapse all
     const handleToggleExpandAll = () => {
-      if (expandedUnitIds.size === filteredUnitPayments.length && filteredUnitPayments.length > 0) {
+      const allRowKeys = filteredUnitPayments.map(u => u.row_key || `${u.unit_id}_${u.funding_type || 'STATE'}`);
+      if (expandedUnitIds.size === allRowKeys.length && allRowKeys.length > 0) {
         setExpandedUnitIds(new Set());
       } else {
-        const allIds = new Set(filteredUnitPayments.map(u => u.unit_id));
-        setExpandedUnitIds(allIds);
+        setExpandedUnitIds(new Set(allRowKeys));
       }
     };
 
     // Filter by search query, funding aspect & payment status
     const filteredUnitPayments = useMemo(() => {
-      return (unitPayments || []).map(u => {
+      return (unitPayments || []).filter(u => {
+        // Funding aspect filter: ALL | STATE | CENTRE
         if (fundingFilter !== 'ALL') {
-          const matchingInsts = (u.institutions || []).filter(inst => {
-            const t = inst.institution_type || 'STATE';
-            return t === fundingFilter;
-          });
-          if (matchingInsts.length === 0) return null;
-
-          const gross = matchingInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
-          const totalPkts = matchingInsts.reduce((s, i) => s + (Number(i.total_packets) || 0), 0);
-          const demandsCount = matchingInsts.reduce((s, i) => s + (Number(i.demand_count) || (i.demands?.length || 0)), 0);
-
-          return {
-            ...u,
-            institutions: matchingInsts,
-            institutions_count: matchingInsts.length,
-            total_amount: gross,
-            gross_amount: gross,
-            total_packets: totalPkts,
-            total_demands: demandsCount
-          };
+          const rowFund = u.funding_type || 'STATE';
+          if (rowFund !== fundingFilter) return false;
         }
-        return u;
-      }).filter(Boolean).filter(u => {
+
         // Group filter
         if (selectedGroup !== 'All' && u.ncc_group !== selectedGroup) return false;
         
@@ -2735,6 +2718,7 @@ export default function RefreshmentReports({ defaultTab }) {
           const q = searchQuery.toLowerCase().trim();
           const matchUnit = (u.unit_name || '').toLowerCase().includes(q) ||
             (u.unit_code || '').toLowerCase().includes(q) ||
+            (u.funding_label || '').toLowerCase().includes(q) ||
             (u.payment_ref || '').toLowerCase().includes(q) ||
             (u.pcda_letter_ref || '').toLowerCase().includes(q);
           const matchInst = (u.institutions || []).some(inst =>
@@ -2836,6 +2820,7 @@ export default function RefreshmentReports({ defaultTab }) {
         const d = getUnitDeductions(pcdaModal.unit);
         const payload = {
           unit_id: pcdaModal.unit.unit_id,
+          funding_type: pcdaModal.unit.funding_type || 'STATE',
           month,
           submission_date: pcdaModal.formData.submission_date,
           letter_ref: pcdaModal.formData.letter_ref,
@@ -2950,6 +2935,7 @@ export default function RefreshmentReports({ defaultTab }) {
         const totDed = d.gstTds + d.itTds + otherDed;
         const payload = {
           unit_id: adminDetailModal.unit.unit_id,
+          funding_type: adminDetailModal.unit.funding_type || 'STATE',
           month,
           gross_amount: d.gross,
           paid_amount: Number(adminDetailModal.formData.paid_amount) || 0,
@@ -3000,6 +2986,7 @@ export default function RefreshmentReports({ defaultTab }) {
         rows.push({
           'Record Type': 'UNIT SUMMARY',
           'S.No': uIdx + 1,
+          'Funding Aspect': u.funding_type === 'CENTRE' ? 'CENTRE FUND (APS/Sainik)' : 'STATE FUND',
           'Unit Name': u.unit_name,
           'Unit Code': u.unit_code || '-',
           'NCC Group': u.ncc_group || '-',
@@ -3452,16 +3439,17 @@ export default function RefreshmentReports({ defaultTab }) {
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {filteredUnitPayments.map((u, idx) => {
                     const d = getUnitDeductions(u);
-                    const isExpanded = expandedUnitIds.has(u.unit_id);
+                    const rowKey = u.row_key || `${u.unit_id}_${u.funding_type || 'STATE'}`;
+                    const isExpanded = expandedUnitIds.has(rowKey);
                     const isPaid = u.payment_status === 'PAID';
                     const isSubmittedToPcda = Number(u.submitted_to_pcda || 0) === 1 || u.payment_status === 'SUBMITTED_TO_PCDA';
                     const isPending = !isPaid && !isSubmittedToPcda;
 
                     return (
-                      <React.Fragment key={u.unit_id}>
+                      <React.Fragment key={rowKey}>
                         {/* ─── Unit Master Row (Clickable to toggle expand) ─── */}
                         <tr
-                          onClick={() => toggleExpandUnit(u.unit_id)}
+                          onClick={() => toggleExpandUnit(rowKey)}
                           className={`cursor-pointer transition-colors group select-none ${
                             isExpanded ? 'bg-blue-50/40 hover:bg-blue-50/70' : 'hover:bg-slate-50/80'
                           }`}
@@ -3471,7 +3459,7 @@ export default function RefreshmentReports({ defaultTab }) {
                             <div className="flex items-start gap-2">
                               <button
                                 type="button"
-                                onClick={(e) => { e.stopPropagation(); toggleExpandUnit(u.unit_id); }}
+                                onClick={(e) => { e.stopPropagation(); toggleExpandUnit(rowKey); }}
                                 className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all print:hidden ${
                                   isExpanded ? 'bg-blue-600 text-white shadow-2xs rotate-180' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
@@ -3485,6 +3473,13 @@ export default function RefreshmentReports({ defaultTab }) {
                                   <h4 className="font-black text-xs sm:text-sm text-slate-900 print:text-black tracking-tight group-hover:text-blue-700 transition-colors">
                                     {u.unit_name}
                                   </h4>
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border shadow-2xs inline-flex items-center gap-1 ${
+                                    u.funding_type === 'CENTRE'
+                                      ? 'bg-indigo-50 text-indigo-800 border-indigo-300'
+                                      : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                  }`}>
+                                    {u.funding_type === 'CENTRE' ? '🏛️ CENTRE FUND' : '🏢 STATE FUND'}
+                                  </span>
                                   {u.unit_code && (
                                     <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 print:text-black rounded text-[10px] font-mono font-bold border border-slate-200">
                                       {u.unit_code}
@@ -3500,7 +3495,9 @@ export default function RefreshmentReports({ defaultTab }) {
                                   <span>{u.institutions_count} {u.institutions_count === 1 ? 'Institution' : 'Institutions'} Supplied</span>
                                   <span className="print:hidden">•</span>
                                   <span className="text-blue-600 hover:underline print:hidden">
-                                    {isExpanded ? 'Hide Schools ▲' : 'View Schools ▼'}
+                                    {isExpanded
+                                      ? 'Hide Schools ▲'
+                                      : (u.funding_type === 'CENTRE' ? 'View Centre Schools ▼' : 'View State Schools ▼')}
                                   </span>
                                 </div>
                               </div>
@@ -3636,14 +3633,21 @@ export default function RefreshmentReports({ defaultTab }) {
                             <td colSpan={9} className="px-4 py-4 sm:px-8">
                               <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-4 space-y-3">
                                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <School className="w-4 h-4 text-blue-600" />
-                                    <h5 className="font-black text-xs uppercase tracking-wider text-slate-900">
-                                      Institution Breakdown for {u.unit_name} — {u.month_label}
+                                    <h5 className="font-black text-xs uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                                      <span>Institution Breakdown for {u.unit_name} — {u.month_label}</span>
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${
+                                        u.funding_type === 'CENTRE'
+                                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      }`}>
+                                        {u.funding_type === 'CENTRE' ? '🏛️ CENTRE FUND (APS / Sainik Schools)' : '🏢 STATE FUND (State Govt / Regular)'}
+                                      </span>
                                     </h5>
                                   </div>
                                   <span className="text-[11px] font-bold text-slate-500">
-                                    {u.institutions.length} Institutions Supplied
+                                    {u.institutions.length} {u.funding_type === 'CENTRE' ? 'Centre Institutions' : 'State Institutions'} Supplied
                                   </span>
                                 </div>
 
@@ -3798,7 +3802,7 @@ export default function RefreshmentReports({ defaultTab }) {
                     <span>Submit Monthly Bill to PCDA / Higher HQ</span>
                   </h4>
                   <p className="text-xs font-bold text-blue-100 mt-0.5">
-                    {pcdaModal.unit.unit_name} — {formatMonthLabel(month)}
+                    {pcdaModal.unit.unit_name} [{pcdaModal.unit.funding_type === 'CENTRE' ? '🏛️ CENTRE FUND' : '🏢 STATE FUND'}] — {formatMonthLabel(month)}
                   </p>
                 </div>
                 <button
@@ -3922,7 +3926,7 @@ export default function RefreshmentReports({ defaultTab }) {
                     <span>Unit Monthly Bill & Vendor Bank Credit Verification</span>
                   </h4>
                   <p className="text-xs font-bold text-indigo-200 mt-0.5">
-                    {adminDetailModal.unit.unit_name} ({adminDetailModal.unit.ncc_group}) — {formatMonthLabel(month)}
+                    {adminDetailModal.unit.unit_name} [{adminDetailModal.unit.funding_type === 'CENTRE' ? '🏛️ CENTRE FUND' : '🏢 STATE FUND'}] ({adminDetailModal.unit.ncc_group}) — {formatMonthLabel(month)}
                   </p>
                 </div>
                 <button

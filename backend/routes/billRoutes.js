@@ -58,6 +58,7 @@ async function ensureBillColumns(db) {
   }
 
   const unitPayCols = [
+    "ALTER TABLE unit_monthly_payments ADD COLUMN funding_type VARCHAR(50) DEFAULT 'STATE'",
     "ALTER TABLE unit_monthly_payments ADD COLUMN gross_amount REAL DEFAULT 0",
     "ALTER TABLE unit_monthly_payments ADD COLUMN gst_tds_rate REAL DEFAULT 2.0",
     "ALTER TABLE unit_monthly_payments ADD COLUMN gst_tds_amount REAL DEFAULT 0",
@@ -716,7 +717,11 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
     }
     const paymentMap = {};
     (unitPayments || []).forEach(p => {
-      paymentMap[p.unit_id] = p;
+      const fund = p.funding_type || 'STATE';
+      paymentMap[`${p.unit_id}_${fund}`] = p;
+      if (!paymentMap[p.unit_id]) {
+        paymentMap[p.unit_id] = p;
+      }
     });
 
     // 4. Fetch refreshment_bills for the month
@@ -735,7 +740,25 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       instBillMap[b.institution_id] = b;
     });
 
-    // 5. Group demands by unit & institution
+    // 4b. Fetch master institution count by unit and funding type (to know if unit has Centre schools registered)
+    let masterCounts = [];
+    try {
+      masterCounts = await db.all(`
+        SELECT unit_id, COALESCE(institution_type, 'STATE') as institution_type, COUNT(*) as cnt
+        FROM institutions
+        WHERE is_deleted = 0
+        GROUP BY unit_id, institution_type
+      `);
+    } catch (e) {
+      masterCounts = [];
+    }
+    const unitMasterCounts = {};
+    masterCounts.forEach(m => {
+      if (!unitMasterCounts[m.unit_id]) unitMasterCounts[m.unit_id] = { STATE: 0, CENTRE: 0 };
+      unitMasterCounts[m.unit_id][m.institution_type] = Number(m.cnt || 0);
+    });
+
+    // 5. Group demands by unit & funding type (STATE vs CENTRE)
     const unitDataMap = {};
     units.forEach(u => {
       unitDataMap[u.id] = {
@@ -748,7 +771,12 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
         month_label: formatMonthLabel(month),
         total_packets: 0,
         total_amount: 0,
-        institutions_map: {}
+        state_packets: 0,
+        state_amount: 0,
+        centre_packets: 0,
+        centre_amount: 0,
+        state_institutions_map: {},
+        centre_institutions_map: {}
       };
     });
 
@@ -760,16 +788,27 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       uEntry.total_packets += q;
       uEntry.total_amount += a;
 
+      const isCentre = (d.institution_type === 'CENTRE');
+      const targetMap = isCentre ? uEntry.centre_institutions_map : uEntry.state_institutions_map;
+
+      if (isCentre) {
+        uEntry.centre_packets += q;
+        uEntry.centre_amount += a;
+      } else {
+        uEntry.state_packets += q;
+        uEntry.state_amount += a;
+      }
+
       const instKey = d.institution_id || `direct_${d.unit_id}`;
-      if (!uEntry.institutions_map[instKey]) {
+      if (!targetMap[instKey]) {
         const bRec = d.institution_id ? instBillMap[d.institution_id] : null;
-        uEntry.institutions_map[instKey] = {
+        targetMap[instKey] = {
           institution_id: d.institution_id,
           institution_name: d.institution_name,
           ano_cto_name: d.ano_cto_name || '',
           ano_cto_contact: d.ano_cto_contact || '',
           pin_code: d.pin_code || '',
-          institution_type: d.institution_type || 'STATE',
+          institution_type: isCentre ? 'CENTRE' : 'STATE',
           total_packets: 0,
           total_amount: 0,
           demand_count: 0,
@@ -779,7 +818,7 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
           payment_status: bRec?.payment_status || 'PENDING'
         };
       }
-      const instEntry = uEntry.institutions_map[instKey];
+      const instEntry = targetMap[instKey];
       instEntry.total_packets += q;
       instEntry.total_amount += a;
       instEntry.demand_count += 1;
@@ -798,11 +837,12 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
     const defaultGstRate = tdsSettings.gst_tds_rate;
     const defaultItRate = tdsSettings.it_tds_rate;
 
-    // 6. Shape final response
-    const result = Object.values(unitDataMap).map(u => {
-      const pRec = paymentMap[u.unit_id];
-      const instList = Object.values(u.institutions_map);
-      const grossAmount = u.total_amount;
+    // Helper to build a distinct slice (STATE or CENTRE) for a Unit
+    const buildSlice = (u, fundType, instMap, pkts, amount) => {
+      const pRecKey = `${u.unit_id}_${fundType}`;
+      const pRec = paymentMap[pRecKey] || (fundType === 'STATE' ? paymentMap[u.unit_id] : null);
+      const instList = Object.values(instMap).sort((a, b) => (a.institution_name || '').localeCompare(b.institution_name || ''));
+      const grossAmount = amount;
 
       const gstRate = pRec?.gst_tds_rate !== undefined && pRec?.gst_tds_rate !== null ? Number(pRec.gst_tds_rate) : defaultGstRate;
       const itRate = pRec?.it_tds_rate !== undefined && pRec?.it_tds_rate !== null ? Number(pRec.it_tds_rate) : defaultItRate;
@@ -840,7 +880,11 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
       const balanceAmount = isPaid ? 0 : grossAmount;
 
       return {
+        id: `${u.unit_id}_${fundType}`,
+        row_key: `${u.unit_id}_${fundType}`,
         unit_id: u.unit_id,
+        funding_type: fundType,
+        funding_label: fundType === 'CENTRE' ? 'CENTRE FUND' : 'STATE FUND',
         unit_name: u.unit_name,
         unit_code: u.unit_code,
         location: u.location,
@@ -848,7 +892,7 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
         month: u.month,
         month_label: u.month_label,
         institutions_count: instList.length,
-        total_packets: u.total_packets,
+        total_packets: pkts,
         total_amount: grossAmount,
         gross_amount: grossAmount,
         gst_tds_rate: gstRate,
@@ -876,6 +920,28 @@ router.get('/unit-payments', authenticateToken, authorizeRoles('ADMIN', 'UNIT'),
         updated_at: pRec?.updated_at || null,
         institutions: instList
       };
+    };
+
+    // 6. Shape final response: Generate TWO rows per Unit (One for STATE and One for CENTRE)
+    const result = [];
+    Object.values(unitDataMap).forEach(u => {
+      const masterCountsForUnit = unitMasterCounts[u.unit_id] || { STATE: 0, CENTRE: 0 };
+      const hasStateDemands = u.state_packets > 0 || Object.keys(u.state_institutions_map).length > 0;
+      const hasCentreDemands = u.centre_packets > 0 || Object.keys(u.centre_institutions_map).length > 0;
+      const hasStatePayment = !!paymentMap[`${u.unit_id}_STATE`] || !!paymentMap[u.unit_id];
+      const hasCentrePayment = !!paymentMap[`${u.unit_id}_CENTRE`];
+
+      // Include STATE row if unit has state demands, state payment, or registered state institutions
+      const includeState = hasStateDemands || hasStatePayment || masterCountsForUnit.STATE > 0 || (!hasCentreDemands && !hasCentrePayment);
+      // Include CENTRE row if unit has centre demands, centre payment, or registered centre institutions (APS/Sainik)
+      const includeCentre = hasCentreDemands || hasCentrePayment || masterCountsForUnit.CENTRE > 0;
+
+      if (includeState) {
+        result.push(buildSlice(u, 'STATE', u.state_institutions_map, u.state_packets, u.state_amount));
+      }
+      if (includeCentre) {
+        result.push(buildSlice(u, 'CENTRE', u.centre_institutions_map, u.centre_packets, u.centre_amount));
+      }
     });
 
     res.json(result);
@@ -891,16 +957,17 @@ router.post('/unit-pcda-submit', authenticateToken, authorizeRoles('UNIT', 'ADMI
     const db = await getDB();
     await ensureBillColumns(db);
     const unitId = req.user.role === 'UNIT' ? req.user.unit_id : req.body.unit_id;
-    const { month, submission_date, letter_ref, remarks, gross_amount, gst_tds_amount, it_tds_amount, total_deductions, net_credit_amount } = req.body;
+    const { month, submission_date, letter_ref, remarks, gross_amount, gst_tds_amount, it_tds_amount, total_deductions, net_credit_amount, funding_type } = req.body;
 
     if (!unitId || !month) {
       return res.status(400).json({ error: 'unit_id and month are required.' });
     }
 
+    const effectiveFunding = (funding_type === 'CENTRE' || funding_type === 'STATE') ? funding_type : 'STATE';
     const subDate = submission_date || new Date().toISOString().split('T')[0];
     const existing = await db.get(
-      'SELECT id, payment_status FROM unit_monthly_payments WHERE unit_id = ? AND month = ?',
-      [unitId, month]
+      'SELECT id, payment_status FROM unit_monthly_payments WHERE unit_id = ? AND month = ? AND funding_type = ?',
+      [unitId, month, effectiveFunding]
     );
 
     const gross = Number(gross_amount) || 0;
@@ -938,12 +1005,12 @@ router.post('/unit-pcda-submit', authenticateToken, authorizeRoles('UNIT', 'ADMI
     } else {
       await db.run(
         `INSERT INTO unit_monthly_payments (
-           unit_id, month, submitted_to_pcda, pcda_submission_date,
+           unit_id, month, funding_type, submitted_to_pcda, pcda_submission_date,
            pcda_letter_ref, gross_amount, gst_tds_amount, it_tds_amount,
            total_deductions, net_credit_amount, remarks, payment_status
-         ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'SUBMITTED_TO_PCDA')`,
+         ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'SUBMITTED_TO_PCDA')`,
         [
-          unitId, month, subDate, letter_ref || null,
+          unitId, month, effectiveFunding, subDate, letter_ref || null,
           gross, gstTds, itTds, totDeduct, netCredit, remarks || null
         ]
       );
@@ -951,7 +1018,7 @@ router.post('/unit-pcda-submit', authenticateToken, authorizeRoles('UNIT', 'ADMI
 
     res.json({
       success: true,
-      message: 'Monthly bill marked as submitted to PCDA successfully.'
+      message: `Monthly bill for ${effectiveFunding} FUND marked as submitted to PCDA successfully.`
     });
   } catch (error) {
     console.error('PCDA submit error:', error);
@@ -976,7 +1043,7 @@ router.post('/verify-vendor-credit', authenticateToken, authorizeRoles('ADMIN'),
     const {
       unit_id, month, paid_amount, payment_date, payment_mode,
       payment_ref, payment_advice_url, other_deductions, remarks,
-      gst_tds_amount, it_tds_amount, gross_amount
+      gst_tds_amount, it_tds_amount, gross_amount, funding_type
     } = req.body;
 
     if (!unit_id || !month) {
@@ -988,6 +1055,7 @@ router.post('/verify-vendor-credit', authenticateToken, authorizeRoles('ADMIN'),
       return res.status(404).json({ error: 'Unit not found.' });
     }
 
+    const effectiveFunding = (funding_type === 'CENTRE' || funding_type === 'STATE') ? funding_type : 'STATE';
     const gross = Number(gross_amount) || 0;
     const netAmount = Number(paid_amount) || 0;
     const otherDeduct = Number(other_deductions) || 0;
@@ -998,8 +1066,8 @@ router.post('/verify-vendor-credit', authenticateToken, authorizeRoles('ADMIN'),
     const pDate = payment_date || today;
 
     const existing = await db.get(
-      'SELECT id FROM unit_monthly_payments WHERE unit_id = ? AND month = ?',
-      [unit_id, month]
+      'SELECT id FROM unit_monthly_payments WHERE unit_id = ? AND month = ? AND funding_type = ?',
+      [unit_id, month, effectiveFunding]
     );
 
     if (existing) {
@@ -1033,13 +1101,13 @@ router.post('/verify-vendor-credit', authenticateToken, authorizeRoles('ADMIN'),
     } else {
       await db.run(
         `INSERT INTO unit_monthly_payments (
-           unit_id, month, payment_status, gross_amount, paid_amount, net_credit_amount,
+           unit_id, month, funding_type, payment_status, gross_amount, paid_amount, net_credit_amount,
            gst_tds_amount, it_tds_amount, other_deductions, total_deductions,
            payment_date, payment_mode, payment_ref, payment_advice_url,
            remarks, vendor_verified, vendor_verified_at, registered_by
-         ) VALUES (?, ?, 'PAID', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, ?)`,
+         ) VALUES (?, ?, ?, 'PAID', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, ?)`,
         [
-          unit_id, month, gross, netAmount, netAmount, gstTds, itTds, otherDeduct, totalDeduct,
+          unit_id, month, effectiveFunding, gross, netAmount, netAmount, gstTds, itTds, otherDeduct, totalDeduct,
           pDate, payment_mode || 'NEFT / RTGS (Bank Transfer)', payment_ref || null,
           payment_advice_url || null, remarks || null, req.user.id
         ]
@@ -1048,7 +1116,7 @@ router.post('/verify-vendor-credit', authenticateToken, authorizeRoles('ADMIN'),
 
     res.json({
       success: true,
-      message: `Bank credit confirmed for ${unit.unit_name} (${formatMonthLabel(month)}).`
+      message: `Bank credit confirmed for ${unit.unit_name} [${effectiveFunding} FUND] (${formatMonthLabel(month)}).`
     });
   } catch (error) {
     console.error('Verify credit error:', error);
@@ -1063,7 +1131,7 @@ router.post('/unit-payments', authenticateToken, authorizeRoles('ADMIN'), async 
     await ensureBillColumns(db);
     const {
       unit_id, month, payment_status, paid_amount,
-      payment_date, payment_mode, payment_ref, remarks
+      payment_date, payment_mode, payment_ref, remarks, funding_type
     } = req.body;
 
     if (!unit_id || !month) {
@@ -1075,14 +1143,15 @@ router.post('/unit-payments', authenticateToken, authorizeRoles('ADMIN'), async 
       return res.status(404).json({ error: 'Unit not found.' });
     }
 
+    const effectiveFunding = (funding_type === 'CENTRE' || funding_type === 'STATE') ? funding_type : 'STATE';
     const status = payment_status || 'PENDING';
     const amount = Number(paid_amount) || 0;
     const today = new Date().toISOString().split('T')[0];
     const pDate = status !== 'PENDING' ? (payment_date || today) : null;
 
     const existing = await db.get(
-      'SELECT id FROM unit_monthly_payments WHERE unit_id = ? AND month = ?',
-      [unit_id, month]
+      'SELECT id FROM unit_monthly_payments WHERE unit_id = ? AND month = ? AND funding_type = ?',
+      [unit_id, month, effectiveFunding]
     );
 
     if (existing) {
@@ -1106,23 +1175,27 @@ router.post('/unit-payments', authenticateToken, authorizeRoles('ADMIN'), async 
     } else {
       await db.run(
         `INSERT INTO unit_monthly_payments (
-           unit_id, month, payment_status, paid_amount, payment_date,
+           unit_id, month, funding_type, payment_status, paid_amount, payment_date,
            payment_mode, payment_ref, remarks, registered_by
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          unit_id, month, status, amount, pDate,
+          unit_id, month, effectiveFunding, status, amount, pDate,
           payment_mode || null, payment_ref || null, remarks || null, req.user.id
         ]
       );
     }
 
-    // Sync to all institutions under this unit for this month in refreshment_bills
+    // Sync to all institutions under this unit for this month in refreshment_bills matching this funding_type
     const instRows = await db.all(
-      `SELECT DISTINCT institution_id
-       FROM demands
-       WHERE is_deleted = 0
-         AND unit_id = ?
-         AND LEFT(demand_date, 7) = ?`,
+      `SELECT DISTINCT d.institution_id
+       FROM demands d
+       JOIN institutions i ON d.institution_id = i.id
+       WHERE d.is_deleted = 0
+         AND d.unit_id = ?
+         AND LEFT(d.demand_date, 7) = ?
+         AND COALESCE(i.institution_type, 'STATE') = ?`,
+      [unit_id, month, effectiveFunding]
+    );
       [unit_id, month]
     );
 
