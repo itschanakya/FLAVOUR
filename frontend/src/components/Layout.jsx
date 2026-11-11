@@ -572,6 +572,14 @@ export default function Layout({ children }) {
                 <h1 className="font-extrabold text-xs sm:text-[13px] 2xl:text-base tracking-tight text-slate-900 leading-none whitespace-nowrap">
                   NCC REFRESHMENT SYSTEM
                 </h1>
+                {role === 'UNIT' && (
+                  <span
+                    className="text-[10px] sm:text-[11px] 2xl:text-xs font-black tracking-wide text-blue-700 uppercase leading-tight mt-0.5 truncate max-w-[190px] sm:max-w-[320px]"
+                    title={user?.unit_name || consoleMeta.subTitle || '2 DELHI ARTY BTY NCC'}
+                  >
+                    {user?.unit_name || consoleMeta.subTitle || '2 DELHI ARTY BTY NCC'}
+                  </span>
+                )}
               </div>
             </div>
 
