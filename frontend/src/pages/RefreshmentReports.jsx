@@ -393,6 +393,7 @@ export default function RefreshmentReports({ defaultTab }) {
     const isAdmin = user?.role === 'ADMIN';
     const groupBy = 'UNIT';
     const [unitFilter, setUnitFilter] = useState('All');
+    const [fundingFilter, setFundingFilter] = useState('ALL'); // ALL | STATE | CENTRE
     const [searchQuery, setSearchQuery] = useState('');
 
     const [showInvoiceGenerator, setShowInvoiceGenerator] = useState(false);
@@ -461,11 +462,13 @@ export default function RefreshmentReports({ defaultTab }) {
       return Array.from(new Set(demands.map(d => d.unit_name).filter(Boolean))).sort();
     }, [demands]);
 
-    // Active filtered demands (by Unit, Group and Search)
+    // Active filtered demands (by Unit, Group, Funding Aspect and Search)
     const filteredDemands = useMemo(() => {
       return demands.filter(d => {
         if (selectedGroup !== 'All' && d.ncc_group !== selectedGroup) return false;
         if (unitFilter !== 'All' && availableUnits.includes(unitFilter) && d.unit_name !== unitFilter) return false;
+        const currentInstType = institutionsMap[d.institution_id]?.institution_type || d.institution_type || 'STATE';
+        if (fundingFilter !== 'ALL' && currentInstType !== fundingFilter) return false;
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const mInst = d.institution_name?.toLowerCase().includes(q);
@@ -480,7 +483,7 @@ export default function RefreshmentReports({ defaultTab }) {
         }
         return true;
       });
-    }, [demands, selectedGroup, unitFilter, searchQuery, invoiceNos]);
+    }, [demands, selectedGroup, unitFilter, fundingFilter, searchQuery, invoiceNos, institutionsMap]);
 
     const totalDemandsCount = filteredDemands.length;
     const totalPacketsCount = filteredDemands.reduce((s, d) => s + (Number(d.total_quantity) || 0), 0);
@@ -807,7 +810,7 @@ export default function RefreshmentReports({ defaultTab }) {
       }, 10);
     };
 
-    const isFiltered = unitFilter !== 'All' || searchQuery !== '';
+    const isFiltered = unitFilter !== 'All' || fundingFilter !== 'ALL' || searchQuery !== '';
 
     return (
       <div className="space-y-6 animate-in fade-in duration-500 w-full">
@@ -1012,7 +1015,58 @@ export default function RefreshmentReports({ defaultTab }) {
             </div>
           )}
 
-          {/* Row 2: Unit Filter & Search */}
+          {/* Quick Funding Mode Tabs (Separate documentation modes) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Documentation Mode:</span>
+              <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl gap-1">
+                <button
+                  type="button"
+                  onClick={() => setFundingFilter('ALL')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    fundingFilter === 'ALL'
+                      ? 'bg-white text-slate-900 shadow-2xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All Modes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFundingFilter('STATE')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    fundingFilter === 'STATE'
+                      ? 'bg-emerald-600 text-white shadow-2xs font-black'
+                      : 'text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                >
+                  <span>🏢 State Funded</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFundingFilter('CENTRE')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    fundingFilter === 'CENTRE'
+                      ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                      : 'text-indigo-700 hover:bg-indigo-50'
+                  }`}
+                >
+                  <span>🏛️ Centre Funded</span>
+                </button>
+              </div>
+            </div>
+            {fundingFilter !== 'ALL' && (
+              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${
+                fundingFilter === 'CENTRE'
+                  ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              }`}>
+                {fundingFilter === 'CENTRE' ? '🏛️ Army Public School / Sainik School Mode' : '🏢 State Govt & Regular Vacancy Mode'}
+              </span>
+            )}
+          </div>
+
+          {/* Row 2: Unit Filter, Funding Aspect & Search */}
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 pt-1">
             {/* Unit Indicator Badge */}
             <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-3.5 py-1.5 rounded-xl text-xs font-black text-blue-800 uppercase tracking-wider shrink-0 shadow-xs">
@@ -1021,7 +1075,7 @@ export default function RefreshmentReports({ defaultTab }) {
             </div>
 
             {/* Unit Filter Dropdown */}
-            <div className="flex-1 min-w-[200px]">
+            <div className="flex-1 min-w-[180px]">
               <select
                 value={unitFilter}
                 onChange={(e) => setUnitFilter(e.target.value)}
@@ -1034,8 +1088,22 @@ export default function RefreshmentReports({ defaultTab }) {
               </select>
             </div>
 
+            {/* Funding Aspect Dropdown */}
+            <div className="w-40 shrink-0">
+              <select
+                value={fundingFilter}
+                onChange={(e) => setFundingFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 transition-colors shadow-xs cursor-pointer"
+                title="Funding Aspect Filter"
+              >
+                <option value="ALL">🌐 All Modes</option>
+                <option value="STATE">🏢 State Funded</option>
+                <option value="CENTRE">🏛️ Centre Funded</option>
+              </select>
+            </div>
+
             {/* Search Input */}
-            <div className="flex-1 min-w-[220px] relative">
+            <div className="flex-1 min-w-[200px] relative">
               <input
                 type="text"
                 placeholder="Search Institution, Demand Ref, Invoice No, Item..."
@@ -1094,9 +1162,10 @@ export default function RefreshmentReports({ defaultTab }) {
               headerUnitName = user.unit_name;
             }
 
-            const sectionTitleText = `MONTHLY REFRESHMENT SUMMARY - UNIT : ${headerUnitName.toUpperCase()}`;
+            const fundLabel = fundingFilter !== 'ALL' ? (fundingFilter === 'CENTRE' ? 'CENTRE FUND' : 'STATE FUND') : '';
+            const sectionTitleText = `MONTHLY REFRESHMENT SUMMARY - UNIT : ${headerUnitName.toUpperCase()}${fundLabel ? ` (${fundLabel})` : ''}`;
             const monthMeta = groupBy === 'MONTH' ? `MONTH : ${sec.key.toUpperCase()} • ` : '';
-            const extraMetaText = `${monthMeta}TOTAL ENTRIES: ${sec.items.length}`;
+            const extraMetaText = `${monthMeta}TOTAL ENTRIES: ${sec.items.length}${fundingFilter !== 'ALL' ? ` • FUND: ${fundingFilter}` : ''}`;
 
             return (
               <div 
@@ -1187,7 +1256,18 @@ export default function RefreshmentReports({ defaultTab }) {
                             <td className="px-3 py-3 font-mono font-medium text-blue-700 print:text-black whitespace-nowrap border border-slate-200 print:border-black">{row.demand_number || '-'}</td>
                             <td className="px-3 py-3 font-normal text-slate-700 print:text-black whitespace-nowrap border border-slate-200 print:border-black">{row.unit_name || '-'}</td>
                             <td className="px-3 py-3 print:text-black border border-slate-200 print:border-black min-w-[200px]">
-                              <div className="font-normal text-slate-800 uppercase">{row.institution_name}</div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-normal text-slate-800 uppercase">{row.institution_name}</span>
+                                {((institutionsMap[row.institution_id]?.institution_type || row.institution_type) === 'CENTRE') ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-indigo-50 text-indigo-800 border border-indigo-200 print:border-black print:text-black inline-flex items-center gap-0.5">
+                                    🏛️ CENTRE
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 print:border-black print:text-black inline-flex items-center gap-0.5">
+                                    🏢 STATE
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] font-normal text-slate-500 leading-tight mt-0.5">
                                 {addressText}
                               </div>
@@ -2423,6 +2503,7 @@ export default function RefreshmentReports({ defaultTab }) {
     const [expandedUnitIds, setExpandedUnitIds] = useState(new Set());
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | PENDING | SUBMITTED | PAID
+    const [fundingFilter, setFundingFilter] = useState('ALL'); // ALL | STATE | CENTRE
     const [savingAction, setSavingAction] = useState(false);
     const [uploadingAdvice, setUploadingAdvice] = useState(false);
 
@@ -2615,9 +2696,32 @@ export default function RefreshmentReports({ defaultTab }) {
       }
     };
 
-    // Filter by search query & payment status
+    // Filter by search query, funding aspect & payment status
     const filteredUnitPayments = useMemo(() => {
-      return (unitPayments || []).filter(u => {
+      return (unitPayments || []).map(u => {
+        if (fundingFilter !== 'ALL') {
+          const matchingInsts = (u.institutions || []).filter(inst => {
+            const t = inst.institution_type || 'STATE';
+            return t === fundingFilter;
+          });
+          if (matchingInsts.length === 0) return null;
+
+          const gross = matchingInsts.reduce((s, i) => s + (Number(i.total_amount) || 0), 0);
+          const totalPkts = matchingInsts.reduce((s, i) => s + (Number(i.total_packets) || 0), 0);
+          const demandsCount = matchingInsts.reduce((s, i) => s + (Number(i.demand_count) || (i.demands?.length || 0)), 0);
+
+          return {
+            ...u,
+            institutions: matchingInsts,
+            institutions_count: matchingInsts.length,
+            total_amount: gross,
+            gross_amount: gross,
+            total_packets: totalPkts,
+            total_demands: demandsCount
+          };
+        }
+        return u;
+      }).filter(Boolean).filter(u => {
         // Group filter
         if (selectedGroup !== 'All' && u.ncc_group !== selectedGroup) return false;
         
@@ -2642,7 +2746,7 @@ export default function RefreshmentReports({ defaultTab }) {
 
         return true;
       });
-    }, [unitPayments, selectedGroup, statusFilter, searchQuery]);
+    }, [unitPayments, selectedGroup, statusFilter, searchQuery, fundingFilter]);
 
     // Overall summary metrics including statutory TDS (accurately computed for all units)
     const summary = useMemo(() => {
@@ -2957,7 +3061,8 @@ export default function RefreshmentReports({ defaultTab }) {
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, `Unit_Billing_${month}`);
-      XLSX.writeFile(wb, `NCC_Unit_Monthly_Billing_${month}.xlsx`);
+      const safeFundingStr = fundingFilter === 'ALL' ? '' : `_${fundingFilter}`;
+      XLSX.writeFile(wb, `NCC_Unit_Monthly_Billing_${month}${safeFundingStr}.xlsx`);
       toast.success('Unit monthly billing exported to Excel!');
     };
 
@@ -3125,6 +3230,57 @@ export default function RefreshmentReports({ defaultTab }) {
             </div>
           </div>
 
+          {/* Quick Funding Mode Tabs (Separate documentation modes) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Documentation Mode:</span>
+              <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl gap-1">
+                <button
+                  type="button"
+                  onClick={() => setFundingFilter('ALL')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    fundingFilter === 'ALL'
+                      ? 'bg-white text-slate-900 shadow-2xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All Modes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFundingFilter('STATE')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    fundingFilter === 'STATE'
+                      ? 'bg-emerald-600 text-white shadow-2xs font-black'
+                      : 'text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                >
+                  <span>🏢 State Funded</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFundingFilter('CENTRE')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    fundingFilter === 'CENTRE'
+                      ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                      : 'text-indigo-700 hover:bg-indigo-50'
+                  }`}
+                >
+                  <span>🏛️ Centre Funded</span>
+                </button>
+              </div>
+            </div>
+            {fundingFilter !== 'ALL' && (
+              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${
+                fundingFilter === 'CENTRE'
+                  ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              }`}>
+                {fundingFilter === 'CENTRE' ? '🏛️ Army Public School / Sainik School Mode' : '🏢 State Govt & Regular Vacancy Mode'}
+              </span>
+            )}
+          </div>
+
           {/* Slicers & Search Controls */}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
             {/* Payment Status Tabs */}
@@ -3150,9 +3306,22 @@ export default function RefreshmentReports({ defaultTab }) {
               ))}
             </div>
 
-            {/* Search Box & Expand All Button */}
-            <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
-              <div className="relative flex-1 min-w-[180px]">
+            {/* Funding Aspect Dropdown, Search Box & Expand All Button */}
+            <div className="flex items-center gap-2 flex-1 max-w-lg justify-end">
+              <div className="w-36 shrink-0">
+                <select
+                  value={fundingFilter}
+                  onChange={(e) => setFundingFilter(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 transition-colors shadow-2xs cursor-pointer"
+                  title="Funding Aspect Filter"
+                >
+                  <option value="ALL">🌐 All Modes</option>
+                  <option value="STATE">🏢 State Funded</option>
+                  <option value="CENTRE">🏛️ Centre Funded</option>
+                </select>
+              </div>
+
+              <div className="relative flex-1 min-w-[160px]">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -3245,9 +3414,9 @@ export default function RefreshmentReports({ defaultTab }) {
         {/* ═══ Unitwise Monthly Master Table ═══ */}
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden print:border-none print:shadow-none">
           <PrintHeader
-            title="UNITWISE MONTHLY REFRESHMENT BILL SUBMISSION & PAYMENT TRACKER"
+            title={`UNITWISE MONTHLY REFRESHMENT BILL SUBMISSION & PAYMENT TRACKER${fundingFilter !== 'ALL' ? ` (${fundingFilter === 'CENTRE' ? 'CENTRE FUND' : 'STATE FUND'})` : ''}`}
             period={`MONTH: ${formatMonthLabel(month)} | NCC GROUP: ${selectedGroup === 'All' ? 'ALL GROUPS' : selectedGroup}`}
-            extraMeta={`TOTAL UNITS: ${summary.unitsCount} | TOTAL PACKETS: ${summary.totalPkts.toLocaleString('en-IN')}`}
+            extraMeta={`TOTAL UNITS: ${summary.unitsCount} | TOTAL PACKETS: ${summary.totalPkts.toLocaleString('en-IN')}${fundingFilter !== 'ALL' ? ` | FUND: ${fundingFilter}` : ''}`}
           />
           
           {loadingUnits ? (
@@ -4009,6 +4178,7 @@ export default function RefreshmentReports({ defaultTab }) {
     const isAdmin = user?.role === 'ADMIN';
     const [unitFilterId, setUnitFilterId] = useState('ALL');
     const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | BALANCE | RECEIVED
+    const [fundingFilter, setFundingFilter] = useState('ALL'); // ALL | STATE | CENTRE
     const [searchQuery, setSearchQuery] = useState('');
     const [apiBillMap, setApiBillMap] = useState({});
     const [loadingReturns, setLoadingReturns] = useState(false);
@@ -4207,6 +4377,7 @@ export default function RefreshmentReports({ defaultTab }) {
           grouped[instId] = {
             institution_id: instId,
             institution_name: d.institution_name || instInfo.institution_name || 'Institution',
+            institution_type: instInfo.institution_type || d.institution_type || 'STATE',
             ano_cto_name: d.ano_cto_name || instInfo.ano_cto_name || 'ANO Incharge',
             ano_cto_contact: instInfo.ano_cto_contact || '',
             ano_email: billOverlay.ano_email || instInfo.ano_email || '',
@@ -4389,6 +4560,7 @@ export default function RefreshmentReports({ defaultTab }) {
 
     const filteredRows = rows.filter(r => {
       if (selectedGroup !== 'All' && r.ncc_group !== selectedGroup) return false;
+      if (fundingFilter !== 'ALL' && (r.institution_type || 'STATE') !== fundingFilter) return false;
       if (statusFilter === 'BALANCE' && r.bill_submitted === 1) return false;
       if (statusFilter === 'RECEIVED' && r.bill_submitted !== 1) return false;
       if (statusFilter === 'REMINDED' && !(Number(r.reminder_count || 0) > 0)) return false;
@@ -4404,19 +4576,70 @@ export default function RefreshmentReports({ defaultTab }) {
       return true;
     });
 
-    const totalInstCount = rows.length;
-    const receivedList = rows.filter(r => r.bill_submitted === 1);
-    const balanceList = rows.filter(r => r.bill_submitted === 0);
-    const remindedList = rows.filter(r => Number(r.reminder_count || 0) > 0);
+    const totalInstCount = filteredRows.length;
+    const receivedList = filteredRows.filter(r => r.bill_submitted === 1);
+    const balanceList = filteredRows.filter(r => r.bill_submitted === 0);
+    const remindedList = filteredRows.filter(r => Number(r.reminder_count || 0) > 0);
     const receivedAmt = receivedList.reduce((s, r) => s + Number(r.total_amount || 0), 0);
     const balanceAmt = balanceList.reduce((s, r) => s + Number(r.total_amount || 0), 0);
-    const totalRemindersSent = rows.reduce((s, r) => s + Number(r.reminder_count || 0), 0);
+    const totalRemindersSent = filteredRows.reduce((s, r) => s + Number(r.reminder_count || 0), 0);
 
     const monthDateObj = month ? new Date(month + '-01') : new Date();
     const monthDisplayStr = monthDateObj.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }).toUpperCase();
 
     return (
       <div className="space-y-3 animate-in fade-in duration-300 w-full">
+        {/* Quick Funding Mode Tabs (Separate documentation modes) */}
+        <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs print:hidden flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Documentation Mode:</span>
+            <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl gap-1">
+              <button
+                type="button"
+                onClick={() => setFundingFilter('ALL')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  fundingFilter === 'ALL'
+                    ? 'bg-white text-slate-900 shadow-2xs font-black'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                All Modes
+              </button>
+              <button
+                type="button"
+                onClick={() => setFundingFilter('STATE')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  fundingFilter === 'STATE'
+                    ? 'bg-emerald-600 text-white shadow-2xs font-black'
+                    : 'text-emerald-700 hover:bg-emerald-50'
+                }`}
+              >
+                <span>🏢 State Funded</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFundingFilter('CENTRE')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  fundingFilter === 'CENTRE'
+                    ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                    : 'text-indigo-700 hover:bg-indigo-50'
+                }`}
+              >
+                <span>🏛️ Centre Funded</span>
+              </button>
+            </div>
+          </div>
+          {fundingFilter !== 'ALL' && (
+            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${
+              fundingFilter === 'CENTRE'
+                ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            }`}>
+              {fundingFilter === 'CENTRE' ? '🏛️ Army Public School / Sainik School Mode' : '🏢 State Govt & Regular Vacancy Mode'}
+            </span>
+          )}
+        </div>
+
         {/* Clean White Compact Control Bar */}
         <div className="bg-white p-2.5 sm:px-3.5 sm:py-2.5 rounded-xl border border-slate-200 shadow-xs print:hidden flex flex-wrap items-center justify-between gap-2">
           {/* Left: Filters */}
@@ -4445,6 +4668,17 @@ export default function RefreshmentReports({ defaultTab }) {
                 ))}
               </select>
             )}
+
+            <select
+              value={fundingFilter}
+              onChange={e => setFundingFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer max-w-[140px]"
+              title="Funding Aspect Filter"
+            >
+              <option value="ALL">🌐 All Modes</option>
+              <option value="STATE">🏢 State Funded</option>
+              <option value="CENTRE">🏛️ Centre Funded</option>
+            </select>
 
             <div className="relative flex-1 min-w-[190px] max-w-[300px]">
               <Search size={13} className="text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -4563,9 +4797,9 @@ export default function RefreshmentReports({ defaultTab }) {
         {/* Report Canvas & Printable Table Container */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm print:shadow-none print:border-none print:bg-white print:overflow-visible print:w-full">
           <PrintHeader
-            title="MONTHLY COUNTERSIGNED BILL SUBMISSION & BALANCE REGISTER"
+            title={`MONTHLY COUNTERSIGNED BILL SUBMISSION & BALANCE REGISTER${fundingFilter !== 'ALL' ? ` (${fundingFilter === 'CENTRE' ? 'CENTRE FUND' : 'STATE FUND'})` : ''}`}
             period={`MONTH : ${monthDisplayStr}`}
-            extraMeta={`TOTAL INSTITUTIONS: ${filteredRows.length} • RECEIVED: ${receivedList.length} • BALANCE: ${balanceList.length}`}
+            extraMeta={`TOTAL INSTITUTIONS: ${filteredRows.length} • RECEIVED: ${receivedList.length} • BALANCE: ${balanceList.length}${fundingFilter !== 'ALL' ? ` • FUND: ${fundingFilter}` : ''}`}
           />
 
           <div className="overflow-x-auto print:overflow-visible print:w-full">
@@ -4622,9 +4856,20 @@ export default function RefreshmentReports({ defaultTab }) {
                           {/* INSTITUTION */}
                           <td className="px-3.5 py-2.5 border border-slate-200 print:border-black">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-slate-900 print:text-black uppercase text-xs tracking-tight">
-                                {row.institution_name}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-slate-900 print:text-black uppercase text-xs tracking-tight">
+                                  {row.institution_name}
+                                </span>
+                                {row.institution_type === 'CENTRE' ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-indigo-50 text-indigo-800 border border-indigo-200 print:border-black print:text-black inline-flex items-center gap-0.5">
+                                    🏛️ CENTRE
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 print:border-black print:text-black inline-flex items-center gap-0.5">
+                                    🏢 STATE
+                                  </span>
+                                )}
+                              </div>
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold shrink-0 print:hidden ${
                                 isExpanded
                                   ? 'bg-blue-600 text-white'
