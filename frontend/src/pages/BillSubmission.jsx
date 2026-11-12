@@ -94,6 +94,9 @@ export default function BillSubmission() {
                 <AlertTriangle className="w-5 h-5" />
               </span>
               <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 block">
+                  GENTLE REMINDER
+                </span>
                 <h2 className="text-sm sm:text-base font-black text-rose-900 uppercase tracking-tight">
                   Balance Refreshment Bill Submission (Pending at NCC Unit)
                 </h2>

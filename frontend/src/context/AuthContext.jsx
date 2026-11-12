@@ -80,6 +80,9 @@ export function AuthProvider({ children }) {
     sessionStorage.setItem('ncc_token', data.token);
     try {
       sessionStorage.setItem('ncc_user', JSON.stringify(data.user));
+      if (data.user?.id) {
+        sessionStorage.removeItem(`ano_bill_popup_ack_${data.user.id}`);
+      }
     } catch (e) {}
     setToken(data.token);
     setUser(data.user);
@@ -121,6 +124,9 @@ export function AuthProvider({ children }) {
     sessionStorage.setItem('ncc_token', data.token);
     try {
       sessionStorage.setItem('ncc_user', JSON.stringify(data.user));
+      if (data.user?.id) {
+        sessionStorage.removeItem(`ano_bill_popup_ack_${data.user.id}`);
+      }
     } catch (e) {}
     setToken(data.token);
     setUser(data.user);

@@ -516,7 +516,7 @@ router.get('/my-pending-returns', authenticateToken, async (req, res) => {
     }
     const instId = req.user.institution_id;
 
-    // Find all distinct months where this institution has valid demands (not cancelled/rejected/pending)
+    // Find all distinct months where this institution has valid demands (not cancelled/rejected)
     const monthsRows = await db.all(
       `SELECT DISTINCT LEFT(d.demand_date, 7) as month
        FROM demands d
@@ -530,11 +530,23 @@ router.get('/my-pending-returns', authenticateToken, async (req, res) => {
     const currentYM = getCurrentISTYearMonth();
     const pendingList = [];
     for (const r of monthsRows) {
-      if (!r.month || String(r.month) >= currentYM) continue;
+      if (!r.month) continue;
       const monthData = await buildMonthInstitutionBillData(db, r.month, 'ALL');
       const myRecord = monthData.find(x => String(x.institution_id) === String(instId));
       if (myRecord && myRecord.bill_submitted === 0 && myRecord.total_packets > 0) {
-        pendingList.push(myRecord);
+        // 1. All past calendar months where physical bill has not been received at unit
+        if (String(r.month) < currentYM) {
+          pendingList.push(myRecord);
+        }
+        // 2. Or current running month if at least one demand was already delivered
+        else if (String(r.month) === currentYM) {
+          const hasDelivered = (myRecord.demands || []).some(
+            d => d.delivery_status === 'DELIVERED' || d.status === 'DELIVERED'
+          );
+          if (hasDelivered) {
+            pendingList.push(myRecord);
+          }
+        }
       }
     }
 
@@ -545,7 +557,7 @@ router.get('/my-pending-returns', authenticateToken, async (req, res) => {
   }
 });
 
-// ANO balance-bill popup toggle, controlled per NCC Unit from the Unit portal's App Settings (OFF by default)
+// ANO balance-bill popup toggle, controlled per NCC Unit or globally (OFF by default)
 const anoPopupKey = (unitId) => `ano_balance_popup_enabled_unit_${unitId}`;
 async function ensureAppSettingsTable(db) {
   await db.run(`CREATE TABLE IF NOT EXISTS app_settings (
@@ -556,10 +568,15 @@ async function ensureAppSettingsTable(db) {
 }
 async function isAnoPopupEnabled(db, unitId) {
   try {
-    if (!unitId) return false;
     await ensureAppSettingsTable(db);
-    const row = await db.get('SELECT setting_value FROM app_settings WHERE setting_key = ?', [anoPopupKey(unitId)]);
-    return row ? String(row.setting_value) === 'true' : false;
+    if (unitId) {
+      const row = await db.get('SELECT setting_value FROM app_settings WHERE setting_key = ?', [anoPopupKey(unitId)]);
+      if (row && row.setting_value !== undefined && row.setting_value !== null) {
+        return String(row.setting_value) === 'true';
+      }
+    }
+    const globalRow = await db.get("SELECT setting_value FROM app_settings WHERE setting_key = 'ano_balance_popup_enabled_global'");
+    return globalRow ? String(globalRow.setting_value) === 'true' : false;
   } catch (e) {
     return false;
   }
@@ -581,11 +598,8 @@ router.put('/ano-popup-setting', authenticateToken, authorizeRoles('ADMIN', 'UNI
   try {
     const db = await getDB();
     const unitId = req.user.role === 'UNIT' ? req.user.unit_id : req.body.unit_id;
-    if (!unitId) {
-      return res.status(400).json({ error: 'unit_id is required.' });
-    }
     await ensureAppSettingsTable(db);
-    const key = anoPopupKey(unitId);
+    const key = unitId ? anoPopupKey(unitId) : 'ano_balance_popup_enabled_global';
     const value = req.body.enabled ? 'true' : 'false';
     const existing = await db.get('SELECT setting_key FROM app_settings WHERE setting_key = ?', [key]);
     if (existing) {

@@ -729,7 +729,7 @@ export default function Layout({ children }) {
             <div className="bg-gradient-to-r from-rose-700 via-red-600 to-rose-700 px-5 py-3.5 text-white flex items-center justify-between">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-widest text-rose-100">
-                  URGENT MILITARY NOTICE • ACTION REQUIRED
+                  GENTLE REMINDER
                 </div>
                 <h3 className="text-sm sm:text-base font-black uppercase tracking-tight mt-0.5">
                   Balance Refreshment Bill Submission
