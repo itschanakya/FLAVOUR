@@ -10,7 +10,9 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const db = await getDB();
     let query = `
-      SELECT i.*, u.unit_name, u.unit_code, u.ncc_group,
+      SELECT i.*, 
+        UPPER(i.institution_name) as institution_name,
+        u.unit_name, u.unit_code, u.ncc_group,
         u.demand_cutoff_day, u.demand_cutoff_time, u.demand_cutoff_notice, u.demand_cutoff_enabled,
         usr.email as ano_email,
         usr.login_id as login_id
@@ -164,10 +166,11 @@ router.post('/bulk', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (
   }
 });
 
-// POST /api/institutions - NCC Unit adds institution under it + creates ANO/CTO login + sets strength
-router.post('/', authenticateToken, authorizeRoles('UNIT'), async (req, res) => {
+// POST /api/institutions - NCC Unit or Admin adds institution under a unit + creates ANO/CTO login + sets strength
+router.post('/', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (req, res) => {
   try {
     const {
+      unit_id: reqUnitId,
       institution_name,
       ano_cto_name,
       ano_cto_contact,
@@ -187,9 +190,9 @@ router.post('/', authenticateToken, authorizeRoles('UNIT'), async (req, res) => 
     }
 
     const upperInstName = institution_name.toString().trim().toUpperCase();
-    const unit_id = req.user.unit_id;
+    const unit_id = req.user.role === 'ADMIN' ? (reqUnitId || req.user.unit_id) : req.user.unit_id;
     if (!unit_id) {
-      return res.status(400).json({ error: 'User is not assigned to a valid NCC Unit.' });
+      return res.status(400).json({ error: 'Valid NCC Unit selection is required.' });
     }
 
     const db = await getDB();

@@ -164,7 +164,7 @@ export default function Distribution() {
   const toggleLock = (stopId) => {
     setLockedStopIds(prev => {
       const next = prev.includes(stopId) ? prev.filter(x => x !== stopId) : [...prev, stopId];
-      try { localStorage.setItem('locked_delivery_stops', JSON.stringify(next)); } catch (e) {}
+      try { localStorage.setItem('locked_delivery_stops', JSON.stringify(next)); } catch (e) { }
       return next;
     });
   };
@@ -457,7 +457,7 @@ export default function Distribution() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ sequences })
       });
-      if (!res.ok) { let m = 'Failed to save order'; try { const j = await res.json(); if (j && j.error) m = j.error; } catch(e){} throw new Error(m); }
+      if (!res.ok) { let m = 'Failed to save order'; try { const j = await res.json(); if (j && j.error) m = j.error; } catch (e) { } throw new Error(m); }
     } catch (err) {
       alert(err.message);
       fetchData();
@@ -1063,13 +1063,13 @@ export default function Distribution() {
             </thead>
             <tbody>
               ${stops.map((s, idx) => {
-                const pkts = Number(s.total_quantity) || 0;
-                const addr = s.complete_address ? `<div class="inst-addr">${s.complete_address}</div>` : '';
-                const anoName = s.ano_cto_name ? `<div class="contact-name">${s.ano_cto_name}</div>` : '<div class="contact-name">ANO / Caretaker</div>';
-                const anoPhone = s.ano_cto_contact ? `<div class="contact-phone">Tel: ${s.ano_cto_contact}</div>` : '';
-                const unitBadge = s.unit_code || s.unit_name || '—';
-                const whDist = s.wh_distance_km ? `<div class="wh-tag">${s.wh_distance_km} km from depot</div>` : '';
-                return `
+      const pkts = Number(s.total_quantity) || 0;
+      const addr = s.complete_address ? `<div class="inst-addr">${s.complete_address}</div>` : '';
+      const anoName = s.ano_cto_name ? `<div class="contact-name">${s.ano_cto_name}</div>` : '<div class="contact-name">ANO / Caretaker</div>';
+      const anoPhone = s.ano_cto_contact ? `<div class="contact-phone">Tel: ${s.ano_cto_contact}</div>` : '';
+      const unitBadge = s.unit_code || s.unit_name || '—';
+      const whDist = s.wh_distance_km ? `<div class="wh-tag">${s.wh_distance_km} km from depot</div>` : '';
+      return `
                   <tr>
                     <td class="seq-cell">${idx + 1}</td>
                     <td>
@@ -1093,7 +1093,7 @@ export default function Distribution() {
                     </td>
                   </tr>
                 `;
-              }).join('')}
+    }).join('')}
               <tr class="total-row">
                 <td colspan="5" style="text-align: right; padding-right: 10px; font-weight: 900;">
                   TOTAL REFRESHMENT LOAD (${stops.length} STOPS):
@@ -1181,7 +1181,7 @@ export default function Distribution() {
           const doc = printWindow.document;
           const btn = doc ? doc.getElementById('printManifestBtn') : null;
           if (btn) {
-            btn.onclick = function() {
+            btn.onclick = function () {
               try {
                 printWindow.focus();
                 printWindow.print();
@@ -1189,7 +1189,7 @@ export default function Distribution() {
                 console.error(err);
               }
             };
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function () {
               try {
                 printWindow.focus();
                 printWindow.print();
@@ -1318,9 +1318,8 @@ export default function Distribution() {
           <button
             key={m.key}
             onClick={() => setMode(m.key)}
-            className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${
-              mode === m.key ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${mode === m.key ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
           >
             {m.label}
           </button>
@@ -1357,22 +1356,20 @@ export default function Distribution() {
           <button
             type="button"
             onClick={() => setSelectedDate(localToday())}
-            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              selectedDate === localToday()
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${selectedDate === localToday()
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
+              }`}
           >
             Today
           </button>
           <button
             type="button"
             onClick={() => setSelectedDate(localTomorrow())}
-            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              selectedDate === localTomorrow()
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${selectedDate === localTomorrow()
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-            }`}
+              }`}
           >
             Tomorrow
           </button>
@@ -1391,11 +1388,10 @@ export default function Distribution() {
               <button
                 key={dy.date}
                 onClick={() => setSelectedDate(dy.date)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-black whitespace-nowrap border transition-all cursor-pointer ${
-                  selectedDate === dy.date
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-black whitespace-nowrap border transition-all cursor-pointer ${selectedDate === dy.date
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 {fmtDate(dy.date)} ({dy.stops} • {dy.packets} Pkts)
               </button>
@@ -1501,11 +1497,10 @@ export default function Distribution() {
                         type="button"
                         onClick={() => optimizeCarRoute(partner, null, !cfg.schoolTimeAware)}
                         disabled={isOptimizing}
-                        className={`px-1.5 py-0.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
-                          cfg.schoolTimeAware
+                        className={`px-1.5 py-0.5 rounded-lg text-[10px] font-bold border cursor-pointer ${cfg.schoolTimeAware
                             ? 'bg-amber-100 text-amber-900 border-amber-300'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                        }`}
+                          }`}
                         title="Toggle School Time Priority"
                       >
                         🕒 School Time {cfg.schoolTimeAware ? 'ON' : 'OFF'}
@@ -1553,13 +1548,12 @@ export default function Distribution() {
                       return (
                         <div
                           key={s.id}
-                          className={`p-2.5 rounded-xl border bg-white flex items-center gap-2 transition-all ${
-                            selectedIds.includes(s.id)
+                          className={`p-2.5 rounded-xl border bg-white flex items-center gap-2 transition-all ${selectedIds.includes(s.id)
                               ? 'border-blue-400 ring-2 ring-blue-100'
                               : isLocked
-                              ? 'border-indigo-200 bg-indigo-50/20'
-                              : 'border-slate-200'
-                          }`}
+                                ? 'border-indigo-200 bg-indigo-50/20'
+                                : 'border-slate-200'
+                            }`}
                         >
                           {/* Selection Checkbox */}
                           <button
@@ -1574,13 +1568,12 @@ export default function Distribution() {
 
                           {/* Stop Number Badge */}
                           <span
-                            className={`w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${
-                              st === 'DELIVERED'
+                            className={`w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${st === 'DELIVERED'
                                 ? 'bg-emerald-600 text-white'
                                 : i === 0
-                                ? 'bg-indigo-600 text-white ring-2 ring-indigo-200'
-                                : 'bg-slate-800 text-white'
-                            }`}
+                                  ? 'bg-indigo-600 text-white ring-2 ring-indigo-200'
+                                  : 'bg-slate-800 text-white'
+                              }`}
                             title={i === 0 ? 'Stop #1: Nearest to Depot' : `Stop #${i + 1}`}
                           >
                             {st === 'DELIVERED' ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
@@ -1650,11 +1643,10 @@ export default function Distribution() {
                           <button
                             type="button"
                             onClick={() => toggleLock(s.id)}
-                            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                              isLocked
+                            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${isLocked
                                 ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
                                 : 'bg-slate-50 text-slate-400 hover:text-slate-600 border-slate-200'
-                            }`}
+                              }`}
                             title={isLocked ? 'Stop is LOCKED (Auto-Plan will not move it)' : 'Click to LOCK this stop'}
                           >
                             {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}

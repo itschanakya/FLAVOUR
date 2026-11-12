@@ -1,5 +1,4 @@
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+require('dotenv').config();
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
@@ -185,42 +184,6 @@ async function upgradeInventorySchema(db) {
     await db.run("UPDATE refreshment_items SET expiry_date = NULL WHERE item_name = 'Standard Refreshment Packet'");
     await syncStandardPacketPrice(db);
   } catch (e) { }
-
-  // Self-healing migration: Ensure all institution names and unit names are strictly UPPERCASE
-  try {
-    await db.run("UPDATE institutions SET institution_name = UPPER(TRIM(institution_name)) WHERE institution_name IS NOT NULL AND institution_name != UPPER(TRIM(institution_name))");
-  } catch (_) { }
-  try {
-    await db.run("UPDATE units SET unit_name = UPPER(TRIM(unit_name)) WHERE unit_name IS NOT NULL AND unit_name != UPPER(TRIM(unit_name))");
-  } catch (_) { }
-
-  // Ensure app_settings table exists
-  try {
-    await db.run(`
-      CREATE TABLE IF NOT EXISTS app_settings (
-        setting_key VARCHAR(255) PRIMARY KEY,
-        setting_value TEXT NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `);
-  } catch (err) { }
-
-  // Ensure route_distance_cache table exists
-  try {
-    await db.run(`
-      CREATE TABLE IF NOT EXISTS route_distance_cache (
-        id INTEGER PRIMARY KEY AUTO_INCREMENT,
-        source_key VARCHAR(100) NOT NULL,
-        dest_key VARCHAR(100) NOT NULL,
-        provider VARCHAR(20) DEFAULT 'osrm',
-        distance_km DECIMAL(8,2) NOT NULL,
-        duration_min INTEGER NOT NULL,
-        is_approx INTEGER DEFAULT 0,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY unique_route_pair (source_key, dest_key, provider)
-      )
-    `);
-  } catch (err) { }
 }
 
 async function initializeSchema(db) {
