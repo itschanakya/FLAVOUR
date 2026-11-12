@@ -120,18 +120,18 @@ export default function Distribution() {
         fetch(`/api/delivery/warehouse?t=${ts}`, { headers })
       ]);
       if (dRes.ok) {
-        const d = await dRes.json();
-        setDemands(Array.isArray(d) ? d : []);
+        const d = await dRes.json().catch(() => null);
+        if (Array.isArray(d)) setDemands(d);
       }
       if (pRes.ok) {
-        const p = await pRes.json();
-        setPartners(Array.isArray(p) ? p : []);
+        const p = await pRes.json().catch(() => null);
+        if (Array.isArray(p)) setPartners(p);
       }
       if (wRes.ok) {
         const wContentType = wRes.headers.get('content-type') || '';
         if (wContentType.includes('application/json')) {
-          const w = await wRes.json();
-          if (w.warehouse) {
+          const w = await wRes.json().catch(() => null);
+          if (w && w.warehouse) {
             setWarehouse(w.warehouse);
             setWarehouseForm(w.warehouse);
             localStorage.setItem('fb_warehouse_depot', JSON.stringify(w.warehouse));
@@ -555,8 +555,8 @@ export default function Distribution() {
         });
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
-          const data = await res.json();
-          if (data.warehouse) {
+          const data = await res.json().catch(() => null);
+          if (data && data.warehouse) {
             setWarehouse(data.warehouse);
             localStorage.setItem('fb_warehouse_depot', JSON.stringify(data.warehouse));
           }
@@ -606,8 +606,8 @@ export default function Distribution() {
         });
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
-          const data = await res.json();
-          if (res.ok) saved = true;
+          const data = await res.json().catch(() => null);
+          if (res.ok && data) saved = true;
         }
       } catch (netErr) {
         console.warn('resolve-geotag route warning:', netErr);
@@ -639,7 +639,7 @@ export default function Distribution() {
 
       setGeotagModal({ open: false, stop: null, inputVal: '', resolving: false, error: '' });
       clearDistanceCache();
-      fetchData();
+      fetchData().catch(() => {});
     } catch (err) {
       setGeotagModal(prev => ({ ...prev, resolving: false, error: err.message || 'Geotag save failed' }));
     }

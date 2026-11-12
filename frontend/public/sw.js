@@ -76,14 +76,30 @@ self.addEventListener('fetch', (event) => {
   const isStaticAsset =
     url.pathname.startsWith('/assets/') ||
     url.pathname.startsWith('/icons/') ||
-    /\.(js|css|png|jpg|jpeg|svg|webp|woff|woff2|ttf|ico)$/i.test(url.pathname);
+    /\.(js|mjs|css|png|jpg|jpeg|svg|webp|woff|woff2|ttf|ico)$/i.test(url.pathname);
 
   if (isStaticAsset) {
     event.respondWith(
       caches.match(req).then((cachedResponse) => {
+        const isJs = /\.(m?js)$/i.test(url.pathname);
+
+        // Sanity check: If a cached response for a JS file is accidentally HTML, purge it immediately
+        if (cachedResponse && isJs) {
+          const ct = cachedResponse.headers.get('content-type') || '';
+          if (ct.includes('text/html')) {
+            caches.open(CACHE_NAME).then((cache) => cache.delete(req));
+            cachedResponse = null;
+          }
+        }
+
         const fetchPromise = fetch(req)
           .then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
+              const ct = networkResponse.headers.get('content-type') || '';
+              // CRITICAL: NEVER cache an HTML response as a JS asset
+              if (isJs && ct.includes('text/html')) {
+                return networkResponse;
+              }
               const copy = networkResponse.clone();
               caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
             }
@@ -100,3 +116,4 @@ self.addEventListener('fetch', (event) => {
   // Default: Network fetch
   event.respondWith(fetch(req));
 });
+

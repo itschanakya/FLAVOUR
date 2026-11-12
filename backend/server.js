@@ -78,6 +78,11 @@ app.use('/api', (err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
+// Unhandled API requests return 404 JSON, NEVER index.html
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl}` });
+});
+
 // Serve React frontend (check frontend/dist then backend/public)
 const fs = require('fs');
 const primaryBuild = path.join(__dirname, '..', 'frontend', 'dist');
@@ -85,8 +90,32 @@ const fallbackBuild = path.join(__dirname, 'public');
 const activeBuild = fs.existsSync(primaryBuild) ? primaryBuild : (fs.existsSync(fallbackBuild) ? fallbackBuild : null);
 
 if (activeBuild) {
-  app.use(express.static(activeBuild));
+  // Static assets with smart cache headers
+  app.use(express.static(activeBuild, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html') || filePath.endsWith('sw.js') || filePath.endsWith('manifest.json')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      } else if (filePath.includes(path.sep + 'assets' + path.sep) || filePath.includes('/assets/')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    }
+  }));
+
+  // Missing assets in /assets must return 404, NEVER fall through to index.html!
+  app.use('/assets', (req, res) => {
+    res.status(404).set({
+      'Content-Type': 'text/plain',
+      'Cache-Control': 'no-cache, no-store, must-revalidate'
+    }).send('Asset not found');
+  });
+
+  // SPA navigation fallback: serve index.html with no-cache headers for non-asset GET requests
   app.get('*', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(activeBuild, 'index.html'));
   });
   console.log('Serving frontend from:', activeBuild);

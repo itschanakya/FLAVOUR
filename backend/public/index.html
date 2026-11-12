@@ -16,11 +16,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/assets/index-DkAAOQzh.js"></script>
+    <script type="module" crossorigin src="/assets/index-Ch8rPx4o.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DkT1WG0m.css">
   </head>
   <body class="bg-slate-900 text-slate-100 font-sans antialiased selection:bg-blue-600 selection:text-white">
     <div id="root"></div>
+    <script>
+      // Immediately listen for chunk loading / Vite preload errors
+      window.addEventListener('vite:preloadError', function(event) {
+        console.warn('Vite dynamic import chunk failure detected. Reloading page...', event);
+        window.location.reload();
+      });
+    </script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {

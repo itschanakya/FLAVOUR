@@ -19,6 +19,13 @@
   </head>
   <body class="bg-slate-900 text-slate-100 font-sans antialiased selection:bg-blue-600 selection:text-white">
     <div id="root"></div>
+    <script>
+      // Immediately listen for chunk loading / Vite preload errors
+      window.addEventListener('vite:preloadError', function(event) {
+        console.warn('Vite dynamic import chunk failure detected. Reloading page...', event);
+        window.location.reload();
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
