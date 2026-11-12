@@ -347,7 +347,7 @@ export default function ManageInstitutions() {
 
           return {
             rowNum: idx + 2,
-            institution_name: instName,
+            institution_name: (instName || '').trim().toUpperCase(),
             institution_type: instType,
             pin_code: pin,
             ano_cto_name: ano || 'ANO Incharge',
@@ -428,7 +428,7 @@ export default function ManageInstitutions() {
             Authorization: `Bearer ${token}`
           },
           body: JSON.stringify({
-            institution_name: instName,
+            institution_name: (instName || '').trim().toUpperCase(),
             institution_type: instType,
             ano_cto_name: anoName,
             ano_cto_contact: anoContact,
@@ -455,7 +455,7 @@ export default function ManageInstitutions() {
             Authorization: `Bearer ${token}`
           },
           body: JSON.stringify({
-            institution_name: instName,
+            institution_name: (instName || '').trim().toUpperCase(),
             institution_type: instType,
             ano_cto_name: anoName,
             ano_cto_contact: anoContact,
@@ -672,7 +672,7 @@ export default function ManageInstitutions() {
                     <tr key={inst.id} className="hover:bg-white/50 transition-colors">
                       <td className="p-4 text-slate-500 font-bold">{index + 1}</td>
                       <td className="p-4 font-bold text-slate-900">
-                        <div>{inst.institution_name}</div>
+                        <div className="uppercase">{(inst.institution_name || '').toUpperCase()}</div>
                         {inst.complete_address && <div className="text-xs text-slate-400 font-normal mt-0.5 max-w-[200px] truncate">{inst.complete_address}</div>}
                       </td>
                       <td className="p-4 whitespace-nowrap">
@@ -767,9 +767,9 @@ export default function ManageInstitutions() {
                   type="text"
                   required
                   value={instName}
-                  onChange={(e) => setInstName(e.target.value)}
-                  placeholder="e.g. St. Joseph University"
-                  className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500"
+                  onChange={(e) => setInstName(e.target.value.toUpperCase())}
+                  placeholder="e.g. ST. JOSEPH UNIVERSITY"
+                  className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500 uppercase font-semibold"
                 />
               </div>
 

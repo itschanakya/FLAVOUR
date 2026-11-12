@@ -1930,7 +1930,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                                 </div>
                               </td>
                               <td className="px-4 py-3 max-w-xs truncate cursor-pointer" onClick={() => setSelectedDemandForSummary(dem)}>
-                                <div className="font-bold text-slate-900 truncate">{dem.institution_name}</div>
+                                <div className="font-bold text-slate-900 truncate uppercase">{dem.institution_name}</div>
                                 <div className="text-[11px] text-slate-500 truncate">{dem.complete_address}</div>
                               </td>
                               <td className="px-4 py-3 text-center">
@@ -2126,7 +2126,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               {/* Institution and Battalion */}
               <div>
                 <h3 className="font-black text-base sm:text-lg text-slate-900 uppercase leading-snug tracking-tight">
-                  {selectedDemandForSummary.institution_name}
+                  <span className="uppercase">{selectedDemandForSummary.institution_name}</span>
                 </h3>
                 <p className="text-xs text-slate-500 font-bold mt-0.5">
                   {selectedDemandForSummary.unit_name} {selectedDemandForSummary.ncc_group ? `• ${selectedDemandForSummary.ncc_group}` : ''}
@@ -2373,7 +2373,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
               <div>
                 <h3 className="text-lg font-black text-slate-900">Assign Delivery Partner</h3>
                 <p className="text-xs text-slate-500 font-medium">
-                  {selectedDemandForAssign.demand_number} • {selectedDemandForAssign.institution_name}
+                  {selectedDemandForAssign.demand_number} • <span className="uppercase">{selectedDemandForAssign.institution_name}</span>
                 </p>
               </div>
               <button
@@ -2854,7 +2854,7 @@ _National Cadet Corps - Supply & Logistics Portal_`;
                 <td className="p-2 border text-center">{idx + 1}</td>
                 <td className="p-2 border font-mono font-bold">{dem.demand_number}</td>
                 <td className="p-2 border">
-                  <div className="font-bold">{dem.institution_name}</div>
+                  <div className="font-bold uppercase">{dem.institution_name}</div>
                   <div className="text-[10px] text-slate-600">{dem.complete_address}</div>
                 </td>
                 <td className="p-2 border font-bold">{dem.pin_code}</td>

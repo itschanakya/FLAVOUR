@@ -19,6 +19,33 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
   });
 }
 
+const {
+  DEFAULT_WAREHOUSE,
+  parseLatLng,
+  haversineRoadEstimate,
+  getWarehouseDistance,
+  solveNajdikPehle,
+  solveKamSeKamKm,
+  autoPlanCars,
+  generateMultiPartMapsLinks
+} = require('../utils/routeOptimizer');
+
+async function getWarehouseSettings(db) {
+  try {
+    const row = await db.get("SELECT setting_value FROM app_settings WHERE setting_key = 'warehouse_settings'");
+    if (row && row.setting_value) {
+      const parsed = JSON.parse(row.setting_value);
+      return {
+        ...DEFAULT_WAREHOUSE,
+        ...parsed
+      };
+    }
+  } catch (err) {
+    console.warn('Error reading warehouse settings:', err.message);
+  }
+  return DEFAULT_WAREHOUSE;
+}
+
 // GET /api/delivery/view-doc - Safely view receipt/invoice PDFs or images with authorized signature
 router.get('/view-doc', async (req, res) => {
   try {
@@ -87,7 +114,7 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
         d.delivery_notes,
         d.created_at,
         i.id as institution_id,
-        COALESCE(i.institution_name, u.unit_name) as institution_name,
+        UPPER(COALESCE(i.institution_name, u.unit_name)) as institution_name,
         COALESCE(i.pin_code, 'N/A') as pin_code,
         COALESCE(i.complete_address, d.delivery_venue, u.location, 'Unit Battalion HQ') as complete_address,
         COALESCE(i.google_location, '') as google_location,
@@ -577,6 +604,340 @@ router.post('/switch', authenticateToken, authorizeRoles('ADMIN'), async (req, r
   }
 });
 
+// GET /api/delivery/warehouse - Get warehouse settings
+router.get('/warehouse', authenticateToken, async (req, res) => {
+  try {
+    const db = await getDB();
+    const warehouse = await getWarehouseSettings(db);
+    res.json({ warehouse });
+  } catch (err) {
+    console.error('Error fetching warehouse:', err);
+    res.status(500).json({ error: 'Failed to fetch warehouse settings' });
+  }
+});
+
+// PUT /api/delivery/warehouse - Update warehouse settings (ADMIN only)
+router.put('/warehouse', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { name, address, lat, lng, provider } = req.body;
+    const nLat = parseFloat(lat);
+    const nLng = parseFloat(lng);
+    if (isNaN(nLat) || isNaN(nLng)) {
+      return res.status(400).json({ error: 'Valid latitude and longitude are required' });
+    }
+    const db = await getDB();
+    const updated = {
+      name: (name || DEFAULT_WAREHOUSE.name).trim(),
+      address: (address || DEFAULT_WAREHOUSE.address).trim(),
+      lat: nLat,
+      lng: nLng,
+      provider: provider || 'osrm'
+    };
+    const val = JSON.stringify(updated);
+    const existing = await db.get("SELECT setting_key FROM app_settings WHERE setting_key = 'warehouse_settings'");
+    if (existing) {
+      await db.run("UPDATE app_settings SET setting_value = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = 'warehouse_settings'", [val]);
+    } else {
+      await db.run("INSERT INTO app_settings (setting_key, setting_value) VALUES ('warehouse_settings', ?)", [val]);
+    }
+    broadcastToAll('WAREHOUSE_SETTINGS_UPDATED', { warehouse: updated, timestamp: Date.now() });
+    res.json({ message: 'Warehouse settings saved', warehouse: updated });
+  } catch (err) {
+    console.error('Error saving warehouse settings:', err);
+    res.status(500).json({ error: 'Failed to save warehouse settings' });
+  }
+});
+
+// POST /api/delivery/distances - Compute road distance & duration from warehouse for given stops
+router.post('/distances', authenticateToken, async (req, res) => {
+  try {
+    const { stops } = req.body;
+    if (!Array.isArray(stops)) {
+      return res.status(400).json({ error: 'Stops array is required' });
+    }
+    const db = await getDB();
+    const warehouse = await getWarehouseSettings(db);
+    const results = {};
+
+    for (const item of stops) {
+      const coords = parseLatLng(item.google_location || item.coords || item);
+      if (coords) {
+        const est = getWarehouseDistance(warehouse, coords);
+        results[item.id || `${coords.lat},${coords.lng}`] = {
+          ...est,
+          coords
+        };
+      } else {
+        results[item.id || 'unknown'] = {
+          distanceKm: 0,
+          durationMin: 0,
+          noGeotag: true
+        };
+      }
+    }
+
+    res.json({ warehouse, distances: results });
+  } catch (err) {
+    console.error('Error computing distances:', err);
+    res.status(500).json({ error: 'Failed to compute warehouse distances' });
+  }
+});
+
+// POST /api/delivery/resolve-geotag - Resolve and store coordinates for an institution
+router.post('/resolve-geotag', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { institution_id, institution_name, google_location } = req.body;
+    if (!google_location) {
+      return res.status(400).json({ error: 'Location string or URL is required' });
+    }
+
+    let parsed = parseLatLng(google_location);
+
+    // If it's a URL and direct regex didn't find coordinates, attempt HTTP redirect resolution
+    if (!parsed && typeof google_location === 'string' && google_location.startsWith('http')) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const resp = await fetch(google_location, { method: 'GET', redirect: 'follow', signal: controller.signal });
+        clearTimeout(timeout);
+        const finalUrl = resp.url || '';
+        parsed = parseLatLng(finalUrl);
+      } catch (e) {
+        console.warn('Geotag URL redirect resolve error:', e.message);
+      }
+    }
+
+    if (!parsed) {
+      return res.status(400).json({ error: 'Could not extract valid latitude/longitude coordinates.' });
+    }
+
+    const formatted = `${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)}`;
+    const db = await getDB();
+
+    if (institution_id) {
+      await db.run('UPDATE institutions SET google_location = ? WHERE id = ?', [formatted, institution_id]);
+    } else if (institution_name) {
+      await db.run('UPDATE institutions SET google_location = ? WHERE UPPER(TRIM(institution_name)) = UPPER(TRIM(?))', [formatted, institution_name]);
+    }
+
+    res.json({
+      success: true,
+      coords: parsed,
+      google_location: formatted,
+      institution_id
+    });
+  } catch (err) {
+    console.error('Error resolving geotag:', err);
+    res.status(500).json({ error: 'Failed to resolve geotag' });
+  }
+});
+
+// POST /api/delivery/auto-plan - Generate balanced car assignment & route preview
+router.post('/auto-plan', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { date, respectLocks, schoolTimeAware } = req.body;
+    if (!date) {
+      return res.status(400).json({ error: 'Date is required for auto planning' });
+    }
+
+    const db = await getDB();
+    const warehouse = await getWarehouseSettings(db);
+
+    // Fetch active delivery cars
+    const cars = await db.all(
+      `SELECT id, name, phone, vehicle_no, vehicle_type, 
+              COALESCE(load_capacity_packets, 750) as capacity_packets 
+       FROM delivery_partners 
+       WHERE is_active = 1 AND vehicle_type NOT IN ('PORTER', 'SELF_SERVICE')
+       ORDER BY id ASC`
+    );
+
+    if (cars.length === 0) {
+      return res.status(400).json({ error: 'No active delivery cars found.' });
+    }
+
+    // Fetch demands for the selected date
+    const demands = await db.all(
+      `SELECT d.id, d.demand_number, d.demand_date, d.demand_time, d.institution_id,
+              d.delivery_partner_id, d.delivery_sequence, d.delivery_mode, d.delivery_status,
+              UPPER(COALESCE(i.institution_name, u.unit_name)) as institution_name,
+              COALESCE(i.pin_code, 'N/A') as pin_code,
+              COALESCE(i.complete_address, d.delivery_venue, u.location, 'Unit Battalion HQ') as complete_address,
+              COALESCE(i.google_location, '') as google_location,
+              COALESCE(i.ano_cto_name, 'Unit HQ') as ano_cto_name,
+              COALESCE(i.ano_cto_contact, '') as ano_cto_contact,
+              u.unit_code,
+              (SELECT COALESCE(SUM(di.quantity), 0) FROM demand_items di WHERE di.demand_id = d.id) as total_quantity
+       FROM demands d
+       LEFT JOIN institutions i ON d.institution_id = i.id
+       JOIN units u ON d.unit_id = u.id
+       WHERE d.is_deleted = 0
+         AND d.demand_date = ?
+         AND d.status IN ('READY_FOR_DISPATCH', 'DELIVERED', 'FULFILLED')
+       ORDER BY d.id ASC`,
+      [date]
+    );
+
+    if (demands.length === 0) {
+      return res.status(400).json({ error: `No demands scheduled for ${date}.` });
+    }
+
+    const plan = autoPlanCars(demands, cars, warehouse, {
+      respectLocks: respectLocks !== false,
+      schoolTimeAware: Boolean(schoolTimeAware)
+    });
+
+    res.json({
+      plan,
+      warehouse,
+      date
+    });
+  } catch (err) {
+    console.error('Auto plan error:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate auto plan' });
+  }
+});
+
+// POST /api/delivery/apply-auto-plan - Save confirmed auto-plan assignments and sequences
+router.post('/apply-auto-plan', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { carPlans } = req.body;
+    if (!Array.isArray(carPlans) || carPlans.length === 0) {
+      return res.status(400).json({ error: 'carPlans array is required' });
+    }
+
+    const db = await getDB();
+    let updatedCount = 0;
+
+    for (const cp of carPlans) {
+      const partnerId = cp.partnerId;
+      const driverName = cp.driver_name || (cp.car && cp.car.name) || '';
+      const phone = (cp.car && cp.car.phone) || '';
+      const vehicleNo = cp.vehicle_no || (cp.car && cp.car.vehicle_no) || '';
+
+      if (Array.isArray(cp.stops)) {
+        for (let i = 0; i < cp.stops.length; i++) {
+          const stop = cp.stops[i];
+          const seq = stop.delivery_sequence || i + 1;
+
+          await db.run(
+            `UPDATE demands 
+             SET delivery_mode = 'DRIVER',
+                 delivery_partner_id = ?,
+                 delivery_partner_name = ?,
+                 delivery_partner_phone = ?,
+                 delivery_partner_vehicle = ?,
+                 delivery_sequence = ?
+             WHERE id = ?`,
+            [partnerId, driverName, phone, vehicleNo, seq, stop.id]
+          );
+          updatedCount++;
+        }
+      }
+    }
+
+    broadcastToAll('DEMAND_UPDATED', {
+      type: 'AUTO_PLAN_APPLIED',
+      timestamp: Date.now()
+    });
+
+    res.json({ message: `Successfully applied plan for ${updatedCount} demand(s)`, updatedCount });
+  } catch (err) {
+    console.error('Apply auto-plan error:', err);
+    res.status(500).json({ error: err.message || 'Failed to apply auto plan' });
+  }
+});
+
+// POST /api/delivery/optimize-car-route - Re-order a specific car (or all cars)
+router.post('/optimize-car-route', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { partnerId, date, mode = 'najdik', schoolTimeAware = false, departureTime = '07:00' } = req.body;
+    if (!date) return res.status(400).json({ error: 'Date is required' });
+
+    const db = await getDB();
+    const warehouse = await getWarehouseSettings(db);
+
+    let query = `
+      SELECT d.id, d.demand_number, d.demand_date, d.demand_time, d.institution_id,
+             d.delivery_partner_id, d.delivery_sequence, d.delivery_mode, d.delivery_status,
+             UPPER(COALESCE(i.institution_name, u.unit_name)) as institution_name,
+             COALESCE(i.pin_code, 'N/A') as pin_code,
+             COALESCE(i.complete_address, d.delivery_venue, u.location, 'Unit Battalion HQ') as complete_address,
+             COALESCE(i.google_location, '') as google_location,
+             COALESCE(i.ano_cto_name, 'Unit HQ') as ano_cto_name,
+             COALESCE(i.ano_cto_contact, '') as ano_cto_contact,
+             u.unit_code,
+             (SELECT COALESCE(SUM(di.quantity), 0) FROM demand_items di WHERE di.demand_id = d.id) as total_quantity
+      FROM demands d
+      LEFT JOIN institutions i ON d.institution_id = i.id
+      JOIN units u ON d.unit_id = u.id
+      WHERE d.is_deleted = 0
+        AND d.demand_date = ?
+        AND d.delivery_mode = 'DRIVER'
+    `;
+    const params = [date];
+
+    if (partnerId && partnerId !== 'ALL') {
+      query += ` AND d.delivery_partner_id = ?`;
+      params.push(partnerId);
+    }
+
+    query += ` ORDER BY d.delivery_sequence ASC, d.id ASC`;
+
+    const demands = await db.all(query, params);
+    if (demands.length === 0) {
+      return res.status(400).json({ error: 'No demands to optimize for this vehicle.' });
+    }
+
+    // Parse coordinates
+    const stopsWithCoords = demands.map((d) => {
+      const parsed = parseLatLng(d.google_location);
+      return {
+        ...d,
+        lat: parsed ? parsed.lat : warehouse.lat + 0.1,
+        lng: parsed ? parsed.lng : warehouse.lng + 0.1,
+        hasGeotag: Boolean(parsed)
+      };
+    });
+
+    let tour;
+    if (mode === 'kam_km') {
+      tour = solveKamSeKamKm(stopsWithCoords, warehouse);
+    } else {
+      tour = solveNajdikPehle(stopsWithCoords, warehouse, null, { schoolTimeAware });
+    }
+
+    // Save newly calculated sequences
+    for (let i = 0; i < tour.stops.length; i++) {
+      const s = tour.stops[i];
+      await db.run('UPDATE demands SET delivery_sequence = ? WHERE id = ?', [s.delivery_sequence, s.id]);
+    }
+
+    // Also calculate alternative method comparison
+    const otherTour = mode === 'kam_km'
+      ? solveNajdikPehle(stopsWithCoords, warehouse, null, { schoolTimeAware })
+      : solveKamSeKamKm(stopsWithCoords, warehouse);
+
+    broadcastToAll('DEMAND_UPDATED', {
+      type: 'ROUTE_OPTIMIZED',
+      partnerId,
+      timestamp: Date.now()
+    });
+
+    res.json({
+      tour,
+      otherModeKm: otherTour.totalKm,
+      otherModeName: mode === 'kam_km' ? 'Nearest First' : 'Shortest Distance (Min Km)',
+      stopsCount: tour.stops.length,
+      totalKm: tour.totalKm,
+      totalDurationMin: tour.totalTourMin
+    });
+  } catch (err) {
+    console.error('Optimize route error:', err);
+    res.status(500).json({ error: err.message || 'Failed to optimize route' });
+  }
+});
+
 // POST /api/delivery/status - Update delivery status (dynamic multi-stage)
 router.post('/status', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
@@ -918,7 +1279,7 @@ router.get('/driver/demands', authenticateToken, authorizeRoles('DELIVERY', 'ADM
         d.total_km,
         d.created_at,
         i.id as institution_id,
-        COALESCE(i.institution_name, u.unit_name, 'N/A') as institution_name,
+        UPPER(COALESCE(i.institution_name, u.unit_name, 'N/A')) as institution_name,
         COALESCE(i.pin_code, 'N/A') as pin_code,
         COALESCE(i.complete_address, d.delivery_venue, u.location, '') as complete_address,
         COALESCE(i.google_location, '') as google_location,

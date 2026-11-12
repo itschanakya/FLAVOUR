@@ -1,5 +1,6 @@
+const path = require('path');
 const dotenv = require('dotenv');
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const express = require('express');
 const cors = require('cors');
@@ -16,6 +17,7 @@ const rateLimit = require('express-rate-limit');
 // and Cloudinary CDN assets can load seamlessly across all browsers.
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: false,
   contentSecurityPolicy: false
 }));
 
@@ -26,8 +28,6 @@ app.use(helmet({
 // Enable CORS & JSON Parsing
 app.use(cors({ origin: '*' }));
 app.use(express.json());
-
-const path = require('path');
 
 // Serve uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

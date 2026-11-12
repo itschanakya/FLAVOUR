@@ -6,7 +6,7 @@ import {
   Search, Edit3, ShieldAlert, X, ShoppingBag, Users, MapPin, ExternalLink,
   Truck, Plus, Trash2, Phone, ShieldCheck, Wifi, Eye, EyeOff, Boxes,
   Gauge, AlertCircle, Info, Navigation, Scale, Compass, Map, CalendarDays, History,
-  Download, Upload, RotateCcw, DatabaseBackup, Lock, ShieldOff, FileJson, Layers, ClipboardList, Clock, IndianRupee
+  Download, Upload, RotateCcw, DatabaseBackup, Lock, ShieldOff, FileJson, Layers, ClipboardList, Clock, IndianRupee, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ManageCatalog from './ManageCatalog';
@@ -1115,6 +1115,13 @@ export default function AppSettings() {
                   <IndianRupee className="w-4 h-4 text-emerald-600" />
                   TDS & Billing Rates
                 </button>
+                <button
+                  onClick={() => setActiveTab('warehouse-settings')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'warehouse-settings' ? 'bg-rose-50 text-rose-800 font-bold border border-rose-300 shadow-xs' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <MapPin className="w-4 h-4 text-rose-600" />
+                  Warehouse Depot & Routing
+                </button>
               </>
             )}
 
@@ -1238,6 +1245,7 @@ export default function AppSettings() {
                 {activeTab === 'km-history' && 'Record and review daily starting and closing odometer readings for all fleet drivers.'}
                 {activeTab === 'data-backup' && 'Export a full database backup, restore from a backup file, or reset all demand records.'}
                 {activeTab === 'tds-settings' && 'Configure statutory tax deduction rates (GST TDS & Income Tax TDS) applied when Higher HQ / PCDA releases payment to vendor.'}
+                {activeTab === 'warehouse-settings' && 'Configure central warehouse depot location (Manesar Sector 1), GPS coordinates, and routing engine provider.'}
               </p>
             </div>
 
@@ -1860,6 +1868,11 @@ export default function AppSettings() {
                 {/* ═══ TDS & BILLING RATES TAB (ADMIN ROLE) ═══ */}
                 {activeTab === 'tds-settings' && role === 'ADMIN' && (
                   <TdsSettingsPanel token={token} />
+                )}
+
+                {/* ═══ WAREHOUSE DEPOT & ROUTING TAB (ADMIN ROLE) ═══ */}
+                {activeTab === 'warehouse-settings' && role === 'ADMIN' && (
+                  <WarehouseSettingsPanel token={token} />
                 )}
 
                 {/* ═══ ANO BILL NOTICES (UNIT ROLE) ═══ */}
@@ -3466,6 +3479,245 @@ const TdsSettingsPanel = ({ token }) => {
             >
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               <span>Save TDS & Billing Rates</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const WarehouseSettingsPanel = ({ token }) => {
+  const [warehouse, setWarehouse] = useState({
+    name: 'Manesar Sector 1, Gurgaon',
+    lat: 28.3588,
+    lng: 76.9382,
+    provider: 'osrm',
+    googleApiKey: ''
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/delivery/warehouse', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (!cancelled && data && data.warehouse) {
+          setWarehouse({
+            name: data.warehouse.name || 'Manesar Sector 1, Gurgaon',
+            lat: data.warehouse.lat !== undefined ? Number(data.warehouse.lat) : 28.3588,
+            lng: data.warehouse.lng !== undefined ? Number(data.warehouse.lng) : 76.9382,
+            provider: data.warehouse.provider || 'osrm',
+            googleApiKey: data.warehouse.googleApiKey || ''
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/delivery/warehouse', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(warehouse)
+      });
+      if (res.ok) {
+        localStorage.setItem('fb_warehouse_depot', JSON.stringify(warehouse));
+        setMessage('Warehouse Depot settings saved successfully!');
+        setTimeout(() => setMessage(''), 4000);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || 'Failed to save settings.');
+      }
+    } catch (err) {
+      alert(err.message || 'Error saving warehouse settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClearCache = () => {
+    try {
+      const keys = Object.keys(localStorage);
+      keys.forEach(k => {
+        if (k.startsWith('fb_dist_') || k.startsWith('fb_dist_all_')) {
+          localStorage.removeItem(k);
+        }
+      });
+      alert('Distance calculation cache cleared successfully!');
+    } catch (_) {}
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+        <RefreshCw className="w-4 h-4 animate-spin text-rose-600" />
+        Loading warehouse depot configuration...
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-3xl space-y-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-rose-600" />
+              Central Warehouse Depot & Route Engine Settings
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Configure the central dispatch warehouse location (default: Manesar Sector 1) and road routing distance provider.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleClearCache}
+            className="px-3 py-1.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+            title="Clear stored road distance metrics"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+            Clear Distance Cache
+          </button>
+        </div>
+
+        {message && (
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            {message}
+          </div>
+        )}
+
+        <form onSubmit={handleSave} className="space-y-5">
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+              <label className="block text-xs font-black uppercase text-slate-700">
+                Warehouse Depot Name / Label:
+              </label>
+              <input
+                type="text"
+                value={warehouse.name}
+                onChange={e => setWarehouse(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                <label className="block text-xs font-black uppercase text-slate-700">
+                  Latitude (Decimal):
+                </label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={warehouse.lat}
+                  onChange={e => setWarehouse(prev => ({ ...prev, lat: parseFloat(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                <label className="block text-xs font-black uppercase text-slate-700">
+                  Longitude (Decimal):
+                </label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={warehouse.lng}
+                  onChange={e => setWarehouse(prev => ({ ...prev, lng: parseFloat(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${warehouse.lat},${warehouse.lng}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-bold hover:bg-rose-100"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Preview Location on Google Maps
+              </a>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+              <label className="block text-xs font-black uppercase text-slate-700">
+                Road Routing Provider Engine:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className={`p-3 rounded-xl border cursor-pointer flex items-center gap-3 transition-all ${warehouse.provider === 'osrm' ? 'bg-white border-rose-500 shadow-xs' : 'border-slate-200 bg-white/50'}`}>
+                  <input
+                    type="radio"
+                    name="provider"
+                    value="osrm"
+                    checked={warehouse.provider === 'osrm'}
+                    onChange={() => setWarehouse(prev => ({ ...prev, provider: 'osrm' }))}
+                    className="text-rose-600 focus:ring-rose-500"
+                  />
+                  <div>
+                    <div className="font-black text-xs text-slate-900">OSRM Table API (Default, Free)</div>
+                    <div className="text-[10px] text-slate-500">Public OpenStreetMap road network matrix with backoff & chunking.</div>
+                  </div>
+                </label>
+
+                <label className={`p-3 rounded-xl border cursor-pointer flex items-center gap-3 transition-all ${warehouse.provider === 'google' ? 'bg-white border-rose-500 shadow-xs' : 'border-slate-200 bg-white/50'}`}>
+                  <input
+                    type="radio"
+                    name="provider"
+                    value="google"
+                    checked={warehouse.provider === 'google'}
+                    onChange={() => setWarehouse(prev => ({ ...prev, provider: 'google' }))}
+                    className="text-rose-600 focus:ring-rose-500"
+                  />
+                  <div>
+                    <div className="font-black text-xs text-slate-900">Google Routes Matrix API</div>
+                    <div className="text-[10px] text-slate-500">Official Google Routes API (requires API key).</div>
+                  </div>
+                </label>
+              </div>
+
+              {warehouse.provider === 'google' && (
+                <div className="mt-3 space-y-1">
+                  <label className="block text-[11px] font-black uppercase text-slate-600">
+                    Google Routes API Key:
+                  </label>
+                  <input
+                    type="password"
+                    value={warehouse.googleApiKey}
+                    onChange={e => setWarehouse(prev => ({ ...prev, googleApiKey: e.target.value }))}
+                    placeholder="AIzaSy..."
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md shadow-rose-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>Save Warehouse Depot Settings</span>
             </button>
           </div>
         </form>

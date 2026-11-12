@@ -80,11 +80,11 @@ router.get('/', authenticateToken, async (req, res) => {
 
     let baseQuery = `
       SELECT d.*, 
-        CASE 
+        UPPER(CASE 
           WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name, 'UNIT HQ')
           WHEN i.institution_name IS NULL OR i.institution_name = '1' OR i.institution_name REGEXP '^[0-9]+$' THEN COALESCE(u.unit_code, u.unit_name, 'UNIT HQ')
           ELSE i.institution_name 
-        END as institution_name,
+        END) as institution_name,
         CASE 
           WHEN d.demand_type = 'UNIT_DIRECT' THEN 'UNIT ADM' 
           WHEN i.ano_cto_name IS NULL OR i.ano_cto_name = '1' OR i.ano_cto_name REGEXP '^[0-9]+$' THEN 'UNIT ADM' 
@@ -94,7 +94,7 @@ router.get('/', authenticateToken, async (req, res) => {
         COALESCE(i.google_location, '') as google_location,
         COALESCE(i.institution_type, 'STATE') as institution_type,
         u.unit_name, u.unit_code, u.ncc_group,
-        CASE WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name) ELSE COALESCE(i.institution_name, u.unit_name) END as beneficiary_name,
+        UPPER(CASE WHEN d.demand_type = 'UNIT_DIRECT' THEN COALESCE(u.unit_code, u.unit_name) ELSE COALESCE(i.institution_name, u.unit_name) END) as beneficiary_name,
         usr.name as raised_by_name,
         rev.name as reviewed_by_name,
         COALESCE(di_agg.total_amount, 0) as total_amount,
@@ -262,7 +262,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const db = await getDB();
     const demand = await db.get(
       `SELECT d.*, 
-              COALESCE(i.institution_name, CONCAT(u.unit_name, ' (Direct Unit Demand)')) as institution_name,
+              UPPER(COALESCE(i.institution_name, CONCAT(u.unit_name, ' (Direct Unit Demand)'))) as institution_name,
               COALESCE(i.ano_cto_name, CONCAT(usr.name, ' (Unit HQ)')) as ano_cto_name,
               i.strength_1st_year, i.strength_2nd_year, i.strength_3rd_year,
               COALESCE(i.complete_address, d.delivery_venue, u.location, 'Unit Battalion HQ') as complete_address,

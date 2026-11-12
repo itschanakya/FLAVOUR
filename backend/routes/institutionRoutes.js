@@ -58,7 +58,7 @@ router.post('/bulk', authenticateToken, authorizeRoles('UNIT', 'ADMIN'), async (
 
     for (let i = 0; i < institutions.length; i++) {
       const row = institutions[i];
-      const instName = (row.institution_name || row['INSTITUTION NAME'] || row.name || '').toString().trim();
+      const instName = (row.institution_name || row['INSTITUTION NAME'] || row.name || '').toString().trim().toUpperCase();
       if (!instName) continue;
 
       const pinCode = (row.pin_code || row['PIN CODE'] || row.pin || '').toString().replace(/\D/g, '').slice(0, 6);
@@ -186,6 +186,7 @@ router.post('/', authenticateToken, authorizeRoles('UNIT'), async (req, res) => 
       return res.status(400).json({ error: 'Institution name, ANO/CTO name, email, login ID, and password are required.' });
     }
 
+    const upperInstName = institution_name.toString().trim().toUpperCase();
     const unit_id = req.user.unit_id;
     if (!unit_id) {
       return res.status(400).json({ error: 'User is not assigned to a valid NCC Unit.' });
@@ -208,7 +209,7 @@ router.post('/', authenticateToken, authorizeRoles('UNIT'), async (req, res) => 
     const instRes = await db.run(
       `INSERT INTO institutions (unit_id, institution_name, ano_cto_name, ano_cto_contact, pin_code, strength_1st_year, strength_2nd_year, strength_3rd_year, google_location, complete_address, institution_type)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [unit_id, institution_name, ano_cto_name, ano_cto_contact || '', pin_code || '', s1, s2, s3, google_location || '', complete_address || '', instType]
+      [unit_id, upperInstName, ano_cto_name, ano_cto_contact || '', pin_code || '', s1, s2, s3, google_location || '', complete_address || '', instType]
     );
     const instId = instRes.lastID;
 
@@ -223,14 +224,14 @@ router.post('/', authenticateToken, authorizeRoles('UNIT'), async (req, res) => 
     // Audit Log
     await db.run(
       'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
-      ['INSTITUTION', instId, 'ONBOARDED', req.user.id, `Onboarded institution ${institution_name} with cadet strength (1st Yr: ${s1}, 2nd Yr: ${s2}, 3rd Yr: ${s3})`]
+      ['INSTITUTION', instId, 'ONBOARDED', req.user.id, `Onboarded institution ${upperInstName} with cadet strength (1st Yr: ${s1}, 2nd Yr: ${s2}, 3rd Yr: ${s3})`]
     );
 
     res.status(201).json({
       message: 'Institution & ANO/CTO login created successfully.',
       institution: {
         id: instId,
-        institution_name,
+        institution_name: upperInstName,
         ano_cto_name,
         ano_cto_contact,
         strength_1st_year: s1,
@@ -288,12 +289,14 @@ router.put('/:id', authenticateToken, authorizeRoles('UNIT', 'INSTITUTION', 'ADM
       ? (req.body.institution_type === 'CENTRE' ? 'CENTRE' : 'STATE')
       : (inst.institution_type || 'STATE');
 
+    const upperInstName = institution_name ? institution_name.toString().trim().toUpperCase() : (inst.institution_name ? inst.institution_name.toString().trim().toUpperCase() : '');
+
     await db.run(
       `UPDATE institutions 
        SET institution_name = ?, ano_cto_name = ?, ano_cto_contact = ?, pin_code = ?, strength_1st_year = ?, strength_2nd_year = ?, strength_3rd_year = ?, google_location = ?, complete_address = ?, institution_type = ?
        WHERE id = ?`,
       [
-        institution_name || inst.institution_name,
+        upperInstName,
         ano_cto_name || inst.ano_cto_name,
         ano_cto_contact ?? inst.ano_cto_contact,
         pin_code ?? inst.pin_code,
