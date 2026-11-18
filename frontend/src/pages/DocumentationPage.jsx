@@ -3,10 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { useSSE } from '../context/SSEContext';
 import { Link } from 'react-router-dom';
 import { getDocumentViewUrl, getDocumentImageUrl } from '../utils/documentViewer';
+import jsPDF from 'jspdf';
 import {
   FileCheck, CheckCircle2, Calendar, Upload, FileText,
   IndianRupee, MapPin, RefreshCw, School, Package, Users,
-  ChevronDown, ChevronUp, AlertTriangle, X, Eye, Building2,
+  ChevronDown, ChevronUp, ChevronRight, AlertTriangle, X, Eye, Building2,
   Layers, Filter, Search, Phone, MessageCircle, ExternalLink,
   Printer, ArrowUpRight, Truck, Clock, ShieldCheck, Download, Gauge
 } from 'lucide-react';
@@ -18,9 +19,18 @@ export default function DocumentationPage() {
   const [demands, setDemands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDate, setSelectedDate] = useState('ALL');
   const [selectedPin, setSelectedPin] = useState('ALL');
   const [selectedUnit, setSelectedUnit] = useState('ALL');
   const [docFilter, setDocFilter] = useState('BALANCE'); // 'BALANCE' | 'FULLY_DOCUMENTED'
+  const [groupMode, setGroupMode] = useState('DATEWISE'); // 'ALL' | 'DATEWISE' | 'UNITWISE'
+  const [collapsedGroups, setCollapsedGroups] = useState({});
+
+  // Owner Summary & Compact PDF State
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [ownerSummaryStats, setOwnerSummaryStats] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [recipientViewMode, setRecipientViewMode] = useState('UNITWISE'); // 'UNITWISE' | 'INSTITUTIONWISE'
   
   // Modals
   const [selectedDemandForSummary, setSelectedDemandForSummary] = useState(null);
@@ -115,7 +125,29 @@ export default function DocumentationPage() {
     }
   };
 
+  const formatDateDisplay = (dateStr) => {
+    const ts = parseDateToTimestamp(dateStr);
+    if (!ts) return dateStr || 'Undated';
+    return new Date(ts).toLocaleDateString('en-IN', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
   // Available filter options
+  const availableDates = useMemo(() => {
+    const dateMap = new Map();
+    demands.forEach(d => {
+      const dt = d.demand_date || 'Undated';
+      dateMap.set(dt, (dateMap.get(dt) || 0) + 1);
+    });
+    return Array.from(dateMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => parseDateToTimestamp(b.date) - parseDateToTimestamp(a.date));
+  }, [demands]);
+
   const availablePins = useMemo(() => {
     const pins = new Set();
     demands.forEach(d => {
@@ -129,9 +161,11 @@ export default function DocumentationPage() {
     demands.forEach(d => {
       const code = d.unit_code || d.unit_name;
       if (code) {
+        const existing = unitMap.get(code);
         unitMap.set(code, {
-          code: code,
-          name: d.unit_name
+          code,
+          name: d.unit_name,
+          count: (existing ? existing.count : 0) + 1
         });
       }
     });
@@ -141,6 +175,7 @@ export default function DocumentationPage() {
   // Filtered demands
   const filteredDemands = useMemo(() => {
     return demands.filter(d => {
+      if (selectedDate !== 'ALL' && (d.demand_date || 'Undated') !== selectedDate) return false;
       if (selectedPin !== 'ALL' && d.pin_code !== selectedPin) return false;
       if (selectedUnit !== 'ALL' && d.unit_code !== selectedUnit && d.unit_name !== selectedUnit) return false;
 
@@ -162,14 +197,585 @@ export default function DocumentationPage() {
       }
       return true;
     }).sort((a, b) => (parseDateToTimestamp(b.demand_date) - parseDateToTimestamp(a.demand_date)) || (b.id - a.id));
-  }, [demands, selectedPin, selectedUnit, docFilter, searchTerm]);
+  }, [demands, selectedDate, selectedPin, selectedUnit, docFilter, searchTerm]);
+
+  // Datewise grouping (each date sorted newest first; rows inside sorted by Unit then Demand #)
+  const groupedDatewise = useMemo(() => {
+    const map = {};
+    filteredDemands.forEach(d => {
+      const key = d.demand_date || 'Undated';
+      if (!map[key]) {
+        map[key] = {
+          key,
+          date: key,
+          totalPackets: 0,
+          totalAmount: 0,
+          unitSet: new Set(),
+          demands: []
+        };
+      }
+      map[key].totalPackets += Number(d.total_quantity) || 0;
+      map[key].totalAmount += Number(d.total_amount) || 0;
+      if (d.unit_name || d.unit_code) map[key].unitSet.add(d.unit_code || d.unit_name);
+      map[key].demands.push(d);
+    });
+    return Object.values(map)
+      .sort((a, b) => parseDateToTimestamp(b.date) - parseDateToTimestamp(a.date))
+      .map(g => ({
+        ...g,
+        unitCount: g.unitSet.size,
+        demands: [...g.demands].sort((a, b) =>
+          (a.unit_name || '').localeCompare(b.unit_name || '') || (b.id - a.id)
+        )
+      }));
+  }, [filteredDemands]);
+
+  // Unitwise grouping (alphabetical by Unit Name; rows inside sorted newest date first)
+  const groupedUnitwise = useMemo(() => {
+    const map = {};
+    filteredDemands.forEach(d => {
+      const key = d.unit_code || d.unit_name || 'GENERAL';
+      if (!map[key]) {
+        map[key] = {
+          key,
+          unitCode: d.unit_code || '',
+          unitName: d.unit_name || 'General Unit',
+          nccGroup: d.ncc_group || '',
+          totalPackets: 0,
+          totalAmount: 0,
+          dateSet: new Set(),
+          demands: []
+        };
+      }
+      map[key].totalPackets += Number(d.total_quantity) || 0;
+      map[key].totalAmount += Number(d.total_amount) || 0;
+      if (d.demand_date) map[key].dateSet.add(d.demand_date);
+      map[key].demands.push(d);
+    });
+    return Object.values(map)
+      .sort((a, b) => a.unitName.localeCompare(b.unitName))
+      .map(g => ({
+        ...g,
+        dateCount: g.dateSet.size,
+        demands: [...g.demands].sort((a, b) =>
+          (parseDateToTimestamp(b.demand_date) - parseDateToTimestamp(a.demand_date)) || (b.id - a.id)
+        )
+      }));
+  }, [filteredDemands]);
+
+  const toggleGroupCollapse = (groupKey) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [groupKey]: !prev[groupKey]
+    }));
+  };
 
   // Overall counts
   const totalDelivered = demands.length;
   const balanceCount = demands.filter(d => !d.delivery_receipt_url || !d.invoice_url).length;
   const fullyDocumentedCount = demands.filter(d => d.delivery_receipt_url && d.invoice_url).length;
-  const totalPackets = demands.reduce((sum, d) => sum + (Number(d.total_quantity) || 0), 0);
-  const totalAmount = demands.reduce((sum, d) => sum + (Number(d.total_amount) || 0), 0);
+  const totalPackets = filteredDemands.reduce((sum, d) => sum + (Number(d.total_quantity) || 0), 0);
+  const totalAmount = filteredDemands.reduce((sum, d) => sum + (Number(d.total_amount) || 0), 0);
+
+  // Owner Executive Summary Data (across all delivered demands matching Date/Unit/PIN/Search, ignoring Balance/Documented tab)
+  const ownerReportData = useMemo(() => {
+    const scopedDemands = demands.filter(d => {
+      if (selectedDate !== 'ALL' && (d.demand_date || 'Undated') !== selectedDate) return false;
+      if (selectedPin !== 'ALL' && d.pin_code !== selectedPin) return false;
+      if (selectedUnit !== 'ALL' && d.unit_code !== selectedUnit && d.unit_name !== selectedUnit) return false;
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const matchNum = (d.demand_number || '').toLowerCase().includes(q);
+        const matchInst = (d.institution_name || '').toLowerCase().includes(q);
+        const matchUnit = (d.unit_name || '').toLowerCase().includes(q);
+        const matchPartner = (d.delivery_partner_name || '').toLowerCase().includes(q);
+        const matchPin = (d.pin_code || '').toLowerCase().includes(q);
+        if (!matchNum && !matchInst && !matchUnit && !matchPartner && !matchPin) return false;
+      }
+      return true;
+    });
+
+    const itemMap = new Map();
+    const unitMap = new Map();
+    const instMap = new Map();
+    const dateMap = new Map();
+
+    let docPendingCount = 0;
+    let verifiedCount = 0;
+    let receiptPendingCount = 0;
+    let billPendingCount = 0;
+    let docPendingAmount = 0;
+    let deliveredPackets = 0;
+    let deliveredAmount = 0;
+
+    scopedDemands.forEach(d => {
+      const qty = Number(d.total_quantity) || 0;
+      const amt = Number(d.total_amount) || 0;
+      const hasReceipt = Boolean(d.delivery_receipt_url);
+      const hasInvoice = Boolean(d.invoice_url);
+      const isVerified = hasReceipt && hasInvoice;
+
+      deliveredPackets += qty;
+      deliveredAmount += amt;
+
+      if (isVerified) {
+        verifiedCount += 1;
+      } else {
+        docPendingCount += 1;
+        docPendingAmount += amt;
+        if (!hasReceipt) receiptPendingCount += 1;
+        if (!hasInvoice) billPendingCount += 1;
+      }
+
+      // 1. Items aggregation
+      (d.items || []).forEach(it => {
+        const iName = (it.item_name || 'Refreshment Pack').trim();
+        const iQty = Number(it.quantity) || 0;
+        const iCost = Number(it.total_cost) || (iQty * (Number(it.unit_price_snapshot || it.unit_price) || 0));
+        if (!itemMap.has(iName)) {
+          itemMap.set(iName, { itemName: iName, qty: 0, amount: 0 });
+        }
+        const entry = itemMap.get(iName);
+        entry.qty += iQty;
+        entry.amount += iCost;
+      });
+
+      // 2. Unit-wise recipient aggregation
+      const uKey = d.unit_code || d.unit_name || 'GENERAL';
+      if (!unitMap.has(uKey)) {
+        unitMap.set(uKey, {
+          key: uKey,
+          unitCode: d.unit_code || '',
+          unitName: d.unit_name || 'General Unit',
+          instSet: new Set(),
+          demandCount: 0,
+          packets: 0,
+          amount: 0,
+          receiptPending: 0,
+          billPending: 0,
+          verifiedCount: 0
+        });
+      }
+      const uEntry = unitMap.get(uKey);
+      uEntry.demandCount += 1;
+      uEntry.packets += qty;
+      uEntry.amount += amt;
+      if (d.institution_name) uEntry.instSet.add(d.institution_name);
+      if (isVerified) uEntry.verifiedCount += 1;
+      if (!hasReceipt) uEntry.receiptPending += 1;
+      if (!hasInvoice) uEntry.billPending += 1;
+
+      // 3. Institution-wise recipient aggregation
+      const instKey = `${d.institution_name || 'Institution'}__${uKey}`;
+      if (!instMap.has(instKey)) {
+        instMap.set(instKey, {
+          key: instKey,
+          institutionName: d.institution_name || 'Institution',
+          unitCode: d.unit_code || '',
+          unitName: d.unit_name || 'General Unit',
+          demandCount: 0,
+          packets: 0,
+          amount: 0,
+          receiptPending: 0,
+          billPending: 0,
+          verifiedCount: 0
+        });
+      }
+      const instEntry = instMap.get(instKey);
+      instEntry.demandCount += 1;
+      instEntry.packets += qty;
+      instEntry.amount += amt;
+      if (isVerified) instEntry.verifiedCount += 1;
+      if (!hasReceipt) instEntry.receiptPending += 1;
+      if (!hasInvoice) instEntry.billPending += 1;
+
+      // 4. Datewise documentation pending aggregation
+      const dtKey = d.demand_date || 'Undated';
+      if (!dateMap.has(dtKey)) {
+        dateMap.set(dtKey, {
+          date: dtKey,
+          demandCount: 0,
+          packets: 0,
+          amount: 0,
+          receiptPending: 0,
+          billPending: 0,
+          docPendingCount: 0,
+          verifiedCount: 0,
+          pendingRefs: []
+        });
+      }
+      const dtEntry = dateMap.get(dtKey);
+      dtEntry.demandCount += 1;
+      dtEntry.packets += qty;
+      dtEntry.amount += amt;
+      if (isVerified) {
+        dtEntry.verifiedCount += 1;
+      } else {
+        dtEntry.docPendingCount += 1;
+        if (!hasReceipt) dtEntry.receiptPending += 1;
+        if (!hasInvoice) dtEntry.billPending += 1;
+        if (d.demand_number) dtEntry.pendingRefs.push(d.demand_number);
+      }
+    });
+
+    const itemSummary = Array.from(itemMap.values())
+      .map(it => ({
+        ...it,
+        avgRate: it.qty > 0 ? Math.round((it.amount / it.qty) * 100) / 100 : 0
+      }))
+      .sort((a, b) => b.qty - a.qty);
+
+    const unitRecipientSummary = Array.from(unitMap.values())
+      .map(u => ({ ...u, instCount: u.instSet.size }))
+      .sort((a, b) => b.amount - a.amount);
+
+    const institutionRecipientSummary = Array.from(instMap.values())
+      .sort((a, b) => b.amount - a.amount);
+
+    const datePendingSummary = Array.from(dateMap.values())
+      .sort((a, b) => parseDateToTimestamp(b.date) - parseDateToTimestamp(a.date));
+
+    return {
+      scopedCount: scopedDemands.length,
+      deliveredPackets,
+      deliveredAmount,
+      docPendingCount,
+      verifiedCount,
+      receiptPendingCount,
+      billPendingCount,
+      docPendingAmount,
+      itemSummary,
+      unitRecipientSummary,
+      institutionRecipientSummary,
+      datePendingSummary
+    };
+  }, [demands, selectedDate, selectedPin, selectedUnit, searchTerm]);
+
+  const handleOpenOwnerSummary = async () => {
+    setSummaryModalOpen(true);
+    setLoadingSummary(true);
+    try {
+      const qs = new URLSearchParams();
+      if (selectedDate !== 'ALL') qs.set('date', selectedDate);
+      if (selectedUnit !== 'ALL') qs.set('unit_code', selectedUnit);
+      if (selectedPin !== 'ALL') qs.set('pin_code', selectedPin);
+      const res = await fetch(`/api/delivery/documentation-summary?${qs.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOwnerSummaryStats(data);
+      }
+    } catch (err) {
+      console.error('Error fetching owner summary stats:', err);
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  const handleDownloadOwnerPdf = () => {
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const contentW = pageW - margin * 2;
+    let y = 10;
+
+    const fmtRs = (n) => `Rs. ${Number(n || 0).toLocaleString('en-IN')}`;
+    const fmtNum = (n) => Number(n || 0).toLocaleString('en-IN');
+
+    const ensureSpace = (neededMm) => {
+      if (y + neededMm > pageH - 12) {
+        pdf.addPage();
+        y = 12;
+      }
+    };
+
+    // Header Banner
+    pdf.setFillColor(15, 23, 42); // slate-900
+    pdf.roundedRect(margin, y, contentW, 18, 2, 2, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.text('FLAVOUR BASE INDIA — DELIVERY & DOCUMENTATION SUMMARY', margin + 4, y + 7);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    const scopeParts = [
+      selectedDate === 'ALL' ? 'Date: All Dates' : `Date: ${formatDDMMYYYY(selectedDate)}`,
+      selectedUnit === 'ALL' ? 'Unit: All Units' : `Unit: ${selectedUnit}`,
+      selectedPin === 'ALL' ? 'PIN: All' : `PIN: ${selectedPin}`
+    ];
+    const generatedAt = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    pdf.text(`Scope: ${scopeParts.join(' | ')}   •   Generated: ${generatedAt}`, margin + 4, y + 13.5);
+    y += 22;
+
+    // KPI Summary Strip (4 compact boxes)
+    const genCount = ownerSummaryStats?.generated?.count ?? ownerReportData.scopedCount;
+    const genPkts = ownerSummaryStats?.generated?.packets ?? ownerReportData.deliveredPackets;
+    const genAmt = ownerSummaryStats?.generated?.amount ?? ownerReportData.deliveredAmount;
+    const delCount = ownerSummaryStats?.delivered?.count ?? ownerReportData.scopedCount;
+    const delPkts = ownerSummaryStats?.delivered?.packets ?? ownerReportData.deliveredPackets;
+    const delAmt = ownerSummaryStats?.delivered?.amount ?? ownerReportData.deliveredAmount;
+    const pendDelCount = ownerSummaryStats?.pending_delivery?.count ?? Math.max(0, genCount - delCount);
+    const pendDelPkts = ownerSummaryStats?.pending_delivery?.packets ?? Math.max(0, genPkts - delPkts);
+    const delPct = genCount > 0 ? Math.round((delCount / genCount) * 100) : 0;
+
+    const kpis = [
+      {
+        title: 'TOTAL DEMAND GENERATED',
+        main: `${fmtNum(genCount)} Demands`,
+        sub: `${fmtNum(genPkts)} Pkts | ${fmtRs(genAmt)}`,
+        bg: [239, 246, 255],
+        border: [191, 219, 254],
+        accent: [29, 78, 216]
+      },
+      {
+        title: `TOTAL DELIVERED (${delPct}%)`,
+        main: `${fmtNum(delCount)} Demands`,
+        sub: `${fmtNum(delPkts)} Pkts | ${fmtRs(delAmt)}`,
+        bg: [236, 253, 245],
+        border: [167, 243, 208],
+        accent: [4, 120, 87]
+      },
+      {
+        title: 'PENDING DELIVERY',
+        main: `${fmtNum(pendDelCount)} Demands`,
+        sub: `${fmtNum(pendDelPkts)} Pkts in pipeline`,
+        bg: [248, 250, 252],
+        border: [226, 232, 240],
+        accent: [51, 65, 85]
+      },
+      {
+        title: 'DOCS PENDING (BALANCE)',
+        main: `${fmtNum(ownerReportData.docPendingCount)} Demands`,
+        sub: `Rcpt: ${ownerReportData.receiptPendingCount} | Bill: ${ownerReportData.billPendingCount} | ${fmtRs(ownerReportData.docPendingAmount)}`,
+        bg: [255, 251, 235],
+        border: [253, 230, 138],
+        accent: [180, 83, 9]
+      }
+    ];
+
+    const boxGap = 2.5;
+    const boxW = (contentW - boxGap * 3) / 4;
+    kpis.forEach((k, idx) => {
+      const bx = margin + idx * (boxW + boxGap);
+      pdf.setFillColor(...k.bg);
+      pdf.setDrawColor(...k.border);
+      pdf.roundedRect(bx, y, boxW, 17, 1.5, 1.5, 'FD');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(...k.accent);
+      pdf.text(k.title, bx + 2.5, y + 4.5);
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(k.main, bx + 2.5, y + 10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(pdf.splitTextToSize(k.sub, boxW - 5)[0] || '', bx + 2.5, y + 14.5);
+    });
+    y += 22;
+
+    // Helper for compact vector tables
+    const drawSectionTable = (title, headers, rows, colWidths, aligns = []) => {
+      ensureSpace(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(title, margin, y);
+      y += 2.5;
+
+      const drawHeaderRow = () => {
+        pdf.setFillColor(241, 245, 249);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.rect(margin, y, contentW, 6.5, 'FD');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.setTextColor(51, 65, 85);
+        let cx = margin;
+        headers.forEach((h, i) => {
+          const al = aligns[i] || 'left';
+          const tx = al === 'right' ? cx + colWidths[i] - 2 : al === 'center' ? cx + colWidths[i] / 2 : cx + 2;
+          pdf.text(String(h), tx, y + 4.4, { align: al });
+          cx += colWidths[i];
+        });
+        y += 6.5;
+      };
+
+      drawHeaderRow();
+
+      rows.forEach((row, rIdx) => {
+        const isTotalRow = Boolean(row._isTotal);
+        const cellLines = row.cells.map((val, i) => pdf.splitTextToSize(String(val ?? ''), colWidths[i] - 4));
+        const maxLines = Math.max(1, ...cellLines.map(l => l.length));
+        const rowH = Math.max(5.8, maxLines * 3.5 + 2.2);
+
+        if (y + rowH > pageH - 12) {
+          pdf.addPage();
+          y = 12;
+          drawHeaderRow();
+        }
+
+        if (isTotalRow) {
+          pdf.setFillColor(238, 242, 255);
+        } else if (rIdx % 2 === 1) {
+          pdf.setFillColor(248, 250, 252);
+        } else {
+          pdf.setFillColor(255, 255, 255);
+        }
+        pdf.setDrawColor(226, 232, 240);
+        pdf.rect(margin, y, contentW, rowH, 'FD');
+
+        pdf.setFont('helvetica', isTotalRow ? 'bold' : 'normal');
+        pdf.setFontSize(7.2);
+        pdf.setTextColor(15, 23, 42);
+
+        let cx = margin;
+        cellLines.forEach((lines, i) => {
+          const al = aligns[i] || 'left';
+          const tx = al === 'right' ? cx + colWidths[i] - 2 : al === 'center' ? cx + colWidths[i] / 2 : cx + 2;
+          lines.forEach((ln, lIdx) => {
+            pdf.text(ln, tx, y + 4 + lIdx * 3.5, { align: al });
+          });
+          cx += colWidths[i];
+        });
+        y += rowH;
+      });
+      y += 5;
+    };
+
+    // Section 1: Total Items Delivered
+    if (ownerReportData.itemSummary.length > 0) {
+      const itemRows = ownerReportData.itemSummary.map(it => ({
+        cells: [it.itemName, fmtNum(it.qty), fmtRs(it.avgRate), fmtRs(it.amount)]
+      }));
+      itemRows.push({
+        _isTotal: true,
+        cells: [
+          'TOTAL DELIVERED',
+          fmtNum(ownerReportData.deliveredPackets),
+          '-',
+          fmtRs(ownerReportData.deliveredAmount)
+        ]
+      });
+      drawSectionTable(
+        '1. TOTAL ITEMS DELIVERED (ITEM-WISE SUMMARY)',
+        ['Item / Menu Pack Name', 'Qty / Packets', 'Avg Rate', 'Total Amount'],
+        itemRows,
+        [95, 30, 30, 35],
+        ['left', 'right', 'right', 'right']
+      );
+    }
+
+    // Section 2: Delivered To Whom (Unit-wise or Institution-wise)
+    if (recipientViewMode === 'INSTITUTIONWISE') {
+      const instRows = ownerReportData.institutionRecipientSummary.map(inst => ({
+        cells: [
+          `${inst.institutionName} (${inst.unitCode || inst.unitName})`,
+          fmtNum(inst.demandCount),
+          fmtNum(inst.packets),
+          fmtRs(inst.amount),
+          `${inst.verifiedCount} Ver / ${inst.demandCount - inst.verifiedCount} Pend`
+        ]
+      }));
+      instRows.push({
+        _isTotal: true,
+        cells: [
+          `TOTAL (${ownerReportData.institutionRecipientSummary.length} Institutions)`,
+          fmtNum(ownerReportData.scopedCount),
+          fmtNum(ownerReportData.deliveredPackets),
+          fmtRs(ownerReportData.deliveredAmount),
+          `${ownerReportData.verifiedCount} Ver / ${ownerReportData.docPendingCount} Pend`
+        ]
+      });
+      drawSectionTable(
+        '2. DELIVERED TO WHOM (INSTITUTION-WISE BREAKDOWN)',
+        ['Institution (NCC Unit)', 'Demands', 'Packets', 'Amount', 'Docs Status'],
+        instRows,
+        [86, 20, 22, 30, 32],
+        ['left', 'center', 'right', 'right', 'center']
+      );
+    } else {
+      const unitRows = ownerReportData.unitRecipientSummary.map(u => ({
+        cells: [
+          u.unitCode ? `${u.unitName} (${u.unitCode})` : u.unitName,
+          fmtNum(u.instCount),
+          fmtNum(u.demandCount),
+          fmtNum(u.packets),
+          fmtRs(u.amount),
+          `${u.verifiedCount} Ver / ${u.demandCount - u.verifiedCount} Pend`
+        ]
+      }));
+      unitRows.push({
+        _isTotal: true,
+        cells: [
+          `TOTAL (${ownerReportData.unitRecipientSummary.length} Units)`,
+          '-',
+          fmtNum(ownerReportData.scopedCount),
+          fmtNum(ownerReportData.deliveredPackets),
+          fmtRs(ownerReportData.deliveredAmount),
+          `${ownerReportData.verifiedCount} Ver / ${ownerReportData.docPendingCount} Pend`
+        ]
+      });
+      drawSectionTable(
+        '2. DELIVERED TO WHOM (UNIT-WISE SUMMARY)',
+        ['NCC Unit / Battalion', 'Inst.', 'Demands', 'Packets', 'Amount', 'Docs Status'],
+        unitRows,
+        [74, 14, 20, 22, 28, 32],
+        ['left', 'center', 'center', 'right', 'right', 'center']
+      );
+    }
+
+    // Section 3: Documentation Pending Datewise
+    if (ownerReportData.datePendingSummary.length > 0) {
+      const dateRows = ownerReportData.datePendingSummary.map(dt => ({
+        cells: [
+          formatDDMMYYYY(dt.date),
+          fmtNum(dt.demandCount),
+          fmtNum(dt.packets),
+          fmtRs(dt.amount),
+          fmtNum(dt.receiptPending),
+          fmtNum(dt.billPending),
+          fmtNum(dt.verifiedCount),
+          dt.pendingRefs.length > 0 ? dt.pendingRefs.join(', ') : 'All Verified'
+        ]
+      }));
+      dateRows.push({
+        _isTotal: true,
+        cells: [
+          'TOTAL',
+          fmtNum(ownerReportData.scopedCount),
+          fmtNum(ownerReportData.deliveredPackets),
+          fmtRs(ownerReportData.deliveredAmount),
+          fmtNum(ownerReportData.receiptPendingCount),
+          fmtNum(ownerReportData.billPendingCount),
+          fmtNum(ownerReportData.verifiedCount),
+          `${ownerReportData.docPendingCount} Pending`
+        ]
+      });
+      drawSectionTable(
+        '3. DOCUMENTATION PENDING — DATEWISE SUMMARY',
+        ['Date', 'Deliv.', 'Packets', 'Amount', 'Rcpt Pend', 'Bill Pend', 'Verified', 'Pending Demand Refs'],
+        dateRows,
+        [22, 13, 17, 25, 17, 16, 16, 64],
+        ['left', 'center', 'right', 'right', 'center', 'center', 'center', 'left']
+      );
+    }
+
+    // Page Footers
+    const totalPages = pdf.internal.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      pdf.setPage(p);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('Flavour Base India • Official Delivery & Documentation Summary', margin, pageH - 5);
+      pdf.text(`Page ${p} of ${totalPages}`, pageW - margin, pageH - 5, { align: 'right' });
+    }
+
+    const dateTag = new Date().toISOString().slice(0, 10);
+    pdf.save(`Flavour_Owner_Delivery_Summary_${dateTag}.pdf`);
+  };
 
   // Document Upload Handler
   const handleUploadDocs = async (e) => {
@@ -383,6 +989,179 @@ export default function DocumentationPage() {
     window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
+  const activeGroups = groupMode === 'DATEWISE' ? groupedDatewise : groupMode === 'UNITWISE' ? groupedUnitwise : [];
+  const allCollapsed = activeGroups.length > 0 && activeGroups.every(g => collapsedGroups[g.key]);
+
+  const handleToggleAllGroups = () => {
+    if (allCollapsed) {
+      setCollapsedGroups({});
+    } else {
+      const next = {};
+      activeGroups.forEach(g => {
+        next[g.key] = true;
+      });
+      setCollapsedGroups(next);
+    }
+  };
+
+  const renderManifestTable = (rows) => (
+    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap">
+            <tr>
+              <th className="px-4 py-3.5 w-[15%]"># / Demand Ref</th>
+              <th className="px-4 py-3.5 w-[18%]">Battalion / Unit</th>
+              <th className="px-4 py-3.5 w-[30%]">Delivered Institution & Address</th>
+              <th className="px-4 py-3.5 text-center w-[11%]">Packets / Value</th>
+              <th className="px-4 py-3.5 text-center w-[12%]">Delivered By</th>
+              <th className="px-4 py-3.5 text-center w-[10%]">Documentation Proof</th>
+              <th className="px-4 py-3.5 text-right w-[4%]">Summary Card</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {rows.map((dem, idx) => {
+              const hasReceipt = Boolean(dem.delivery_receipt_url);
+              const hasInvoice = Boolean(dem.invoice_url);
+              const isFullyDoc = hasReceipt && hasInvoice;
+
+              return (
+                <tr
+                  key={dem.id}
+                  onClick={() => setSelectedDemandForSummary(dem)}
+                  className="hover:bg-slate-50/90 transition-colors cursor-pointer group"
+                >
+                  {/* Col 1: # & Demand Ref (Bold & Prominent) */}
+                  <td className="px-4 py-3.5 whitespace-nowrap">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 font-mono font-black text-xs flex items-center justify-center shrink-0 border border-emerald-200 shadow-2xs">
+                        {idx + 1}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-mono font-black text-base text-blue-700 group-hover:text-blue-800 tracking-tight">
+                          {dem.demand_number}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 mt-0.5">
+                          <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                          {formatDDMMYYYY(dem.demand_date)}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Col 2: Battalion / Unit */}
+                  <td className="px-4 py-3.5">
+                    <div className="font-extrabold text-xs text-slate-900" title={dem.unit_name}>
+                      {dem.unit_name || 'General Unit'}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      {dem.unit_code && (
+                        <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded text-[10px] font-mono font-bold border border-slate-200">
+                          {dem.unit_code}
+                        </span>
+                      )}
+                      {dem.ncc_group && (
+                        <span className="px-1.5 py-0.2 bg-amber-50 text-amber-800 rounded text-[10px] font-extrabold border border-amber-200">
+                          {dem.ncc_group}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Col 3: Delivered Institution & PIN & Address */}
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h5 className="font-black text-xs sm:text-sm text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">
+                        {dem.institution_name}
+                      </h5>
+                      {dem.pin_code && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-200 shrink-0">
+                          <MapPin className="w-2.5 h-2.5 text-rose-500" />
+                          PIN {dem.pin_code}
+                        </span>
+                      )}
+                    </div>
+                    {dem.complete_address && (
+                      <p className="text-[11px] text-slate-500 font-medium truncate max-w-xl mt-0.5" title={dem.complete_address}>
+                        {dem.complete_address}
+                      </p>
+                    )}
+                  </td>
+
+                  {/* Col 4: Quantity & Amount */}
+                  <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                    <span className="text-xs font-black text-indigo-950 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-xl shadow-2xs inline-block">
+                      {dem.total_quantity || 0} Pkts
+                    </span>
+                    <div className="text-xs font-black text-emerald-700 mt-0.5">
+                      ₹{(dem.total_amount || 0).toLocaleString('en-IN')}
+                    </div>
+                  </td>
+
+                  {/* Col 5: Delivered By */}
+                  <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                    <div className="text-xs font-extrabold text-slate-800" title={dem.delivery_partner_name}>
+                      {dem.delivery_partner_name || 'Assigned Driver'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-bold mt-0.5">
+                      {dem.delivery_partner_vehicle || 'Delivery Van'}
+                    </div>
+                  </td>
+
+                  {/* Col 6: Documentation Proof */}
+                  <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      {isFullyDoc ? (
+                        <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 shadow-2xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Verified & Fully Doc</span>
+                        </span>
+                      ) : (
+                        <>
+                          {hasReceipt ? (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Receipt
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-amber-600" /> Receipt Pending
+                            </span>
+                          )}
+                          {hasInvoice ? (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-indigo-600" /> Bill
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-amber-600" /> Bill Pending
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Col 7: Summary Card */}
+                  <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDemandForSummary(dem)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-black text-xs shadow-xs transition-colors inline-flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                      title="Open Delivery Summary Card & Upload Documents"
+                    >
+                      <span>Card</span>
+                      <ExternalLink className="w-3 h-3 opacity-80" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
     <div className="w-full space-y-4">
       {/* Executive Header */}
@@ -406,7 +1185,16 @@ export default function DocumentationPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleOpenOwnerSummary}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            title="View compact executive summary & download PDF report for Flavour Base India owner"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Owner Summary & PDF</span>
+          </button>
           <button
             type="button"
             onClick={() => setBulkModalOpen(true)}
@@ -479,69 +1267,146 @@ export default function DocumentationPage() {
         </div>
 
         {/* Filter Controls Row */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-          {/* Search Box */}
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search demand #, school, driver, PIN..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-            />
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+            {/* Search Box */}
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search demand #, school, driver, PIN..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+              />
+            </div>
 
-          {/* PIN Filter */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
-            <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
-            <span className="font-extrabold text-slate-400 text-[10px]">PIN:</span>
-            <select
-              value={selectedPin}
-              onChange={e => setSelectedPin(e.target.value)}
-              className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer max-w-[120px] truncate"
-            >
-              <option value="ALL">All PINs ({availablePins.length})</option>
-              {availablePins.map(pin => (
-                <option key={pin} value={pin}>PIN {pin}</option>
-              ))}
-            </select>
-          </div>
+            {/* Date Filter */}
+            {availableDates.length > 0 && (
+              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
+                <Calendar className="w-3 h-3 text-indigo-600 shrink-0" />
+                <span className="font-extrabold text-slate-400 text-[10px]">Date:</span>
+                <select
+                  value={selectedDate}
+                  onChange={e => setSelectedDate(e.target.value)}
+                  className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer max-w-[155px] truncate"
+                >
+                  <option value="ALL">All Dates ({availableDates.length})</option>
+                  {availableDates.map(d => (
+                    <option key={d.date} value={d.date}>
+                      {formatDDMMYYYY(d.date)} ({d.count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-          {/* NCC Unit Filter */}
-          {availableUnits.length > 0 && (
+            {/* PIN Filter */}
             <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
-              <Building2 className="w-3 h-3 text-blue-600 shrink-0" />
-              <span className="font-extrabold text-slate-400 text-[10px]">Unit:</span>
+              <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+              <span className="font-extrabold text-slate-400 text-[10px]">PIN:</span>
               <select
-                value={selectedUnit}
-                onChange={e => setSelectedUnit(e.target.value)}
-                className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer max-w-[170px] truncate"
+                value={selectedPin}
+                onChange={e => setSelectedPin(e.target.value)}
+                className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer max-w-[120px] truncate"
               >
-                <option value="ALL">All Units ({availableUnits.length})</option>
-                {availableUnits.map(u => (
-                  <option key={u.code} value={u.code}>
-                    {u.code}
-                  </option>
+                <option value="ALL">All PINs ({availablePins.length})</option>
+                {availablePins.map(pin => (
+                  <option key={pin} value={pin}>PIN {pin}</option>
                 ))}
               </select>
             </div>
-          )}
 
-          {/* Reset button */}
-          {(selectedPin !== 'ALL' || selectedUnit !== 'ALL' || docFilter !== 'BALANCE' || searchTerm) && (
-            <button
-              onClick={() => {
-                setSelectedPin('ALL');
-                setSelectedUnit('ALL');
-                setDocFilter('BALANCE');
-                setSearchTerm('');
-              }}
-              className="px-2 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1"
-            >
-              <X className="w-3 h-3" /> Reset
-            </button>
-          )}
+            {/* NCC Unit Filter */}
+            {availableUnits.length > 0 && (
+              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
+                <Building2 className="w-3 h-3 text-blue-600 shrink-0" />
+                <span className="font-extrabold text-slate-400 text-[10px]">Unit:</span>
+                <select
+                  value={selectedUnit}
+                  onChange={e => setSelectedUnit(e.target.value)}
+                  className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer max-w-[170px] truncate"
+                >
+                  <option value="ALL">All Units ({availableUnits.length})</option>
+                  {availableUnits.map(u => (
+                    <option key={u.code} value={u.code}>
+                      {u.code} ({u.count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Reset button */}
+            {(selectedDate !== 'ALL' || selectedPin !== 'ALL' || selectedUnit !== 'ALL' || docFilter !== 'BALANCE' || searchTerm) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDate('ALL');
+                  setSelectedPin('ALL');
+                  setSelectedUnit('ALL');
+                  setDocFilter('BALANCE');
+                  setSearchTerm('');
+                }}
+                className="px-2 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <X className="w-3 h-3" /> Reset
+              </button>
+            )}
+          </div>
+
+          {/* Group By View Mode Switcher */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => { setGroupMode('DATEWISE'); setCollapsedGroups({}); }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  groupMode === 'DATEWISE'
+                    ? 'bg-white text-indigo-700 shadow-xs border border-indigo-200/70'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Calendar className="w-3 h-3" />
+                <span>Datewise</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setGroupMode('UNITWISE'); setCollapsedGroups({}); }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  groupMode === 'UNITWISE'
+                    ? 'bg-white text-blue-700 shadow-xs border border-blue-200/70'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Building2 className="w-3 h-3" />
+                <span>Unitwise</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGroupMode('ALL')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  groupMode === 'ALL'
+                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Layers className="w-3 h-3" />
+                <span>All</span>
+              </button>
+            </div>
+
+            {groupMode !== 'ALL' && activeGroups.length > 1 && (
+              <button
+                type="button"
+                onClick={handleToggleAllGroups}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-extrabold transition-colors cursor-pointer"
+                title={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
+              >
+                {allCollapsed ? 'Expand All' : 'Collapse All'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -567,162 +1432,119 @@ export default function DocumentationPage() {
             </Link>
           </div>
         </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                <tr>
-                  <th className="px-4 py-3.5 w-[15%]"># / Demand Ref</th>
-                  <th className="px-4 py-3.5 w-[18%]">Battalion / Unit</th>
-                  <th className="px-4 py-3.5 w-[30%]">Delivered Institution & Address</th>
-                  <th className="px-4 py-3.5 text-center w-[11%]">Packets / Value</th>
-                  <th className="px-4 py-3.5 text-center w-[12%]">Delivered By</th>
-                  <th className="px-4 py-3.5 text-center w-[10%]">Documentation Proof</th>
-                  <th className="px-4 py-3.5 text-right w-[4%]">Summary Card</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {filteredDemands.map((dem, idx) => {
-                  const hasReceipt = Boolean(dem.delivery_receipt_url);
-                  const hasInvoice = Boolean(dem.invoice_url);
-                  const isFullyDoc = hasReceipt && hasInvoice;
-
-                  return (
-                    <tr
-                      key={dem.id}
-                      onClick={() => setSelectedDemandForSummary(dem)}
-                      className="hover:bg-slate-50/90 transition-colors cursor-pointer group"
-                    >
-                      {/* Col 1: # & Demand Ref (Bold & Prominent) */}
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 font-mono font-black text-xs flex items-center justify-center shrink-0 border border-emerald-200 shadow-2xs">
-                            {idx + 1}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-mono font-black text-base text-blue-700 group-hover:text-blue-800 tracking-tight">
-                              {dem.demand_number}
-                            </span>
-                            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 mt-0.5">
-                              <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                              {formatDDMMYYYY(dem.demand_date)}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Col 2: Battalion / Unit */}
-                      <td className="px-4 py-3.5">
-                        <div className="font-extrabold text-xs text-slate-900" title={dem.unit_name}>
-                          {dem.unit_name || 'General Unit'}
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          {dem.unit_code && (
-                            <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded text-[10px] font-mono font-bold border border-slate-200">
-                              {dem.unit_code}
-                            </span>
-                          )}
-                          {dem.ncc_group && (
-                            <span className="px-1.5 py-0.2 bg-amber-50 text-amber-800 rounded text-[10px] font-extrabold border border-amber-200">
-                              {dem.ncc_group}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Col 3: Delivered Institution & PIN & Address */}
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h5 className="font-black text-xs sm:text-sm text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">
-                            {dem.institution_name}
-                          </h5>
-                          {dem.pin_code && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-200 shrink-0">
-                              <MapPin className="w-2.5 h-2.5 text-rose-500" />
-                              PIN {dem.pin_code}
-                            </span>
-                          )}
-                        </div>
-                        {dem.complete_address && (
-                          <p className="text-[11px] text-slate-500 font-medium truncate max-w-xl mt-0.5" title={dem.complete_address}>
-                            {dem.complete_address}
-                          </p>
-                        )}
-                      </td>
-
-                      {/* Col 4: Quantity & Amount */}
-                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                        <span className="text-xs font-black text-indigo-950 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-xl shadow-2xs inline-block">
-                          {dem.total_quantity || 0} Pkts
+      ) : groupMode === 'DATEWISE' ? (
+        <div className="space-y-4">
+          {groupedDatewise.map(dateGroup => {
+            const isExpanded = !collapsedGroups[dateGroup.key];
+            return (
+              <div key={dateGroup.key} className="space-y-2.5">
+                {/* Datewise Banner Header */}
+                <div
+                  onClick={() => toggleGroupCollapse(dateGroup.key)}
+                  className="bg-gradient-to-r from-indigo-50/90 via-slate-50 to-white rounded-2xl p-3.5 sm:px-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border border-indigo-200/80 cursor-pointer hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-center gap-3">
+                    {isExpanded ? <ChevronDown className="w-5 h-5 text-indigo-600 shrink-0" /> : <ChevronRight className="w-5 h-5 text-indigo-600 shrink-0" />}
+                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-indigo-700">
+                        Delivery Date
+                      </div>
+                      <h3 className="text-sm sm:text-base font-black tracking-tight text-slate-900 flex items-center gap-2 flex-wrap">
+                        <span>{formatDateDisplay(dateGroup.date)}</span>
+                        <span className="text-xs font-mono text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                          {formatDDMMYYYY(dateGroup.date)}
                         </span>
-                        <div className="text-xs font-black text-emerald-700 mt-0.5">
-                          ₹{(dem.total_amount || 0).toLocaleString('en-IN')}
-                        </div>
-                      </td>
+                      </h3>
+                    </div>
+                  </div>
 
-                      {/* Col 5: Delivered By */}
-                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                        <div className="text-xs font-extrabold text-slate-800" title={dem.delivery_partner_name}>
-                          {dem.delivery_partner_name || 'Assigned Driver'}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold mt-0.5">
-                          {dem.delivery_partner_vehicle || 'Delivery Van'}
-                        </div>
-                      </td>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-xl bg-white text-slate-700 font-extrabold text-xs border border-slate-200 shadow-2xs flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                      <span>{dateGroup.unitCount} Unit{dateGroup.unitCount !== 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 font-extrabold text-xs border border-amber-200/80 shadow-2xs flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{dateGroup.demands.length} Demand{dateGroup.demands.length !== 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-xl bg-blue-50 text-blue-800 font-black text-xs border border-blue-200 shadow-2xs">
+                      {dateGroup.totalPackets.toLocaleString('en-IN')} Pkts
+                    </span>
+                    <span className="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 font-black text-xs border border-emerald-200 shadow-2xs">
+                      ₹{dateGroup.totalAmount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
 
-                      {/* Col 6: Documentation Proof */}
-                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                          {isFullyDoc ? (
-                            <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 shadow-2xs">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Verified & Fully Doc</span>
-                            </span>
-                          ) : (
-                            <>
-                              {hasReceipt ? (
-                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Receipt
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
-                                  <AlertTriangle className="w-3 h-3 text-amber-600" /> Receipt Pending
-                                </span>
-                              )}
-                              {hasInvoice ? (
-                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
-                                  <CheckCircle2 className="w-3 h-3 text-indigo-600" /> Bill
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
-                                  <AlertTriangle className="w-3 h-3 text-amber-600" /> Bill Pending
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Col 7: Summary Card */}
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDemandForSummary(dem)}
-                          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-black text-xs shadow-xs transition-colors inline-flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                          title="Open Delivery Summary Card & Upload Documents"
-                        >
-                          <span>Card</span>
-                          <ExternalLink className="w-3 h-3 opacity-80" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                {isExpanded && renderManifestTable(dateGroup.demands)}
+              </div>
+            );
+          })}
         </div>
+      ) : groupMode === 'UNITWISE' ? (
+        <div className="space-y-4">
+          {groupedUnitwise.map(unitGroup => {
+            const isExpanded = !collapsedGroups[unitGroup.key];
+            return (
+              <div key={unitGroup.key} className="space-y-2.5">
+                {/* Unitwise Banner Header */}
+                <div
+                  onClick={() => toggleGroupCollapse(unitGroup.key)}
+                  className="bg-gradient-to-r from-blue-50/90 via-slate-50 to-white rounded-2xl p-3.5 sm:px-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border border-blue-200/80 cursor-pointer hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-center gap-3">
+                    {isExpanded ? <ChevronDown className="w-5 h-5 text-blue-600 shrink-0" /> : <ChevronRight className="w-5 h-5 text-blue-600 shrink-0" />}
+                    <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-blue-700 flex items-center gap-1.5">
+                        <span>NCC Unit / Battalion</span>
+                        {unitGroup.nccGroup && (
+                          <span className="px-1.5 py-0.2 bg-amber-50 text-amber-800 rounded text-[10px] font-extrabold border border-amber-200">
+                            {unitGroup.nccGroup}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-sm sm:text-base font-black tracking-tight text-slate-900 flex items-center gap-2 flex-wrap">
+                        <span>{unitGroup.unitName}</span>
+                        {unitGroup.unitCode && (
+                          <span className="text-xs font-mono text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                            {unitGroup.unitCode}
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-xl bg-white text-slate-700 font-extrabold text-xs border border-slate-200 shadow-2xs flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>{unitGroup.dateCount} Date{unitGroup.dateCount !== 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 font-extrabold text-xs border border-amber-200/80 shadow-2xs flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{unitGroup.demands.length} Demand{unitGroup.demands.length !== 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-xl bg-blue-50 text-blue-800 font-black text-xs border border-blue-200 shadow-2xs">
+                      {unitGroup.totalPackets.toLocaleString('en-IN')} Pkts
+                    </span>
+                    <span className="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 font-black text-xs border border-emerald-200 shadow-2xs">
+                      ₹{unitGroup.totalAmount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+
+                {isExpanded && renderManifestTable(unitGroup.demands)}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        renderManifestTable(filteredDemands)
       )}
 
       {/* SUMMARY CARD MODAL (ONLY ACCESSIBLE AFTER DELIVERY) */}
@@ -1290,6 +2112,269 @@ export default function DocumentationPage() {
                     <><Upload className="w-3.5 h-3.5" /> Confirm & Upload ({bulkFiles.filter(f => f.matchedDemandId).length})</>
                   )}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OWNER EXECUTIVE SUMMARY & COMPACT PDF MODAL */}
+      {summaryModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
+          onClick={() => setSummaryModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
+                  Flavour Base India • Executive Report
+                </div>
+                <h2 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
+                  <span>Delivery, Amount & Documentation Summary</span>
+                </h2>
+                <p className="text-[11px] text-slate-300 font-medium mt-0.5">
+                  Scope: {selectedDate === 'ALL' ? 'All Dates' : formatDDMMYYYY(selectedDate)} • {selectedUnit === 'ALL' ? 'All Units' : selectedUnit} • {selectedPin === 'ALL' ? 'All PINs' : `PIN ${selectedPin}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadOwnerPdf}
+                  disabled={loadingSummary}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Compact PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSummaryModalOpen(false)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-5 bg-slate-50/70">
+              {/* KPI Strip */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-blue-50/90 border border-blue-200 rounded-2xl p-3.5">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-blue-700">Total Demand Generated</div>
+                  <div className="text-xl font-black text-slate-900 mt-1">
+                    {loadingSummary ? '...' : (ownerSummaryStats?.generated?.count ?? ownerReportData.scopedCount).toLocaleString('en-IN')}
+                    <span className="text-xs font-bold text-slate-500 ml-1">Demands</span>
+                  </div>
+                  <div className="text-xs font-bold text-blue-800 mt-0.5">
+                    {(ownerSummaryStats?.generated?.packets ?? ownerReportData.deliveredPackets).toLocaleString('en-IN')} Pkts • ₹{(ownerSummaryStats?.generated?.amount ?? ownerReportData.deliveredAmount).toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-3.5">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                    Total Demand Delivered
+                    {ownerSummaryStats?.generated?.count > 0 && (
+                      <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px]">
+                        {Math.round(((ownerSummaryStats?.delivered?.count ?? 0) / ownerSummaryStats.generated.count) * 100)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-black text-slate-900 mt-1">
+                    {(ownerSummaryStats?.delivered?.count ?? ownerReportData.scopedCount).toLocaleString('en-IN')}
+                    <span className="text-xs font-bold text-slate-500 ml-1">Demands</span>
+                  </div>
+                  <div className="text-xs font-bold text-emerald-800 mt-0.5">
+                    {(ownerSummaryStats?.delivered?.packets ?? ownerReportData.deliveredPackets).toLocaleString('en-IN')} Pkts • ₹{(ownerSummaryStats?.delivered?.amount ?? ownerReportData.deliveredAmount).toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Pending Delivery</div>
+                  <div className="text-xl font-black text-slate-900 mt-1">
+                    {loadingSummary ? '...' : (ownerSummaryStats?.pending_delivery?.count ?? 0).toLocaleString('en-IN')}
+                    <span className="text-xs font-bold text-slate-500 ml-1">Demands</span>
+                  </div>
+                  <div className="text-xs font-bold text-slate-600 mt-0.5">
+                    {(ownerSummaryStats?.pending_delivery?.packets ?? 0).toLocaleString('en-IN')} Pkts in pipeline
+                  </div>
+                </div>
+
+                <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-3.5">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-amber-800">Docs Pending (Balance)</div>
+                  <div className="text-xl font-black text-slate-900 mt-1">
+                    {ownerReportData.docPendingCount.toLocaleString('en-IN')}
+                    <span className="text-xs font-bold text-slate-500 ml-1">Demands</span>
+                  </div>
+                  <div className="text-xs font-bold text-amber-800 mt-0.5">
+                    Rcpt: {ownerReportData.receiptPendingCount} • Bill: {ownerReportData.billPendingCount} • ₹{ownerReportData.docPendingAmount.toLocaleString('en-IN')}
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. Total Items Delivered */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>1. Total Items Delivered (Item-wise)</span>
+                  </h3>
+                  <span className="text-[11px] font-bold text-slate-500">{ownerReportData.itemSummary.length} Item(s)</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/60 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500">
+                      <tr>
+                        <th className="px-4 py-2">Item / Menu Pack</th>
+                        <th className="px-4 py-2 text-right">Qty / Packets</th>
+                        <th className="px-4 py-2 text-right">Avg Rate</th>
+                        <th className="px-4 py-2 text-right">Total Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {ownerReportData.itemSummary.map(it => (
+                        <tr key={it.itemName} className="hover:bg-slate-50">
+                          <td className="px-4 py-2 font-bold text-slate-900">{it.itemName}</td>
+                          <td className="px-4 py-2 text-right font-mono font-bold text-indigo-700">{it.qty.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-2 text-right font-mono text-slate-600">₹{it.avgRate.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-2 text-right font-mono font-black text-emerald-700">₹{it.amount.toLocaleString('en-IN')}</td>
+                        </tr>
+                      ))}
+                      <tr className="bg-indigo-50/70 font-black text-slate-900">
+                        <td className="px-4 py-2">TOTAL DELIVERED</td>
+                        <td className="px-4 py-2 text-right font-mono">{ownerReportData.deliveredPackets.toLocaleString('en-IN')}</td>
+                        <td className="px-4 py-2 text-right">-</td>
+                        <td className="px-4 py-2 text-right font-mono text-emerald-800">₹{ownerReportData.deliveredAmount.toLocaleString('en-IN')}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 2. Delivered To Whom */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>2. Delivered To Whom</span>
+                  </h3>
+                  <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setRecipientViewMode('UNITWISE')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all cursor-pointer ${
+                        recipientViewMode === 'UNITWISE' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-600'
+                      }`}
+                    >
+                      Unit-wise ({ownerReportData.unitRecipientSummary.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecipientViewMode('INSTITUTIONWISE')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all cursor-pointer ${
+                        recipientViewMode === 'INSTITUTIONWISE' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-600'
+                      }`}
+                    >
+                      Institution-wise ({ownerReportData.institutionRecipientSummary.length})
+                    </button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto max-h-64">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/90 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2">{recipientViewMode === 'UNITWISE' ? 'NCC Unit / Battalion' : 'Institution (Unit)'}</th>
+                        {recipientViewMode === 'UNITWISE' && <th className="px-4 py-2 text-center">Inst.</th>}
+                        <th className="px-4 py-2 text-center">Demands</th>
+                        <th className="px-4 py-2 text-right">Packets</th>
+                        <th className="px-4 py-2 text-right">Amount</th>
+                        <th className="px-4 py-2 text-center">Docs (Verified / Pending)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {recipientViewMode === 'UNITWISE'
+                        ? ownerReportData.unitRecipientSummary.map(u => (
+                            <tr key={u.key} className="hover:bg-slate-50">
+                              <td className="px-4 py-2 font-bold text-slate-900">
+                                {u.unitName} {u.unitCode && <span className="text-[10px] font-mono text-slate-500">({u.unitCode})</span>}
+                              </td>
+                              <td className="px-4 py-2 text-center font-mono text-slate-600">{u.instCount}</td>
+                              <td className="px-4 py-2 text-center font-mono font-bold">{u.demandCount}</td>
+                              <td className="px-4 py-2 text-right font-mono font-bold text-indigo-700">{u.packets.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-2 text-right font-mono font-black text-emerald-700">₹{u.amount.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-2 text-center">
+                                <span className="text-emerald-700 font-bold">{u.verifiedCount} Ver</span>
+                                <span className="text-slate-400 mx-1">/</span>
+                                <span className="text-amber-700 font-bold">{u.demandCount - u.verifiedCount} Pend</span>
+                              </td>
+                            </tr>
+                          ))
+                        : ownerReportData.institutionRecipientSummary.map(inst => (
+                            <tr key={inst.key} className="hover:bg-slate-50">
+                              <td className="px-4 py-2 font-bold text-slate-900">
+                                {inst.institutionName} <span className="text-[10px] font-mono text-slate-500">({inst.unitCode || inst.unitName})</span>
+                              </td>
+                              <td className="px-4 py-2 text-center font-mono font-bold">{inst.demandCount}</td>
+                              <td className="px-4 py-2 text-right font-mono font-bold text-indigo-700">{inst.packets.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-2 text-right font-mono font-black text-emerald-700">₹{inst.amount.toLocaleString('en-IN')}</td>
+                              <td className="px-4 py-2 text-center">
+                                <span className="text-emerald-700 font-bold">{inst.verifiedCount} Ver</span>
+                                <span className="text-slate-400 mx-1">/</span>
+                                <span className="text-amber-700 font-bold">{inst.demandCount - inst.verifiedCount} Pend</span>
+                              </td>
+                            </tr>
+                          ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 3. Documentation Pending Datewise */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                    <span>3. Documentation Pending — Datewise</span>
+                  </h3>
+                  <span className="text-[11px] font-bold text-slate-500">{ownerReportData.datePendingSummary.length} Date(s)</span>
+                </div>
+                <div className="overflow-x-auto max-h-64">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/90 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2">Date</th>
+                        <th className="px-4 py-2 text-center">Delivered</th>
+                        <th className="px-4 py-2 text-right">Packets</th>
+                        <th className="px-4 py-2 text-right">Amount</th>
+                        <th className="px-4 py-2 text-center">Rcpt Pend</th>
+                        <th className="px-4 py-2 text-center">Bill Pend</th>
+                        <th className="px-4 py-2 text-center">Verified</th>
+                        <th className="px-4 py-2">Pending Demand Refs</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {ownerReportData.datePendingSummary.map(dt => (
+                        <tr key={dt.date} className="hover:bg-slate-50">
+                          <td className="px-4 py-2 font-mono font-bold text-slate-900 whitespace-nowrap">{formatDDMMYYYY(dt.date)}</td>
+                          <td className="px-4 py-2 text-center font-mono font-bold">{dt.demandCount}</td>
+                          <td className="px-4 py-2 text-right font-mono font-bold text-indigo-700">{dt.packets.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-2 text-right font-mono font-black text-emerald-700">₹{dt.amount.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-2 text-center font-mono font-bold text-amber-700">{dt.receiptPending}</td>
+                          <td className="px-4 py-2 text-center font-mono font-bold text-amber-700">{dt.billPending}</td>
+                          <td className="px-4 py-2 text-center font-mono font-bold text-emerald-700">{dt.verifiedCount}</td>
+                          <td className="px-4 py-2 text-[11px] font-mono text-slate-600 max-w-xs truncate" title={dt.pendingRefs.join(', ')}>
+                            {dt.pendingRefs.length > 0 ? dt.pendingRefs.join(', ') : <span className="text-emerald-700 font-sans font-bold">All Verified</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>

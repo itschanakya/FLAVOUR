@@ -202,6 +202,80 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
   }
 });
 
+// GET /api/delivery/documentation-summary - Compact executive summary of generated vs delivered demands
+router.get('/documentation-summary', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const db = await getDB();
+    const { date, unit_code, pin_code } = req.query;
+
+    let whereSql = ` WHERE d.is_deleted = 0 AND d.status NOT IN ('REJECTED', 'CANCELLED')`;
+    const params = [];
+
+    if (date && date !== 'ALL') {
+      whereSql += ` AND d.demand_date = ?`;
+      params.push(date);
+    }
+    if (unit_code && unit_code !== 'ALL') {
+      whereSql += ` AND (u.unit_code = ? OR u.unit_name = ?)`;
+      params.push(unit_code, unit_code);
+    }
+    if (pin_code && pin_code !== 'ALL') {
+      whereSql += ` AND i.pin_code = ?`;
+      params.push(pin_code);
+    }
+
+    const row = await db.get(
+      `SELECT
+         COUNT(*) as generated_count,
+         COALESCE(SUM(COALESCE(di_agg.total_qty, 0)), 0) as generated_packets,
+         COALESCE(SUM(COALESCE(di_agg.total_amt, 0)), 0) as generated_amount,
+         SUM(CASE WHEN d.delivery_status = 'DELIVERED' OR d.status = 'FULFILLED' THEN 1 ELSE 0 END) as delivered_count,
+         COALESCE(SUM(CASE WHEN d.delivery_status = 'DELIVERED' OR d.status = 'FULFILLED' THEN COALESCE(di_agg.total_qty, 0) ELSE 0 END), 0) as delivered_packets,
+         COALESCE(SUM(CASE WHEN d.delivery_status = 'DELIVERED' OR d.status = 'FULFILLED' THEN COALESCE(di_agg.total_amt, 0) ELSE 0 END), 0) as delivered_amount
+       FROM demands d
+       LEFT JOIN institutions i ON d.institution_id = i.id
+       JOIN units u ON d.unit_id = u.id
+       LEFT JOIN (
+         SELECT demand_id,
+                SUM(quantity) as total_qty,
+                SUM(quantity * COALESCE(unit_price_snapshot, 0)) as total_amt
+         FROM demand_items
+         GROUP BY demand_id
+       ) di_agg ON di_agg.demand_id = d.id
+       ${whereSql}`,
+      params
+    );
+
+    const generatedCount = Number(row?.generated_count) || 0;
+    const generatedPackets = Number(row?.generated_packets) || 0;
+    const generatedAmount = Number(row?.generated_amount) || 0;
+    const deliveredCount = Number(row?.delivered_count) || 0;
+    const deliveredPackets = Number(row?.delivered_packets) || 0;
+    const deliveredAmount = Number(row?.delivered_amount) || 0;
+
+    res.json({
+      generated: {
+        count: generatedCount,
+        packets: generatedPackets,
+        amount: generatedAmount
+      },
+      delivered: {
+        count: deliveredCount,
+        packets: deliveredPackets,
+        amount: deliveredAmount
+      },
+      pending_delivery: {
+        count: Math.max(0, generatedCount - deliveredCount),
+        packets: Math.max(0, generatedPackets - deliveredPackets),
+        amount: Math.max(0, generatedAmount - deliveredAmount)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching documentation summary:', error);
+    res.status(500).json({ error: 'Failed to fetch documentation summary' });
+  }
+});
+
 // GET /api/delivery/partners - List all delivery partners
 router.get('/partners', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
