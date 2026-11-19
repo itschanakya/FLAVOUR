@@ -209,8 +209,8 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Server error during authentication.' });
+    console.error('Login error:', error.code || '', error.message || error);
+    res.status(500).json({ error: 'Server error during authentication.', code: error.code || undefined });
   }
 });
 
@@ -286,8 +286,8 @@ router.post('/verify-otp', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Server error during authentication.' });
+    console.error('Login error:', error.code || '', error.message || error);
+    res.status(500).json({ error: 'Server error during authentication.', code: error.code || undefined });
   }
 });
 

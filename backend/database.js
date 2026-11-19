@@ -62,22 +62,33 @@ async function getDB() {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    const pool = mysql.createPool({
-      uri: process.env.DATABASE_URL || 'mysql://root:password@127.0.0.1:4000/test',
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      multipleStatements: true,
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 10000,
-      ssl: process.env.DATABASE_URL ? { rejectUnauthorized: true } : undefined
-    });
+    try {
+      const pool = mysql.createPool({
+        uri: process.env.DATABASE_URL || 'mysql://root:password@127.0.0.1:4000/test',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        multipleStatements: true,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000,
+        connectTimeout: 15000,
+        ssl: process.env.DATABASE_URL ? { rejectUnauthorized: true } : undefined
+      });
 
-    const instance = new DBWrapper(pool);
-    await initializeSchema(instance);
-    await upgradeInventorySchema(instance);
-    dbInstance = instance;
-    return dbInstance;
+      const instance = new DBWrapper(pool);
+      await initializeSchema(instance);
+      dbInstance = instance;
+
+      // Run incremental column/index checks in background so login/requests never block for 20s+ on cold start
+      upgradeInventorySchema(instance).catch(err => {
+        console.warn('Background schema upgrade warning:', err.message);
+      });
+
+      return dbInstance;
+    } catch (err) {
+      initPromise = null;
+      throw err;
+    }
   })();
 
   return initPromise;
