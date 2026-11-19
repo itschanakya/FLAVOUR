@@ -357,11 +357,26 @@ router.post('/mark-received', authenticateToken, authorizeRoles('ADMIN', 'UNIT')
     }
 
     let emailSent = false;
+    let targetEmail = instSummary.ano_email || '';
+    let targetUserId = instSummary.ano_user_id || null;
+
+    // Fallback direct lookup in users table if instSummary lacked registered ANO email/user_id
+    if ((!targetEmail || !targetEmail.includes('@') || !targetUserId) && isReceived && !wasAlreadyReceived) {
+      const anoUserRow = await db.get(
+        `SELECT id, name, email FROM users WHERE role = 'INSTITUTION' AND institution_id = ? AND email IS NOT NULL AND email LIKE '%@%' ORDER BY id DESC LIMIT 1`,
+        [institution_id]
+      );
+      if (anoUserRow) {
+        if (!targetEmail || !targetEmail.includes('@')) targetEmail = anoUserRow.email;
+        if (!targetUserId) targetUserId = anoUserRow.id;
+      }
+    }
+
     // Thanks message goes out only when status changes Balance -> Received (never duplicated)
     if (isReceived && !wasAlreadyReceived) {
       // Send Confirmation & Appreciation Email to ANO
-      if (instSummary.ano_email && instSummary.ano_email.includes('@')) {
-        emailSent = await sendAnoBillReceivedConfirmationEmail(instSummary.ano_email, {
+      if (targetEmail && targetEmail.includes('@')) {
+        emailSent = await sendAnoBillReceivedConfirmationEmail(targetEmail, {
           institutionName: inst.institution_name,
           anoName: instSummary.ano_cto_name,
           unitName: instSummary.unit_name,
@@ -375,11 +390,11 @@ router.post('/mark-received', authenticateToken, authorizeRoles('ADMIN', 'UNIT')
       }
 
       // Create in-app notification for ANO
-      if (instSummary.ano_user_id) {
+      if (targetUserId) {
         await db.run(
           `INSERT INTO notifications (user_id, title, message, link_url) VALUES (?, ?, ?, '/bills')`,
           [
-            instSummary.ano_user_id,
+            targetUserId,
             `Countersigned Bill Received (${instSummary.month_label})`,
             `Your physical countersigned refreshment bill(s) for ${instSummary.month_label} (${instSummary.total_packets} pkts, ₹${Number(instSummary.total_amount || 0).toLocaleString('en-IN')}) have been marked as RECEIVED by ${instSummary.unit_name}. Thank you!`
           ]
@@ -389,9 +404,10 @@ router.post('/mark-received', authenticateToken, authorizeRoles('ADMIN', 'UNIT')
 
     res.json({
       message: isReceived
-        ? `Marked as RECEIVED at Unit.${emailSent ? ' Confirmation & Thanks email sent to ANO.' : ''}`
+        ? `Marked as RECEIVED at Unit.${emailSent ? ` Confirmation & Thanks email sent to ${targetEmail}.` : targetEmail ? ' (Email delivery failed — please check mail logs.)' : ' (No registered ANO email found.)'}`
         : 'Reverted status to BALANCE (Pending Submission).',
-      emailSent
+      emailSent,
+      emailTarget: targetEmail || null
     });
   } catch (error) {
     console.error('Mark bill received error:', error);
