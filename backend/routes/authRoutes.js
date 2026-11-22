@@ -393,6 +393,42 @@ router.put('/credentials', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/auth/owner-report-settings (Admin only)
+router.get('/owner-report-settings', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const db = await getDB();
+    const { getAppSetting } = require('../utils/ownerReportMailer');
+    const owner_report_email = await getAppSetting(db, 'owner_report_email', '');
+    const owner_report_enabled = (await getAppSetting(db, 'owner_report_enabled', 'true')) !== 'false';
+    const owner_report_last_sent_date = await getAppSetting(db, 'owner_report_last_sent_date', '');
+    res.json({ owner_report_email, owner_report_enabled, owner_report_last_sent_date });
+  } catch (error) {
+    console.error('Fetch owner report settings error:', error);
+    res.status(500).json({ error: 'Failed to fetch owner report settings' });
+  }
+});
+
+// PUT /api/auth/owner-report-settings (Admin only)
+router.put('/owner-report-settings', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const { owner_report_email, owner_report_enabled } = req.body;
+    const db = await getDB();
+    const { setAppSetting } = require('../utils/ownerReportMailer');
+    await setAppSetting(db, 'owner_report_email', String(owner_report_email || '').trim());
+    await setAppSetting(db, 'owner_report_enabled', owner_report_enabled === false ? 'false' : 'true');
+    res.json({ message: 'Owner report email settings saved successfully.' });
+  } catch (error) {
+    console.error('Update owner report settings error:', error);
+    res.status(500).json({ error: 'Failed to save owner report settings' });
+  }
+});
+
 // POST /api/auth/forgot-password/send-otp
 router.post('/forgot-password/send-otp', async (req, res) => {
   try {

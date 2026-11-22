@@ -156,7 +156,7 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
 
     if (demands.length > 0) {
       const demandIds = demands.map(d => d.id);
-      
+
       const allItems = [];
       const chunkSize = 100;
       for (let i = 0; i < demandIds.length; i += chunkSize) {
@@ -202,77 +202,50 @@ router.get('/demands', authenticateToken, authorizeRoles('ADMIN'), async (req, r
   }
 });
 
+const { buildOwnerSummaryData } = require('../utils/ownerSummaryBuilder');
+const { sendOwnerSummaryReport } = require('../utils/ownerReportMailer');
+
 // GET /api/delivery/documentation-summary - Compact executive summary of generated vs delivered demands
 router.get('/documentation-summary', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const db = await getDB();
     const { date, unit_code, pin_code } = req.query;
-
-    let whereSql = ` WHERE d.is_deleted = 0 AND d.status NOT IN ('REJECTED', 'CANCELLED')`;
-    const params = [];
-
-    if (date && date !== 'ALL') {
-      whereSql += ` AND d.demand_date = ?`;
-      params.push(date);
-    }
-    if (unit_code && unit_code !== 'ALL') {
-      whereSql += ` AND (u.unit_code = ? OR u.unit_name = ?)`;
-      params.push(unit_code, unit_code);
-    }
-    if (pin_code && pin_code !== 'ALL') {
-      whereSql += ` AND i.pin_code = ?`;
-      params.push(pin_code);
-    }
-
-    const row = await db.get(
-      `SELECT
-         COUNT(*) as generated_count,
-         COALESCE(SUM(COALESCE(di_agg.total_qty, 0)), 0) as generated_packets,
-         COALESCE(SUM(COALESCE(di_agg.total_amt, 0)), 0) as generated_amount,
-         SUM(CASE WHEN d.delivery_status = 'DELIVERED' OR d.status = 'FULFILLED' THEN 1 ELSE 0 END) as delivered_count,
-         COALESCE(SUM(CASE WHEN d.delivery_status = 'DELIVERED' OR d.status = 'FULFILLED' THEN COALESCE(di_agg.total_qty, 0) ELSE 0 END), 0) as delivered_packets,
-         COALESCE(SUM(CASE WHEN d.delivery_status = 'DELIVERED' OR d.status = 'FULFILLED' THEN COALESCE(di_agg.total_amt, 0) ELSE 0 END), 0) as delivered_amount
-       FROM demands d
-       LEFT JOIN institutions i ON d.institution_id = i.id
-       JOIN units u ON d.unit_id = u.id
-       LEFT JOIN (
-         SELECT demand_id,
-                SUM(quantity) as total_qty,
-                SUM(quantity * COALESCE(unit_price_snapshot, 0)) as total_amt
-         FROM demand_items
-         GROUP BY demand_id
-       ) di_agg ON di_agg.demand_id = d.id
-       ${whereSql}`,
-      params
-    );
-
-    const generatedCount = Number(row?.generated_count) || 0;
-    const generatedPackets = Number(row?.generated_packets) || 0;
-    const generatedAmount = Number(row?.generated_amount) || 0;
-    const deliveredCount = Number(row?.delivered_count) || 0;
-    const deliveredPackets = Number(row?.delivered_packets) || 0;
-    const deliveredAmount = Number(row?.delivered_amount) || 0;
-
-    res.json({
-      generated: {
-        count: generatedCount,
-        packets: generatedPackets,
-        amount: generatedAmount
-      },
-      delivered: {
-        count: deliveredCount,
-        packets: deliveredPackets,
-        amount: deliveredAmount
-      },
-      pending_delivery: {
-        count: Math.max(0, generatedCount - deliveredCount),
-        packets: Math.max(0, generatedPackets - deliveredPackets),
-        amount: Math.max(0, generatedAmount - deliveredAmount)
-      }
-    });
+    const summary = await buildOwnerSummaryData(db, { date, unit_code, pin_code });
+    res.json(summary);
   } catch (error) {
     console.error('Error fetching documentation summary:', error);
     res.status(500).json({ error: 'Failed to fetch documentation summary' });
+  }
+});
+
+// POST /api/delivery/send-owner-summary-now - Manual trigger from Admin Settings
+router.post('/send-owner-summary-now', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const result = await sendOwnerSummaryReport({ force: true });
+    if (!result.sent) {
+      return res.status(400).json({ error: result.reason || 'Failed to send owner summary report' });
+    }
+    res.json({ message: `Owner summary & PDF sent successfully to ${result.to}`, ...result });
+  } catch (error) {
+    console.error('Error sending owner summary now:', error);
+    res.status(500).json({ error: 'Failed to send owner summary email' });
+  }
+});
+
+// POST /api/delivery/trigger-owner-summary-email - External cron trigger (08:00 AM IST)
+router.post('/trigger-owner-summary-email', async (req, res) => {
+  try {
+    const expectedSecret = process.env.CRON_SECRET || process.env.JWT_SECRET;
+    const providedSecret = req.headers['x-cron-secret'] || req.query.secret || req.body?.secret;
+    if (!expectedSecret || providedSecret !== expectedSecret) {
+      return res.status(401).json({ error: 'Unauthorized cron trigger' });
+    }
+    const force = req.query.force === 'true' || req.body?.force === true;
+    const result = await sendOwnerSummaryReport({ force });
+    res.json(result);
+  } catch (error) {
+    console.error('Error in cron trigger owner summary:', error);
+    res.status(500).json({ error: 'Cron trigger failed' });
   }
 });
 
@@ -1160,7 +1133,7 @@ router.post('/reset', authenticateToken, authorizeRoles('ADMIN'), async (req, re
         'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
         [demand.id, req.user.id || 1, 'STATUS_CHANGE', demand.delivery_status || 'DELIVERED', 'PENDING', 'Reverted delivery. Partner assignment removed and delivery reset to initial state.']
       );
-    } catch (e) {}
+    } catch (e) { }
 
     // Audit log
     try {
@@ -1168,7 +1141,7 @@ router.post('/reset', authenticateToken, authorizeRoles('ADMIN'), async (req, re
         'INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, details) VALUES (?, ?, ?, ?, ?)',
         ['DEMAND', demand.id, 'DELIVERY_RESET', req.user.id || 1, `Reverted delivery for ${demand.demand_number || demand.id}. Reset to initial state.`]
       );
-    } catch (e) {}
+    } catch (e) { }
 
     // Real-time broadcast
     broadcastToAll('DEMAND_UPDATED', {

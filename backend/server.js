@@ -138,6 +138,10 @@ getDB().then(() => {
   if (process.env.AUTO_BILL_REMINDERS === 'true' && typeof billRoutes.startDailyBillReminderScheduler === 'function') {
     billRoutes.startDailyBillReminderScheduler();
   }
+
+  // Start automated 08:00 AM IST daily Owner Summary & PDF email scheduler
+  const { startDailyOwnerReportScheduler } = require('./utils/ownerReportMailer');
+  startDailyOwnerReportScheduler();
 }).catch((err) => {
   console.error('Failed to initialize database:', err);
 });

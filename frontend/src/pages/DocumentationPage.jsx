@@ -644,89 +644,288 @@ export default function DocumentationPage() {
       y += 5;
     };
 
-    // Section 1: Total Items Delivered
-    if (ownerReportData.itemSummary.length > 0) {
-      const itemRows = ownerReportData.itemSummary.map(it => ({
-        cells: [it.itemName, fmtNum(it.qty), fmtRs(it.avgRate), fmtRs(it.amount)]
+    // Section 1: Last Day Demand & Delivery Status (Serial #1 - Merged NCC Unit cell when >1 institution)
+    const ld = ownerSummaryStats?.last_day;
+    if (ld) {
+      const ldTot = ld.totals || {};
+      const ldDemands = ld.demands || [];
+
+      ensureSpace(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(`1. LAST DAY DEMAND & DELIVERY STATUS (${formatDDMMYYYY(ld.date)})`, margin, y);
+      y += 2.5;
+
+      const ldColWidths = [28, 28, 66, 14, 24, 30];
+      const ldHeaders = ['NCC Unit', 'Demand Ref', 'Institution', 'Pkts', 'Amount', 'Delivery Status'];
+      const ldAligns = ['left', 'left', 'left', 'right', 'right', 'center'];
+
+      const drawLdHeader = () => {
+        pdf.setFillColor(241, 245, 249);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.rect(margin, y, contentW, 6.5, 'FD');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.setTextColor(51, 65, 85);
+        let cx = margin;
+        ldHeaders.forEach((h, i) => {
+          const al = ldAligns[i];
+          const tx = al === 'right' ? cx + ldColWidths[i] - 2 : al === 'center' ? cx + ldColWidths[i] / 2 : cx + 2;
+          pdf.text(h, tx, y + 4.4, { align: al });
+          cx += ldColWidths[i];
+        });
+        y += 6.5;
+      };
+
+      drawLdHeader();
+
+      if (ldDemands.length === 0) {
+        pdf.setFillColor(255, 255, 255);
+        pdf.setDrawColor(226, 232, 240);
+        pdf.rect(margin, y, contentW, 6, 'FD');
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.2);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`No demands recorded on ${formatDDMMYYYY(ld.date)}`, margin + 2, y + 4);
+        y += 6;
+      } else {
+        // Group demands by unit_name preserving order
+        const unitGroups = [];
+        ldDemands.forEach(d => {
+          const uName = d.unit_name || 'Unassigned';
+          const lastGrp = unitGroups[unitGroups.length - 1];
+          if (lastGrp && lastGrp.unit_name === uName) {
+            lastGrp.items.push(d);
+          } else {
+            unitGroups.push({ unit_name: uName, items: [d] });
+          }
+        });
+
+        unitGroups.forEach(grp => {
+          const rowHeights = grp.items.map(d => {
+            const instLines = pdf.splitTextToSize(String(d.institution_name || ''), ldColWidths[2] - 4);
+            return Math.max(5.8, instLines.length * 3.5 + 2.2);
+          });
+          const totalGrpH = rowHeights.reduce((a, b) => a + b, 0);
+
+          if (y + totalGrpH > pageH - 12) {
+            pdf.addPage();
+            y = 12;
+            drawLdHeader();
+          }
+
+          const grpStartY = y;
+          // Draw merged NCC Unit cell on the left
+          pdf.setFillColor(248, 250, 252);
+          pdf.setDrawColor(226, 232, 240);
+          pdf.rect(margin, grpStartY, ldColWidths[0], totalGrpH, 'FD');
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(7.2);
+          pdf.setTextColor(15, 23, 42);
+          const unitLines = pdf.splitTextToSize(String(grp.unit_name), ldColWidths[0] - 4);
+          const unitTextStartY = grpStartY + (totalGrpH / 2) - ((unitLines.length - 1) * 1.75) + 1.2;
+          unitLines.forEach((ln, lIdx) => {
+            pdf.text(ln, margin + 2, unitTextStartY + lIdx * 3.5);
+          });
+
+          // Draw individual institution/demand rows on the right
+          grp.items.forEach((d, idx) => {
+            const rh = rowHeights[idx];
+            const cells = [d.demand_number, d.institution_name, fmtNum(d.packets), fmtRs(d.amount), d.delivery_status];
+            let cx = margin + ldColWidths[0];
+            for (let cIdx = 0; cIdx < cells.length; cIdx++) {
+              const colW = ldColWidths[cIdx + 1];
+              const al = ldAligns[cIdx + 1];
+              pdf.setFillColor(idx % 2 === 1 ? 252 : 255, idx % 2 === 1 ? 253 : 255, idx % 2 === 1 ? 255 : 255);
+              pdf.setDrawColor(226, 232, 240);
+              pdf.rect(cx, y, colW, rh, 'FD');
+              pdf.setFont('helvetica', cIdx === 4 ? 'bold' : 'normal');
+              pdf.setFontSize(7.1);
+              if (cIdx === 4) {
+                if (d.delivery_status === 'DELIVERED') pdf.setTextColor(4, 120, 87);
+                else if (d.delivery_status === 'CANCELLED' || d.delivery_status === 'REJECTED') pdf.setTextColor(185, 28, 28);
+                else pdf.setTextColor(180, 83, 9);
+              } else {
+                pdf.setTextColor(15, 23, 42);
+              }
+              const lines = pdf.splitTextToSize(String(cells[cIdx] ?? ''), colW - 4);
+              const tx = al === 'right' ? cx + colW - 2 : al === 'center' ? cx + colW / 2 : cx + 2;
+              lines.forEach((ln, lIdx) => {
+                pdf.text(ln, tx, y + 4 + lIdx * 3.5, { align: al });
+              });
+              cx += colW;
+            }
+            y += rh;
+          });
+        });
+      }
+
+      // Totals row for Last Day
+      ensureSpace(7);
+      pdf.setFillColor(238, 242, 255);
+      pdf.setDrawColor(203, 213, 225);
+      pdf.rect(margin, y, contentW, 6.2, 'FD');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7.2);
+      pdf.setTextColor(15, 23, 42);
+      const totCells = [
+        `TOTAL (${formatDDMMYYYY(ld.date)})`,
+        `Dem: ${fmtNum(ldTot.demanded_count)}`,
+        `Del: ${fmtNum(ldTot.delivered_count)} | Pend: ${fmtNum(ldTot.pending_count)} | Canc: ${fmtNum(ldTot.cancelled_count)}`,
+        fmtNum(ldTot.demanded_packets),
+        fmtRs(ldTot.demanded_amount),
+        `${fmtNum(ldTot.delivered_packets)} Del`
+      ];
+      let cxTot = margin;
+      totCells.forEach((val, i) => {
+        const colW = ldColWidths[i];
+        const al = ldAligns[i];
+        const tx = al === 'right' ? cxTot + colW - 2 : al === 'center' ? cxTot + colW / 2 : cxTot + 2;
+        pdf.text(String(val), tx, y + 4.2, { align: al });
+        cxTot += colW;
+      });
+      y += 11;
+    }
+
+    // Section 2: Total Items Demanded, Delivered & Balance (Item-wise)
+    const apiItems = ownerSummaryStats?.item_wise || [];
+    if (apiItems.length > 0) {
+      const totDem = apiItems.reduce((s, x) => s + (x.demanded_packets || 0), 0);
+      const totDemAmt = apiItems.reduce((s, x) => s + (x.demanded_amount || 0), 0);
+      const totDel = apiItems.reduce((s, x) => s + (x.delivered_packets || 0), 0);
+      const totDelAmt = apiItems.reduce((s, x) => s + (x.delivered_amount || 0), 0);
+      const totBal = apiItems.reduce((s, x) => s + (x.balance_packets || 0), 0);
+      const totBalAmt = apiItems.reduce((s, x) => s + (x.balance_amount || 0), 0);
+      const itemRows = apiItems.map(it => ({
+        cells: [
+          it.item_name,
+          `${fmtNum(it.demanded_packets)} / ${fmtRs(it.demanded_amount)}`,
+          `${fmtNum(it.delivered_packets)} / ${fmtRs(it.delivered_amount)}`,
+          `${fmtNum(it.balance_packets)} / ${fmtRs(it.balance_amount)}`
+        ]
       }));
       itemRows.push({
         _isTotal: true,
         cells: [
-          'TOTAL DELIVERED',
-          fmtNum(ownerReportData.deliveredPackets),
-          '-',
-          fmtRs(ownerReportData.deliveredAmount)
+          'TOTAL',
+          `${fmtNum(totDem)} / ${fmtRs(totDemAmt)}`,
+          `${fmtNum(totDel)} / ${fmtRs(totDelAmt)}`,
+          `${fmtNum(totBal)} / ${fmtRs(totBalAmt)}`
         ]
       });
       drawSectionTable(
-        '1. TOTAL ITEMS DELIVERED (ITEM-WISE SUMMARY)',
-        ['Item / Menu Pack Name', 'Qty / Packets', 'Avg Rate', 'Total Amount'],
+        '2. TOTAL ITEMS DEMANDED, DELIVERED & BALANCE (ITEM-WISE)',
+        ['Item / Menu Pack Name', 'Demanded (Qty / Amt)', 'Delivered (Qty / Amt)', 'Balance (Qty / Amt)'],
         itemRows,
-        [95, 30, 30, 35],
+        [70, 40, 40, 40],
+        ['left', 'right', 'right', 'right']
+      );
+    } else if (ownerReportData.itemSummary.length > 0) {
+      const itemRows = ownerReportData.itemSummary.map(it => ({
+        cells: [it.itemName, `${fmtNum(it.qty)} / ${fmtRs(it.amount)}`, `${fmtNum(it.qty)} / ${fmtRs(it.amount)}`, '0 / Rs. 0']
+      }));
+      itemRows.push({
+        _isTotal: true,
+        cells: ['TOTAL', `${fmtNum(ownerReportData.deliveredPackets)} / ${fmtRs(ownerReportData.deliveredAmount)}`, `${fmtNum(ownerReportData.deliveredPackets)} / ${fmtRs(ownerReportData.deliveredAmount)}`, '0 / Rs. 0']
+      });
+      drawSectionTable(
+        '2. TOTAL ITEMS DEMANDED, DELIVERED & BALANCE (ITEM-WISE)',
+        ['Item / Menu Pack Name', 'Demanded (Qty / Amt)', 'Delivered (Qty / Amt)', 'Balance (Qty / Amt)'],
+        itemRows,
+        [70, 40, 40, 40],
         ['left', 'right', 'right', 'right']
       );
     }
 
-    // Section 2: Delivered To Whom (Unit-wise or Institution-wise)
-    if (recipientViewMode === 'INSTITUTIONWISE') {
-      const instRows = ownerReportData.institutionRecipientSummary.map(inst => ({
+    // Section 3A: Delivered To Whom — Unit-wise (ALWAYS printed)
+    const unitRows = ownerReportData.unitRecipientSummary.map(u => ({
+      cells: [
+        u.unitCode ? `${u.unitName} (${u.unitCode})` : u.unitName,
+        fmtNum(u.instCount),
+        fmtNum(u.demandCount),
+        fmtNum(u.packets),
+        fmtRs(u.amount),
+        `${u.verifiedCount} Ver / ${u.demandCount - u.verifiedCount} Pend`
+      ]
+    }));
+    unitRows.push({
+      _isTotal: true,
+      cells: [
+        `TOTAL (${ownerReportData.unitRecipientSummary.length} Units)`,
+        '-',
+        fmtNum(ownerReportData.scopedCount),
+        fmtNum(ownerReportData.deliveredPackets),
+        fmtRs(ownerReportData.deliveredAmount),
+        `${ownerReportData.verifiedCount} Ver / ${ownerReportData.docPendingCount} Pend`
+      ]
+    });
+    drawSectionTable(
+      '3A. DELIVERED TO WHOM (UNIT-WISE SUMMARY)',
+      ['NCC Unit / Battalion', 'Inst.', 'Demands', 'Packets', 'Amount', 'Docs Status'],
+      unitRows,
+      [74, 14, 20, 22, 28, 32],
+      ['left', 'center', 'center', 'right', 'right', 'center']
+    );
+
+    // Section 3B: Delivered To Whom — Institution-wise (ALWAYS printed)
+    const instRows = ownerReportData.institutionRecipientSummary.map(inst => ({
+      cells: [
+        `${inst.institutionName} (${inst.unitCode || inst.unitName})`,
+        fmtNum(inst.demandCount),
+        fmtNum(inst.packets),
+        fmtRs(inst.amount),
+        `${inst.verifiedCount} Ver / ${inst.demandCount - inst.verifiedCount} Pend`
+      ]
+    }));
+    instRows.push({
+      _isTotal: true,
+      cells: [
+        `TOTAL (${ownerReportData.institutionRecipientSummary.length} Institutions)`,
+        fmtNum(ownerReportData.scopedCount),
+        fmtNum(ownerReportData.deliveredPackets),
+        fmtRs(ownerReportData.deliveredAmount),
+        `${ownerReportData.verifiedCount} Ver / ${ownerReportData.docPendingCount} Pend`
+      ]
+    });
+    drawSectionTable(
+      '3B. DELIVERED TO WHOM (INSTITUTION-WISE BREAKDOWN)',
+      ['Institution (NCC Unit)', 'Demands', 'Packets', 'Amount', 'Docs Status'],
+      instRows,
+      [86, 20, 22, 30, 32],
+      ['left', 'center', 'right', 'right', 'center']
+    );
+
+    // Section 4: Stock Balance & Consumption Status
+    const st = ownerSummaryStats?.stock_status;
+    if (st) {
+      const stockRows = (st.unit_wise_consumption || []).map(uc => ({
         cells: [
-          `${inst.institutionName} (${inst.unitCode || inst.unitName})`,
-          fmtNum(inst.demandCount),
-          fmtNum(inst.packets),
-          fmtRs(inst.amount),
-          `${inst.verifiedCount} Ver / ${inst.demandCount - inst.verifiedCount} Pend`
+          uc.unit_name,
+          `${fmtNum(uc.day_packets)} Pkts / ${fmtRs(uc.day_amount)}`,
+          `${fmtNum(uc.week_packets)} Pkts / ${fmtRs(uc.week_amount)}`,
+          `${fmtNum(uc.month_packets)} Pkts / ${fmtRs(uc.month_amount)}`
         ]
       }));
-      instRows.push({
+      stockRows.unshift({
         _isTotal: true,
         cells: [
-          `TOTAL (${ownerReportData.institutionRecipientSummary.length} Institutions)`,
-          fmtNum(ownerReportData.scopedCount),
-          fmtNum(ownerReportData.deliveredPackets),
-          fmtRs(ownerReportData.deliveredAmount),
-          `${ownerReportData.verifiedCount} Ver / ${ownerReportData.docPendingCount} Pend`
+          `TOTAL STOCK: ${fmtNum(st.total_stock_units)} Units (${fmtRs(st.total_stock_value)})`,
+          `Last Del (${formatDDMMYYYY(st.last_delivery_date)})`,
+          `${fmtNum(st.last_delivery_packets)} Pkts`,
+          fmtRs(st.last_delivery_amount)
         ]
       });
       drawSectionTable(
-        '2. DELIVERED TO WHOM (INSTITUTION-WISE BREAKDOWN)',
-        ['Institution (NCC Unit)', 'Demands', 'Packets', 'Amount', 'Docs Status'],
-        instRows,
-        [86, 20, 22, 30, 32],
-        ['left', 'center', 'right', 'right', 'center']
-      );
-    } else {
-      const unitRows = ownerReportData.unitRecipientSummary.map(u => ({
-        cells: [
-          u.unitCode ? `${u.unitName} (${u.unitCode})` : u.unitName,
-          fmtNum(u.instCount),
-          fmtNum(u.demandCount),
-          fmtNum(u.packets),
-          fmtRs(u.amount),
-          `${u.verifiedCount} Ver / ${u.demandCount - u.verifiedCount} Pend`
-        ]
-      }));
-      unitRows.push({
-        _isTotal: true,
-        cells: [
-          `TOTAL (${ownerReportData.unitRecipientSummary.length} Units)`,
-          '-',
-          fmtNum(ownerReportData.scopedCount),
-          fmtNum(ownerReportData.deliveredPackets),
-          fmtRs(ownerReportData.deliveredAmount),
-          `${ownerReportData.verifiedCount} Ver / ${ownerReportData.docPendingCount} Pend`
-        ]
-      });
-      drawSectionTable(
-        '2. DELIVERED TO WHOM (UNIT-WISE SUMMARY)',
-        ['NCC Unit / Battalion', 'Inst.', 'Demands', 'Packets', 'Amount', 'Docs Status'],
-        unitRows,
-        [74, 14, 20, 22, 28, 32],
-        ['left', 'center', 'center', 'right', 'right', 'center']
+        '4. STOCK BALANCE & UNIT-WISE CONSUMPTION (DAY / WEEKLY / MONTHLY)',
+        ['NCC Unit / Stock Summary', 'Day-wise (Last Day)', 'Weekly (7 Days)', 'Monthly (Curr Month)'],
+        stockRows,
+        [64, 42, 42, 42],
+        ['left', 'right', 'right', 'right']
       );
     }
 
-    // Section 3: Documentation Pending Datewise
+    // Section 5: Documentation Pending Datewise
     if (ownerReportData.datePendingSummary.length > 0) {
       const dateRows = ownerReportData.datePendingSummary.map(dt => ({
         cells: [
@@ -754,13 +953,36 @@ export default function DocumentationPage() {
         ]
       });
       drawSectionTable(
-        '3. DOCUMENTATION PENDING — DATEWISE SUMMARY',
+        '5. DOCUMENTATION PENDING — DATEWISE SUMMARY',
         ['Date', 'Deliv.', 'Packets', 'Amount', 'Rcpt Pend', 'Bill Pend', 'Verified', 'Pending Demand Refs'],
         dateRows,
         [22, 13, 17, 25, 17, 16, 16, 64],
         ['left', 'center', 'right', 'right', 'center', 'center', 'center', 'left']
       );
     }
+
+    // Section 6: Cancelled & Rejected Demands (Separate Last Table)
+    const canRej = ownerSummaryStats?.cancelled_rejected || [];
+    const canRows = canRej.length > 0
+      ? canRej.map(c => ({
+          cells: [
+            c.demand_number,
+            formatDDMMYYYY(c.demand_date),
+            c.unit_name ? `${c.institution_name} (${c.unit_name})` : c.institution_name,
+            fmtNum(c.packets),
+            fmtRs(c.amount),
+            c.status,
+            c.reason || '-'
+          ]
+        }))
+      : [{ cells: ['-', '-', 'No cancelled or rejected demands in this scope', '0', 'Rs. 0', '-', '-'] }];
+    drawSectionTable(
+      `6. CANCELLED & REJECTED DEMANDS (${canRej.length})`,
+      ['Demand Ref', 'Date', 'Institution (Unit)', 'Pkts', 'Amount', 'Status', 'Reason'],
+      canRows,
+      [28, 20, 56, 14, 22, 20, 30],
+      ['left', 'left', 'left', 'right', 'right', 'center', 'left']
+    );
 
     // Page Footers
     const totalPages = pdf.internal.getNumberOfPages();
@@ -2217,46 +2439,142 @@ export default function DocumentationPage() {
                 </div>
               </div>
 
-              {/* 1. Total Items Delivered */}
+              {/* 1. Last Day Demand & Delivery Status (Serial #1) */}
+              {ownerSummaryStats?.last_day && (
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                  <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-cyan-600" />
+                      <span>1. Last Day Demand &amp; Delivery Status ({formatDDMMYYYY(ownerSummaryStats.last_day.date)})</span>
+                    </h3>
+                    <span className="text-[11px] font-bold text-slate-600">
+                      Demanded: {ownerSummaryStats.last_day.totals?.demanded_count || 0} ({(ownerSummaryStats.last_day.totals?.demanded_packets || 0).toLocaleString('en-IN')} Pkts) • Delivered: {ownerSummaryStats.last_day.totals?.delivered_count || 0} ({(ownerSummaryStats.last_day.totals?.delivered_packets || 0).toLocaleString('en-IN')} Pkts) • Pending: {ownerSummaryStats.last_day.totals?.pending_count || 0}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto max-h-64">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50/90 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2">NCC Unit</th>
+                          <th className="px-4 py-2">Demand Ref</th>
+                          <th className="px-4 py-2">Institution</th>
+                          <th className="px-4 py-2 text-right">Pkts</th>
+                          <th className="px-4 py-2 text-right">Amount</th>
+                          <th className="px-4 py-2 text-center">Delivery Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(() => {
+                          const groups = [];
+                          (ownerSummaryStats.last_day.demands || []).forEach(d => {
+                            const uName = d.unit_name || 'Unassigned';
+                            const prev = groups[groups.length - 1];
+                            if (prev && prev.unit_name === uName) prev.items.push(d);
+                            else groups.push({ unit_name: uName, items: [d] });
+                          });
+                          return groups.flatMap(grp =>
+                            grp.items.map((d, idx) => (
+                              <tr key={d.id} className="hover:bg-slate-50">
+                                {idx === 0 && (
+                                  <td
+                                    rowSpan={grp.items.length}
+                                    className="px-4 py-2 font-black text-slate-800 bg-slate-50/60 border-r border-slate-200 align-middle whitespace-nowrap"
+                                  >
+                                    {grp.unit_name}
+                                  </td>
+                                )}
+                                <td className="px-4 py-2 font-mono font-bold text-slate-900">{d.demand_number}</td>
+                                <td className="px-4 py-2 font-bold text-slate-900">{d.institution_name}</td>
+                                <td className="px-4 py-2 text-right font-mono">{Number(d.packets || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-4 py-2 text-right font-mono">₹{Number(d.amount || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-4 py-2 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                    d.delivery_status === 'DELIVERED'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : d.delivery_status === 'CANCELLED' || d.delivery_status === 'REJECTED'
+                                        ? 'bg-rose-100 text-rose-800'
+                                        : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {d.delivery_status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          );
+                        })()}
+                        {(ownerSummaryStats.last_day.demands || []).length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="px-4 py-4 text-center text-slate-400">No demands found for {formatDDMMYYYY(ownerSummaryStats.last_day.date)}.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. Total Items Demanded, Delivered & Balance */}
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                     <Package className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>1. Total Items Delivered (Item-wise)</span>
+                    <span>2. Total Items Demanded, Delivered &amp; Balance (Item-wise)</span>
                   </h3>
-                  <span className="text-[11px] font-bold text-slate-500">{ownerReportData.itemSummary.length} Item(s)</span>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    {(ownerSummaryStats?.item_wise?.length ?? ownerReportData.itemSummary.length)} Item(s)
+                  </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50/60 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500">
                       <tr>
                         <th className="px-4 py-2">Item / Menu Pack</th>
-                        <th className="px-4 py-2 text-right">Qty / Packets</th>
-                        <th className="px-4 py-2 text-right">Avg Rate</th>
-                        <th className="px-4 py-2 text-right">Total Amount</th>
+                        <th className="px-4 py-2 text-right">Demanded (Qty / Amt)</th>
+                        <th className="px-4 py-2 text-right">Delivered (Qty / Amt)</th>
+                        <th className="px-4 py-2 text-right">Balance (Qty / Amt)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {ownerReportData.itemSummary.map(it => (
-                        <tr key={it.itemName} className="hover:bg-slate-50">
-                          <td className="px-4 py-2 font-bold text-slate-900">{it.itemName}</td>
-                          <td className="px-4 py-2 text-right font-mono font-bold text-indigo-700">{it.qty.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-2 text-right font-mono text-slate-600">₹{it.avgRate.toLocaleString('en-IN')}</td>
-                          <td className="px-4 py-2 text-right font-mono font-black text-emerald-700">₹{it.amount.toLocaleString('en-IN')}</td>
+                      {(ownerSummaryStats?.item_wise?.length > 0 ? ownerSummaryStats.item_wise : ownerReportData.itemSummary.map(it => ({
+                        item_name: it.itemName,
+                        demanded_packets: it.qty,
+                        demanded_amount: it.amount,
+                        delivered_packets: it.qty,
+                        delivered_amount: it.amount,
+                        balance_packets: 0,
+                        balance_amount: 0
+                      }))).map(it => (
+                        <tr key={it.item_name} className="hover:bg-slate-50">
+                          <td className="px-4 py-2 font-bold text-slate-900">{it.item_name}</td>
+                          <td className="px-4 py-2 text-right font-mono text-slate-700">
+                            {Number(it.demanded_packets || 0).toLocaleString('en-IN')} / ₹{Number(it.demanded_amount || 0).toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-4 py-2 text-right font-mono font-bold text-emerald-700">
+                            {Number(it.delivered_packets || 0).toLocaleString('en-IN')} / ₹{Number(it.delivered_amount || 0).toLocaleString('en-IN')}
+                          </td>
+                          <td className="px-4 py-2 text-right font-mono font-bold text-amber-700">
+                            {Number(it.balance_packets || 0).toLocaleString('en-IN')} / ₹{Number(it.balance_amount || 0).toLocaleString('en-IN')}
+                          </td>
                         </tr>
                       ))}
                       <tr className="bg-indigo-50/70 font-black text-slate-900">
-                        <td className="px-4 py-2">TOTAL DELIVERED</td>
-                        <td className="px-4 py-2 text-right font-mono">{ownerReportData.deliveredPackets.toLocaleString('en-IN')}</td>
-                        <td className="px-4 py-2 text-right">-</td>
-                        <td className="px-4 py-2 text-right font-mono text-emerald-800">₹{ownerReportData.deliveredAmount.toLocaleString('en-IN')}</td>
+                        <td className="px-4 py-2">TOTAL</td>
+                        <td className="px-4 py-2 text-right font-mono">
+                          {(ownerSummaryStats?.item_wise?.reduce((s, x) => s + (x.demanded_packets || 0), 0) ?? ownerReportData.deliveredPackets).toLocaleString('en-IN')} / ₹{(ownerSummaryStats?.item_wise?.reduce((s, x) => s + (x.demanded_amount || 0), 0) ?? ownerReportData.deliveredAmount).toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono text-emerald-800">
+                          {(ownerSummaryStats?.item_wise?.reduce((s, x) => s + (x.delivered_packets || 0), 0) ?? ownerReportData.deliveredPackets).toLocaleString('en-IN')} / ₹{(ownerSummaryStats?.item_wise?.reduce((s, x) => s + (x.delivered_amount || 0), 0) ?? ownerReportData.deliveredAmount).toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono text-amber-800">
+                          {(ownerSummaryStats?.item_wise?.reduce((s, x) => s + (x.balance_packets || 0), 0) ?? 0).toLocaleString('en-IN')} / ₹{(ownerSummaryStats?.item_wise?.reduce((s, x) => s + (x.balance_amount || 0), 0) ?? 0).toLocaleString('en-IN')}
+                        </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* 2. Delivered To Whom */}
+              {/* 3. Delivered To Whom */}
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
@@ -2334,7 +2652,46 @@ export default function DocumentationPage() {
                 </div>
               </div>
 
-              {/* 3. Documentation Pending Datewise */}
+              {/* 4. Stock Balance & Unit-wise Consumption */}
+              {ownerSummaryStats?.stock_status && (
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                  <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>4. Stock Balance &amp; Unit-wise Consumption</span>
+                    </h3>
+                    <span className="text-[11px] font-bold text-blue-700">
+                      Total Stock: {ownerSummaryStats.stock_status.total_stock_units.toLocaleString('en-IN')} Units (₹{ownerSummaryStats.stock_status.total_stock_value.toLocaleString('en-IN')})
+                      {' • '}
+                      Last Del ({formatDDMMYYYY(ownerSummaryStats.stock_status.last_delivery_date)}): {ownerSummaryStats.stock_status.last_delivery_packets.toLocaleString('en-IN')} Pkts (₹{ownerSummaryStats.stock_status.last_delivery_amount.toLocaleString('en-IN')})
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto max-h-60">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50/90 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2">NCC Unit</th>
+                          <th className="px-4 py-2 text-right">Day-wise (Last Day)</th>
+                          <th className="px-4 py-2 text-right">Weekly (7 Days)</th>
+                          <th className="px-4 py-2 text-right">Monthly (Curr Month)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(ownerSummaryStats.stock_status.unit_wise_consumption || []).map(uc => (
+                          <tr key={uc.unit_name} className="hover:bg-slate-50">
+                            <td className="px-4 py-2 font-bold text-slate-900">{uc.unit_name}</td>
+                            <td className="px-4 py-2 text-right font-mono">{uc.day_packets.toLocaleString('en-IN')} Pkts / ₹{uc.day_amount.toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-2 text-right font-mono">{uc.week_packets.toLocaleString('en-IN')} Pkts / ₹{uc.week_amount.toLocaleString('en-IN')}</td>
+                            <td className="px-4 py-2 text-right font-mono font-bold text-emerald-700">{uc.month_packets.toLocaleString('en-IN')} Pkts / ₹{uc.month_amount.toLocaleString('en-IN')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* 5. Documentation Pending Datewise */}
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
@@ -2372,6 +2729,54 @@ export default function DocumentationPage() {
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 6. Cancelled & Rejected Demands */}
+              <div className="bg-white rounded-2xl border border-rose-200 overflow-hidden shadow-2xs">
+                <div className="px-4 py-2.5 bg-rose-50/70 border-b border-rose-200 flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-rose-900 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                    <span>6. Cancelled &amp; Rejected Demands</span>
+                  </h3>
+                  <span className="text-[11px] font-bold text-rose-700">{(ownerSummaryStats?.cancelled_rejected || []).length} Record(s)</span>
+                </div>
+                <div className="overflow-x-auto max-h-56">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/90 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2">Demand Ref</th>
+                        <th className="px-4 py-2">Date</th>
+                        <th className="px-4 py-2">Institution (Unit)</th>
+                        <th className="px-4 py-2 text-right">Pkts</th>
+                        <th className="px-4 py-2 text-right">Amount</th>
+                        <th className="px-4 py-2 text-center">Status</th>
+                        <th className="px-4 py-2">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(ownerSummaryStats?.cancelled_rejected || []).map(c => (
+                        <tr key={c.id} className="hover:bg-rose-50/30">
+                          <td className="px-4 py-2 font-mono font-bold text-slate-900">{c.demand_number}</td>
+                          <td className="px-4 py-2 font-mono text-slate-600 whitespace-nowrap">{formatDDMMYYYY(c.demand_date)}</td>
+                          <td className="px-4 py-2 font-semibold text-slate-800">
+                            {c.institution_name} {c.unit_name && <span className="text-[10px] font-mono text-slate-500">({c.unit_name})</span>}
+                          </td>
+                          <td className="px-4 py-2 text-right font-mono">{c.packets.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-2 text-right font-mono">₹{c.amount.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-2 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800">{c.status}</span>
+                          </td>
+                          <td className="px-4 py-2 text-slate-600 max-w-xs truncate" title={c.reason}>{c.reason || '-'}</td>
+                        </tr>
+                      ))}
+                      {(ownerSummaryStats?.cancelled_rejected || []).length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-4 text-center text-slate-400">No cancelled or rejected demands in this scope.</td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

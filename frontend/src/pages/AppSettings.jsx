@@ -162,6 +162,13 @@ export default function AppSettings() {
     login_id: '',
     password: ''
   });
+  const [ownerReportSettings, setOwnerReportSettings] = useState({
+    owner_report_email: '',
+    owner_report_enabled: true,
+    owner_report_last_sent_date: ''
+  });
+  const [sendingOwnerReport, setSendingOwnerReport] = useState(false);
+  const [ownerReportStatusMsg, setOwnerReportStatusMsg] = useState('');
 
   // 3. Admin: Units List & Edit Modal State
   const [unitsList, setUnitsList] = useState([]);
@@ -530,6 +537,19 @@ export default function AppSettings() {
           password: ''
         });
       }
+      if (role === 'ADMIN') {
+        const ownerRes = await fetch('/api/auth/owner-report-settings', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (ownerRes.ok) {
+          const ownerData = await ownerRes.json();
+          setOwnerReportSettings({
+            owner_report_email: ownerData.owner_report_email || '',
+            owner_report_enabled: ownerData.owner_report_enabled !== false,
+            owner_report_last_sent_date: ownerData.owner_report_last_sent_date || ''
+          });
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -590,6 +610,22 @@ export default function AppSettings() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed to update credentials');
 
+      if (role === 'ADMIN') {
+        const ownerRes = await fetch('/api/auth/owner-report-settings', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            owner_report_email: ownerReportSettings.owner_report_email,
+            owner_report_enabled: ownerReportSettings.owner_report_enabled
+          })
+        });
+        const ownerData = await ownerRes.json();
+        if (!ownerRes.ok) throw new Error(ownerData?.error || 'Failed to save owner report email settings');
+      }
+
       setSaveSuccess(true);
       setMyCreds(prev => ({ ...prev, password: '' }));
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -597,6 +633,43 @@ export default function AppSettings() {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSendOwnerReportNow = async () => {
+    try {
+      setSendingOwnerReport(true);
+      setError('');
+      setOwnerReportStatusMsg('');
+      // Save latest email before sending
+      const saveRes = await fetch('/api/auth/owner-report-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          owner_report_email: ownerReportSettings.owner_report_email,
+          owner_report_enabled: ownerReportSettings.owner_report_enabled
+        })
+      });
+      if (!saveRes.ok) {
+        const sd = await saveRes.json();
+        throw new Error(sd?.error || 'Failed to save owner email');
+      }
+
+      const res = await fetch('/api/delivery/send-owner-summary-now', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to send report email');
+      setOwnerReportStatusMsg(data.message || 'Owner Summary & PDF sent!');
+      setTimeout(() => setOwnerReportStatusMsg(''), 5000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSendingOwnerReport(false);
     }
   };
 
@@ -2539,6 +2612,55 @@ export default function AppSettings() {
                           className="w-full p-3 rounded-xl bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 text-sm"
                         />
                       </div>
+
+                      {role === 'ADMIN' && (
+                        <div className="pt-4 mt-2 border-t border-slate-200 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <label className="block text-slate-800 font-bold text-sm">Owner Daily Report Email (08:00 AM IST)</label>
+                              <p className="text-xs text-slate-500">
+                                Automatically sends the Documentation Owner Summary &amp; PDF attachment every day at 08:00 hrs.
+                              </p>
+                            </div>
+                            <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
+                              <input
+                                type="checkbox"
+                                checked={ownerReportSettings.owner_report_enabled}
+                                onChange={(e) => setOwnerReportSettings({ ...ownerReportSettings, owner_report_enabled: e.target.checked })}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-xs font-semibold text-slate-700">Auto-Send</span>
+                            </label>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              type="text"
+                              value={ownerReportSettings.owner_report_email}
+                              onChange={(e) => setOwnerReportSettings({ ...ownerReportSettings, owner_report_email: e.target.value })}
+                              placeholder="owner@example.com (comma-separated for multiple)"
+                              className="flex-1 p-3 rounded-xl bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSendOwnerReportNow}
+                              disabled={sendingOwnerReport || !ownerReportSettings.owner_report_email.trim()}
+                              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {sendingOwnerReport ? 'Sending...' : 'Send Report Now'}
+                            </button>
+                          </div>
+
+                          {ownerReportStatusMsg && (
+                            <p className="text-xs font-semibold text-emerald-700">{ownerReportStatusMsg}</p>
+                          )}
+                          {ownerReportSettings.owner_report_last_sent_date && (
+                            <p className="text-[11px] text-slate-400">
+                              Last auto/manual report sent: {ownerReportSettings.owner_report_last_sent_date}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-4 border-t border-slate-100 flex items-center justify-between">

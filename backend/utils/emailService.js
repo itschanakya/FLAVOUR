@@ -28,8 +28,12 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
  * Universal helper function to send emails safely.
  * Tries Resend FIRST (for instant production reliability), falls back to Nodemailer (for local testing).
  */
-async function sendEmailSafely(toEmail, subject, htmlContent, textContent) {
-  if (!toEmail || !toEmail.includes('@')) {
+async function sendEmailSafely(toEmail, subject, htmlContent, textContent, attachments = []) {
+  const recipients = Array.isArray(toEmail)
+    ? toEmail.map(e => String(e || '').trim()).filter(e => e.includes('@'))
+    : String(toEmail || '').split(',').map(e => e.trim()).filter(e => e.includes('@'));
+
+  if (recipients.length === 0) {
     console.warn(`[Email System] Invalid email address rejected: ${toEmail}`);
     return false;
   }
@@ -39,16 +43,23 @@ async function sendEmailSafely(toEmail, subject, htmlContent, textContent) {
   // STEP 1: Always try Resend API first (Fastest, avoids Render SMTP blocks)
   if (resend) {
     try {
-      const { data, error } = await resend.emails.send({
+      const resendPayload = {
         from: 'NCC Refreshment Portal <no-reply@flavourbaseindia.org>',
-        to: [toEmail],
+        to: recipients,
         subject: subject,
         html: htmlContent,
         text: textContent
-      });
+      };
+      if (Array.isArray(attachments) && attachments.length > 0) {
+        resendPayload.attachments = attachments.map(att => ({
+          filename: att.filename,
+          content: att.content
+        }));
+      }
+      const { data, error } = await resend.emails.send(resendPayload);
 
       if (!error) {
-        console.log(`[Email System] 🚀 Sent successfully via Resend to ${toEmail}. ID: ${data?.id}`);
+        console.log(`[Email System] 🚀 Sent successfully via Resend to ${recipients.join(', ')}. ID: ${data?.id}`);
         return true; // Stop here if successful
       }
       console.warn(`[Email System] ⚠️ Resend rejected it. Trying fallback... Error:`, error);
@@ -60,23 +71,31 @@ async function sendEmailSafely(toEmail, subject, htmlContent, textContent) {
   // STEP 2: Fallback to Nodemailer SMTP (Works well on localhost)
   if (transporter && !emailSent) {
     try {
-      const info = await transporter.sendMail({
+      const mailOptions = {
         from: `"NCC Refreshment Portal" <${smtpUser}>`,
-        to: toEmail,
+        to: recipients.join(', '),
         replyTo: smtpUser,
         subject: subject,
         text: textContent,
         html: htmlContent,
         priority: 'high'
-      });
-      console.log(`[Email System] 📧 Sent successfully via Gmail SMTP to ${toEmail}. ID: ${info.messageId}`);
+      };
+      if (Array.isArray(attachments) && attachments.length > 0) {
+        mailOptions.attachments = attachments.map(att => ({
+          filename: att.filename,
+          content: att.content,
+          contentType: att.contentType || 'application/pdf'
+        }));
+      }
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[Email System] 📧 Sent successfully via Gmail SMTP to ${recipients.join(', ')}. ID: ${info.messageId}`);
       return true;
     } catch (smtpErr) {
-      console.error(`[Email System] ❌ Gmail SMTP also failed for ${toEmail}:`, smtpErr.message);
+      console.error(`[Email System] ❌ Gmail SMTP also failed for ${recipients.join(', ')}:`, smtpErr.message);
     }
   }
 
-  console.error(`[Email System] 🚨 CRITICAL: All email methods failed for ${toEmail}.`);
+  console.error(`[Email System] 🚨 CRITICAL: All email methods failed for ${recipients.join(', ')}.`);
   return false;
 }
 
@@ -424,6 +443,7 @@ async function sendAnoBillReceivedConfirmationEmail(email, data) {
 }
 
 module.exports = {
+  sendEmailSafely,
   sendOtpEmail,
   sendPasswordResetOtpEmail,
   sendPasswordResetSuccessEmail,
