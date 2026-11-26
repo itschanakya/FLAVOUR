@@ -4,6 +4,11 @@ import { useSSE } from '../context/SSEContext';
 import { Link } from 'react-router-dom';
 import { getDocumentViewUrl, getDocumentImageUrl } from '../utils/documentViewer';
 import jsPDF from 'jspdf';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { extractDemandFromPdf, mergePdfFiles } from '../utils/pdfDemandMatcher';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 import {
   FileCheck, CheckCircle2, Calendar, Upload, FileText,
   IndianRupee, MapPin, RefreshCw, School, Package, Users,
@@ -45,6 +50,9 @@ export default function DocumentationPage() {
   const [bulkDocType, setBulkDocType] = useState('INVOICE'); // 'INVOICE' | 'RECEIPT'
   const [bulkFiles, setBulkFiles] = useState([]);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkScanning, setBulkScanning] = useState(false);
+  const [bulkScanProgress, setBulkScanProgress] = useState({ current: 0, total: 0 });
+  const [bulkMergeSameDemand, setBulkMergeSameDemand] = useState(true);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
   const [bulkResultSummary, setBulkResultSummary] = useState(null);
 
@@ -57,11 +65,14 @@ export default function DocumentationPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        // Filter demands that are delivered or fulfilled
+        // Filter demands that are delivered only
         const deliveredOnly = (Array.isArray(data) ? data : []).filter(
-          d => d.delivery_status === 'DELIVERED' || d.status === 'FULFILLED'
+          d => d.delivery_status === 'DELIVERED'
         );
         setDemands(deliveredOnly);
+        setSelectedDemandForSummary(prev =>
+          prev ? deliveredOnly.find(d => d.id === prev.id) || prev : null
+        );
       }
     } catch (err) {
       console.error('Error fetching documentation demands:', err);
@@ -1073,37 +1084,104 @@ export default function DocumentationPage() {
     return null;
   };
 
-  const autoMatchFiles = (rawFiles) => {
-    const newItems = Array.from(rawFiles).map((file, idx) => {
-      const key = extractDemandKey(file.name);
-      let matchedDemand = null;
+  const findDemandByExtractedKey = useCallback((key) => {
+    if (!key) return null;
+    if (key.full) {
+      const exact = demands.find(d => (d.demand_number || '').toUpperCase() === key.full.toUpperCase());
+      if (exact) return exact;
+    }
+    if (key.num) {
+      const candidates = demands.filter(d => {
+        const m = (d.demand_number || '').match(/(\d+)$/);
+        const dNum = m ? parseInt(m[1], 10) : d.id;
+        return dNum === key.num || d.id === key.num;
+      });
+      if (candidates.length === 1) return candidates[0];
+    }
+    return null;
+  }, [demands]);
 
-      if (key?.full) {
-        matchedDemand = demands.find(d => (d.demand_number || '').toUpperCase() === key.full.toUpperCase());
+  const getDemandRefStatus = useCallback((pdfDemandNum, matchedDemand, isPdf) => {
+    if (!isPdf) return 'IMAGE';
+    if (pdfDemandNum === null || pdfDemandNum === undefined) return 'NO_REF';
+    if (!matchedDemand) return 'NOT_IN_LIST';
+    const m = (matchedDemand.demand_number || '').match(/(\d+)$/);
+    const dNum = m ? parseInt(m[1], 10) : matchedDemand.id;
+    return dNum === pdfDemandNum ? 'MATCH' : 'MISMATCH';
+  }, []);
+
+  const autoMatchFiles = async (rawFiles) => {
+    const fileList = Array.from(rawFiles || []);
+    if (fileList.length === 0) return;
+
+    setBulkScanning(true);
+    setBulkScanProgress({ current: 0, total: fileList.length });
+    try {
+      const results = new Array(fileList.length);
+      const concurrency = 4;
+      let doneCount = 0;
+
+      for (let start = 0; start < fileList.length; start += concurrency) {
+        const slice = fileList.slice(start, start + concurrency);
+        await Promise.all(slice.map(async (file, offset) => {
+          const idx = start + offset;
+          const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+          let matchedDemand = null;
+          let matchSource = null;
+          let invoiceNo = '';
+          let pdfDemandNum = null;
+          let pdfOtherRef = '';
+
+          if (isPdf) {
+            // For PDFs: match strictly by "Other References" inside the PDF (never by filename)
+            const pdfInfo = await extractDemandFromPdf(file);
+            invoiceNo = pdfInfo.invoiceNo || '';
+            pdfDemandNum = pdfInfo.demandNum;
+            pdfOtherRef = pdfInfo.demandFull || (pdfInfo.demandNum !== null ? String(pdfInfo.demandNum) : '');
+            if (pdfInfo.demandFull || pdfInfo.demandNum !== null) {
+              matchedDemand = findDemandByExtractedKey({
+                full: pdfInfo.demandFull,
+                num: pdfInfo.demandNum
+              });
+              if (matchedDemand) {
+                matchSource = pdfInfo.method?.startsWith('ocr') ? 'pdf-ocr' : 'pdf-ref';
+              }
+            }
+          } else {
+            // For image files: fall back to filename matching
+            const fileKey = extractDemandKey(file.name);
+            matchedDemand = findDemandByExtractedKey(fileKey);
+            matchSource = matchedDemand ? 'filename' : null;
+          }
+
+          results[idx] = {
+            id: `${file.name}-${idx}-${Date.now()}-${Math.random()}`,
+            file,
+            name: file.name,
+            size: (file.size / 1024).toFixed(1) + ' KB',
+            isPdf,
+            invoiceNo,
+            pdfDemandNum,
+            pdfOtherRef,
+            refMatchStatus: getDemandRefStatus(pdfDemandNum, matchedDemand, isPdf),
+            matchSource,
+            matchedDemandId: matchedDemand ? matchedDemand.id : '',
+            matchedDemandNumber: matchedDemand ? matchedDemand.demand_number : '',
+            matchedInstitution: matchedDemand ? matchedDemand.institution_name : '',
+            matchedPin: matchedDemand ? matchedDemand.pin_code : '',
+            isMatched: Boolean(matchedDemand)
+          };
+
+          doneCount += 1;
+          setBulkScanProgress({ current: doneCount, total: fileList.length });
+        }));
       }
-      if (!matchedDemand && key?.num) {
-        const candidates = demands.filter(d => {
-          const m = (d.demand_number || '').match(/(\d+)$/);
-          const dNum = m ? parseInt(m[1], 10) : d.id;
-          return dNum === key.num || d.id === key.num;
-        });
-        if (candidates.length === 1) matchedDemand = candidates[0];
-      }
 
-      return {
-        id: `${file.name}-${idx}-${Date.now()}-${Math.random()}`,
-        file,
-        name: file.name,
-        size: (file.size / 1024).toFixed(1) + ' KB',
-        matchedDemandId: matchedDemand ? matchedDemand.id : '',
-        matchedDemandNumber: matchedDemand ? matchedDemand.demand_number : '',
-        matchedInstitution: matchedDemand ? matchedDemand.institution_name : '',
-        matchedPin: matchedDemand ? matchedDemand.pin_code : '',
-        isMatched: Boolean(matchedDemand)
-      };
-    });
-
-    setBulkFiles(prev => [...prev, ...newItems]);
+      setBulkFiles(prev => [...prev, ...results]);
+    } finally {
+      setBulkScanning(false);
+    }
   };
 
   const handleUpdateFileDemand = (fileId, newDemandId) => {
@@ -1116,6 +1194,7 @@ export default function DocumentationPage() {
         matchedDemandNumber: selected ? selected.demand_number : '',
         matchedInstitution: selected ? selected.institution_name : '',
         matchedPin: selected ? selected.pin_code : '',
+        refMatchStatus: getDemandRefStatus(f.pdfDemandNum, selected || null, f.isPdf),
         isMatched: Boolean(selected)
       };
     }));
@@ -1134,15 +1213,55 @@ export default function DocumentationPage() {
 
     setBulkUploading(true);
     setBulkResultSummary(null);
-    setBulkProgress({ current: 0, total: readyFiles.length });
-
-    const batchSize = 10;
-    let totalUpdated = 0;
-    let failedCount = 0;
 
     try {
-      for (let i = 0; i < readyFiles.length; i += batchSize) {
-        const chunk = readyFiles.slice(i, i + batchSize);
+      let filesToUpload = readyFiles;
+
+      // Merge multiple PDFs belonging to the same demand before uploading
+      if (bulkMergeSameDemand) {
+        const byDemand = new Map();
+        for (const item of readyFiles) {
+          const key = String(item.matchedDemandId);
+          if (!byDemand.has(key)) byDemand.set(key, []);
+          byDemand.get(key).push(item);
+        }
+
+        const mergedList = [];
+        for (const [, group] of byDemand.entries()) {
+          const pdfItems = group.filter(
+            i => i.file.type === 'application/pdf' || i.name.toLowerCase().endsWith('.pdf')
+          );
+          const nonPdfItems = group.filter(
+            i => !(i.file.type === 'application/pdf' || i.name.toLowerCase().endsWith('.pdf'))
+          );
+
+          if (pdfItems.length > 1) {
+            pdfItems.sort((a, b) =>
+              (a.invoiceNo || a.name).localeCompare(b.invoiceNo || b.name)
+            );
+            const baseName = `${pdfItems[0].matchedDemandNumber || pdfItems[0].matchedDemandId}.pdf`;
+            const mergedFile = await mergePdfFiles(pdfItems.map(i => i.file), baseName);
+            mergedList.push({
+              ...pdfItems[0],
+              file: mergedFile,
+              name: baseName
+            });
+          } else {
+            mergedList.push(...pdfItems);
+          }
+          mergedList.push(...nonPdfItems);
+        }
+        filesToUpload = mergedList;
+      }
+
+      setBulkProgress({ current: 0, total: filesToUpload.length });
+
+      const batchSize = 10;
+      let totalUpdated = 0;
+      let failedCount = 0;
+
+      for (let i = 0; i < filesToUpload.length; i += batchSize) {
+        const chunk = filesToUpload.slice(i, i + batchSize);
         const formData = new FormData();
         const mappings = [];
 
@@ -1166,12 +1285,14 @@ export default function DocumentationPage() {
 
         const data = await res.json();
         if (res.ok && data.success) {
-          totalUpdated += data.updated || chunk.length;
+          const updatedInChunk = typeof data.updated === 'number' ? data.updated : chunk.length;
+          totalUpdated += updatedInChunk;
+          failedCount += Math.max(0, chunk.length - updatedInChunk);
         } else {
           failedCount += chunk.length;
         }
 
-        setBulkProgress({ current: Math.min(i + chunk.length, readyFiles.length), total: readyFiles.length });
+        setBulkProgress({ current: Math.min(i + chunk.length, filesToUpload.length), total: filesToUpload.length });
       }
 
       setBulkResultSummary({
@@ -2089,7 +2210,7 @@ export default function DocumentationPage() {
             if (e.target === e.currentTarget && !bulkUploading) setBulkModalOpen(false);
           }}
         >
-          <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]">
+          <div className="bg-white rounded-3xl max-w-6xl w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[94vh]">
             {/* Header */}
             <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -2104,7 +2225,7 @@ export default function DocumentationPage() {
                     </span>
                   </h3>
                   <p className="text-xs text-blue-100 font-medium">
-                    Select multiple invoices or receipts. Files with demand reference (e.g., DEM-2026-182) will auto-match.
+                    Select multiple invoices or receipts. PDFs are auto-matched by filename or &quot;Other References&quot; inside the PDF.
                   </p>
                 </div>
               </div>
@@ -2165,13 +2286,13 @@ export default function DocumentationPage() {
                   Click or drag files here to upload in bulk
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1 max-w-md">
-                  Supports multiple <strong>.pdf</strong>, <strong>.jpg</strong>, <strong>.jpeg</strong>, <strong>.png</strong> files. Filenames with demand ref (e.g. <span className="font-mono text-blue-700 bg-blue-100/70 px-1 rounded">DEM-2026-182.pdf</span> or <span className="font-mono text-blue-700 bg-blue-100/70 px-1 rounded">182.pdf</span>) auto-link.
+                  Supports multiple <strong>.pdf</strong>, <strong>.jpg</strong>, <strong>.jpeg</strong>, <strong>.png</strong> files. Any PDF filename works — we automatically read <strong>Other References</strong> inside the PDF (or filename like <span className="font-mono text-blue-700 bg-blue-100/70 px-1 rounded">182.pdf</span>).
                 </div>
                 <input
                   type="file"
                   multiple
                   accept=".pdf,.jpg,.jpeg,.png"
-                  disabled={bulkUploading}
+                  disabled={bulkUploading || bulkScanning}
                   className="hidden"
                   onChange={(e) => {
                     if (e.target.files && e.target.files.length > 0) {
@@ -2182,9 +2303,20 @@ export default function DocumentationPage() {
                 />
               </label>
 
+              {/* Scanning Indicator */}
+              {bulkScanning && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-center justify-between gap-2 text-xs font-bold text-indigo-800">
+                  <span className="flex items-center gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                    Scanning PDF &quot;Other References&quot; (with OCR fallback for scanned bills)...
+                  </span>
+                  <span className="font-mono">{bulkScanProgress.current} / {bulkScanProgress.total}</span>
+                </div>
+              )}
+
               {/* Match Summary Bar */}
               {bulkFiles.length > 0 && (
-                <div className="flex items-center justify-between gap-2 p-3 bg-slate-100 rounded-2xl border border-slate-200">
+                <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-100 rounded-2xl border border-slate-200">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black text-slate-800">
                       {bulkFiles.length} File{bulkFiles.length > 1 ? 's' : ''} Selected:
@@ -2198,15 +2330,27 @@ export default function DocumentationPage() {
                       </span>
                     )}
                   </div>
-                  {!bulkUploading && (
-                    <button
-                      type="button"
-                      onClick={() => setBulkFiles([])}
-                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
-                    >
-                      Clear All
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={bulkMergeSameDemand}
+                        disabled={bulkUploading}
+                        onChange={(e) => setBulkMergeSameDemand(e.target.checked)}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      Merge same-demand PDFs
+                    </label>
+                    {!bulkUploading && (
+                      <button
+                        type="button"
+                        onClick={() => setBulkFiles([])}
+                        className="text-[11px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -2239,35 +2383,81 @@ export default function DocumentationPage() {
 
               {/* Files Table */}
               {bulkFiles.length > 0 && (
-                <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-72 overflow-y-auto">
+                <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-[46vh] overflow-y-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-black sticky top-0 border-b border-slate-200">
+                    <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-black sticky top-0 border-b border-slate-200 z-10">
                       <tr>
                         <th className="p-3">File Name</th>
+                        <th className="p-3">PDF Other Ref</th>
                         <th className="p-3">Matched Demand</th>
-                        <th className="p-3">Institution / Stop</th>
+                        <th className="p-3">School / Institution Name</th>
                         <th className="p-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {bulkFiles.map((item) => (
-                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="p-3">
-                            <div className="font-bold text-slate-900 truncate max-w-[200px]" title={item.name}>
+                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors align-top">
+                          <td className="p-3 max-w-[200px]">
+                            <div className="font-bold text-slate-900 break-words" title={item.name}>
                               {item.name}
                             </div>
                             <span className="text-[10px] text-slate-400 font-mono">{item.size}</span>
                           </td>
+                          <td className="p-3 whitespace-nowrap">
+                            {item.isPdf ? (
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="font-mono font-bold text-slate-800">
+                                  {item.pdfOtherRef ? `Ref: ${item.pdfOtherRef}` : 'No Ref Found'}
+                                </span>
+                                {item.invoiceNo && (
+                                  <span className="text-[10px] text-slate-500 font-mono">
+                                    {item.invoiceNo}
+                                  </span>
+                                )}
+                                {item.refMatchStatus === 'MATCH' && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    ✓ Matches
+                                  </span>
+                                )}
+                                {item.refMatchStatus === 'MISMATCH' && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-200 whitespace-normal">
+                                    ⚠ Mismatch: {item.matchedDemandNumber || `#${item.matchedDemandId}`} ≠ PDF Ref {item.pdfOtherRef}
+                                  </span>
+                                )}
+                                {item.refMatchStatus === 'NOT_IN_LIST' && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200">
+                                    ⚠ Not in Delivered List
+                                  </span>
+                                )}
+                                {item.refMatchStatus === 'NO_REF' && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                    Not in PDF
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">Image file</span>
+                            )}
+                          </td>
                           <td className="p-3">
                             {item.isMatched ? (
-                              <span className="font-mono font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                                {item.matchedDemandNumber}
-                              </span>
+                              <div className="flex flex-col items-start gap-0.5">
+                                <span className="font-mono font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                  {item.matchedDemandNumber}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-500">
+                                  {item.matchSource === 'pdf-ocr'
+                                    ? 'Via PDF OCR'
+                                    : item.matchSource === 'pdf-ref'
+                                      ? 'Via PDF Ref'
+                                      : 'Via Filename'}
+                                </span>
+                              </div>
                             ) : (
                               <select
                                 value={item.matchedDemandId || ''}
                                 onChange={(e) => handleUpdateFileDemand(item.id, e.target.value)}
-                                className="p-1.5 bg-amber-50 border border-amber-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 max-w-[180px]"
+                                className="p-1.5 bg-amber-50 border border-amber-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 max-w-[220px]"
                               >
                                 <option value="">Select Demand...</option>
                                 {demands.map(d => (
@@ -2278,10 +2468,12 @@ export default function DocumentationPage() {
                               </select>
                             )}
                           </td>
-                          <td className="p-3">
+                          <td className="p-3 min-w-[240px]">
                             {item.matchedInstitution ? (
                               <div>
-                                <div className="font-bold text-slate-800 truncate max-w-[200px]">{item.matchedInstitution}</div>
+                                <div className="font-bold text-slate-800 whitespace-normal break-words leading-snug">
+                                  {item.matchedInstitution}
+                                </div>
                                 {item.matchedPin && <span className="text-[10px] text-slate-500">PIN {item.matchedPin}</span>}
                               </div>
                             ) : (
