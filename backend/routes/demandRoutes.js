@@ -1246,6 +1246,64 @@ router.post('/:id/fulfill', authenticateToken, authorizeRoles('ADMIN'), uploadRe
   }
 });
 
+// DELETE /api/demands/:id/document/:type - ADMIN removes an uploaded receipt or invoice
+router.delete('/:id/document/:type', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const demandId = req.params.id;
+    const docType = (req.params.type || '').toLowerCase();
+
+    if (!['receipt', 'invoice'].includes(docType)) {
+      return res.status(400).json({ error: 'Invalid document type. Must be "receipt" or "invoice".' });
+    }
+
+    const db = await getDB();
+    const demand = await db.get('SELECT * FROM demands WHERE id = ? AND is_deleted = 0', [demandId]);
+
+    if (!demand) return res.status(404).json({ error: 'Demand not found.' });
+    if (!['DELIVERED', 'FULFILLED'].includes(demand.status)) {
+      return res.status(400).json({ error: `Only DELIVERED or FULFILLED demands can have delivery documents removed. Current status: ${demand.status}` });
+    }
+
+    const receiptUrl = docType === 'receipt' ? null : demand.delivery_receipt_url;
+    const invoiceUrl = docType === 'invoice' ? null : demand.invoice_url;
+    const isFullyDocumented = Boolean(receiptUrl && invoiceUrl);
+    const newStatus = demand.status === 'FULFILLED' && !isFullyDocumented ? 'DELIVERED' : demand.status;
+
+    await db.run(
+      `UPDATE demands
+       SET delivery_receipt_url = ?,
+           invoice_url = ?,
+           status = ?
+       WHERE id = ?`,
+      [receiptUrl, invoiceUrl, newStatus, demandId]
+    );
+
+    const docLabel = docType === 'invoice' ? 'Vendor Bill / Invoice' : 'Signed Delivery Receipt';
+    await db.run(
+      'INSERT INTO demand_activity (demand_id, user_id, action_type, old_status, new_status, message) VALUES (?, ?, ?, ?, ?, ?)',
+      [demandId, req.user.id, 'DOC_REMOVE', demand.status, newStatus, `Removed ${docLabel}.`]
+    );
+
+    const updatedDemand = await db.get('SELECT * FROM demands WHERE id = ?', [demandId]);
+    const eventPayload = { ...updatedDemand, timestamp: Date.now() };
+    broadcastToAll('DEMAND_UPDATED', eventPayload);
+    broadcastToUser(demand.raised_by, 'DEMAND_UPDATED', eventPayload);
+    broadcastToRole('INSTITUTION', 'DEMAND_UPDATED', eventPayload);
+    broadcastToRole('UNIT', 'DEMAND_UPDATED', eventPayload);
+    broadcastToRole('ADMIN', 'DEMAND_UPDATED', eventPayload);
+
+    res.json({
+      message: `${docLabel} removed successfully.`,
+      status: newStatus,
+      delivery_receipt_url: receiptUrl,
+      invoice_url: invoiceUrl
+    });
+  } catch (error) {
+    console.error('Remove demand document error:', error);
+    res.status(500).json({ error: 'Failed to remove document.' });
+  }
+});
+
 // POST /api/demands/:id/cancel - INSTITUTION, UNIT, or ADMIN can cancel a demand of a particular day/date
 router.post('/:id/cancel', authenticateToken, authorizeRoles('INSTITUTION', 'UNIT', 'ADMIN'), async (req, res) => {
   try {

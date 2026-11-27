@@ -4,8 +4,8 @@ import { useSSE } from '../context/SSEContext';
 import { Link } from 'react-router-dom';
 import { getDocumentViewUrl, getDocumentImageUrl } from '../utils/documentViewer';
 import jsPDF from 'jspdf';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import { extractDemandFromPdf, mergePdfFiles } from '../utils/pdfDemandMatcher';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -14,7 +14,7 @@ import {
   IndianRupee, MapPin, RefreshCw, School, Package, Users,
   ChevronDown, ChevronUp, ChevronRight, AlertTriangle, X, Eye, Building2,
   Layers, Filter, Search, Phone, MessageCircle, ExternalLink,
-  Printer, ArrowUpRight, Truck, Clock, ShieldCheck, Download, Gauge
+  Printer, ArrowUpRight, Truck, Clock, ShieldCheck, Download, Gauge, Trash2
 } from 'lucide-react';
 
 export default function DocumentationPage() {
@@ -40,6 +40,7 @@ export default function DocumentationPage() {
   // Modals
   const [selectedDemandForSummary, setSelectedDemandForSummary] = useState(null);
   const [fulfilling, setFulfilling] = useState(false);
+  const [removingDoc, setRemovingDoc] = useState(null); // 'receipt' | 'invoice' | null
   const [receiptFile, setReceiptFile] = useState(null);
   const [invoiceFile, setInvoiceFile] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
@@ -1044,7 +1045,7 @@ export default function DocumentationPage() {
       // Update local state
       setSelectedDemandForSummary(prev => prev ? ({
         ...prev,
-        status: 'FULFILLED',
+        status: data.status || prev.status,
         delivery_receipt_url: data.delivery_receipt_url || prev.delivery_receipt_url,
         invoice_url: data.invoice_url || prev.invoice_url
       }) : null);
@@ -1054,6 +1055,45 @@ export default function DocumentationPage() {
       alert(err.message);
     } finally {
       setFulfilling(false);
+    }
+  };
+
+  // Document Remove Handler
+  const handleRemoveDoc = async (docType) => {
+    if (!selectedDemandForSummary) return;
+    const label = docType === 'invoice' ? 'Vendor Bill / Invoice' : 'Signed Delivery Receipt';
+    if (!window.confirm(`Are you sure you want to remove the uploaded ${label}?`)) return;
+
+    setRemovingDoc(docType);
+    try {
+      const res = await fetch(`/api/demands/${selectedDemandForSummary.id}/document/${docType}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed to remove ${label}`);
+
+      if (docType === 'receipt') {
+        setReceiptFile(null);
+        setReceiptPreview(null);
+      } else {
+        setInvoiceFile(null);
+        setInvoicePreview(null);
+      }
+
+      setSelectedDemandForSummary(prev => prev ? ({
+        ...prev,
+        status: data.status || prev.status,
+        delivery_receipt_url: data.delivery_receipt_url ?? null,
+        invoice_url: data.invoice_url ?? null
+      }) : null);
+
+      fetchDeliveredDemands();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRemovingDoc(null);
     }
   };
 
@@ -2069,37 +2109,87 @@ export default function DocumentationPage() {
                 <form onSubmit={handleUploadDocs} className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {/* Delivery Receipt */}
-                    <div className="p-3 bg-white rounded-xl border border-slate-200">
-                      <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+                      <label className="block text-[10px] font-black text-slate-600 uppercase">
                         1. Signed Delivery Receipt
                       </label>
                       {selectedDemandForSummary.delivery_receipt_url ? (
-                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <a
-                              href={getDocumentViewUrl(selectedDemandForSummary.delivery_receipt_url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
-                              title="Open original PDF / Document"
-                            >
-                              <Eye className="w-3.5 h-3.5" /> View Receipt
-                            </a>
-                            {selectedDemandForSummary.delivery_receipt_url.includes('cloudinary.com') && selectedDemandForSummary.delivery_receipt_url.toLowerCase().endsWith('.pdf') && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <a
-                                href={getDocumentImageUrl(selectedDemandForSummary.delivery_receipt_url)}
+                                href={getDocumentViewUrl(selectedDemandForSummary.delivery_receipt_url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-0.5"
-                                title="Open rendered preview image (bypasses direct PDF delivery restrictions)"
+                                className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                title="Open original PDF / Document"
                               >
-                                View as Image
+                                <Eye className="w-3.5 h-3.5" /> View Receipt
                               </a>
-                            )}
+                              {selectedDemandForSummary.delivery_receipt_url.includes('cloudinary.com') && selectedDemandForSummary.delivery_receipt_url.toLowerCase().endsWith('.pdf') && (
+                                <a
+                                  href={getDocumentImageUrl(selectedDemandForSummary.delivery_receipt_url)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-0.5"
+                                  title="Open rendered preview image (bypasses direct PDF delivery restrictions)"
+                                >
+                                  View as Image
+                                </a>
+                              )}
+                            </div>
+                            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              Uploaded
+                            </span>
                           </div>
-                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                            Uploaded
-                          </span>
+
+                          <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
+                            <label className="cursor-pointer text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg border border-indigo-200 inline-flex items-center gap-1 transition-colors">
+                              <Upload className="w-3 h-3" />
+                              {receiptFile ? 'Change Selected' : 'Upload New Receipt'}
+                              <input
+                                type="file"
+                                accept=".pdf,image/*"
+                                onChange={e => {
+                                  const f = e.target.files[0];
+                                  if (f) {
+                                    setReceiptFile(f);
+                                    setReceiptPreview(f.name);
+                                  }
+                                }}
+                                className="hidden"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              disabled={removingDoc === 'receipt' || fulfilling}
+                              onClick={() => handleRemoveDoc('receipt')}
+                              className="text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg border border-rose-200 inline-flex items-center gap-1 transition-colors disabled:opacity-50"
+                            >
+                              {removingDoc === 'receipt' ? (
+                                <><RefreshCw className="w-3 h-3 animate-spin" /> Removing...</>
+                              ) : (
+                                <><Trash2 className="w-3 h-3" /> Remove</>
+                              )}
+                            </button>
+                          </div>
+
+                          {receiptPreview && (
+                            <div className="flex items-center justify-between gap-2 text-[11px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-1 rounded-lg">
+                              <span className="truncate font-semibold">New: {receiptPreview}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReceiptFile(null);
+                                  setReceiptPreview(null);
+                                }}
+                                className="text-amber-700 hover:text-amber-950 font-bold shrink-0"
+                                title="Cancel new file selection"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <input
@@ -2116,37 +2206,87 @@ export default function DocumentationPage() {
                     </div>
 
                     {/* Vendor Bill / Invoice */}
-                    <div className="p-3 bg-white rounded-xl border border-slate-200">
-                      <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+                      <label className="block text-[10px] font-black text-slate-600 uppercase">
                         2. Vendor Bill / Invoice
                       </label>
                       {selectedDemandForSummary.invoice_url ? (
-                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <a
-                              href={getDocumentViewUrl(selectedDemandForSummary.invoice_url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
-                              title="Open original PDF / Invoice"
-                            >
-                              <Eye className="w-3.5 h-3.5" /> View Invoice
-                            </a>
-                            {selectedDemandForSummary.invoice_url.includes('cloudinary.com') && selectedDemandForSummary.invoice_url.toLowerCase().endsWith('.pdf') && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <a
-                                href={getDocumentImageUrl(selectedDemandForSummary.invoice_url)}
+                                href={getDocumentViewUrl(selectedDemandForSummary.invoice_url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-0.5"
-                                title="Open rendered preview image (bypasses direct PDF delivery restrictions)"
+                                className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                                title="Open original PDF / Invoice"
                               >
-                                View as Image
+                                <Eye className="w-3.5 h-3.5" /> View Invoice
                               </a>
-                            )}
+                              {selectedDemandForSummary.invoice_url.includes('cloudinary.com') && selectedDemandForSummary.invoice_url.toLowerCase().endsWith('.pdf') && (
+                                <a
+                                  href={getDocumentImageUrl(selectedDemandForSummary.invoice_url)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-0.5"
+                                  title="Open rendered preview image (bypasses direct PDF delivery restrictions)"
+                                >
+                                  View as Image
+                                </a>
+                              )}
+                            </div>
+                            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              Uploaded
+                            </span>
                           </div>
-                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                            Uploaded
-                          </span>
+
+                          <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
+                            <label className="cursor-pointer text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg border border-indigo-200 inline-flex items-center gap-1 transition-colors">
+                              <Upload className="w-3 h-3" />
+                              {invoiceFile ? 'Change Selected' : 'Upload New Bill'}
+                              <input
+                                type="file"
+                                accept=".pdf,image/*"
+                                onChange={e => {
+                                  const f = e.target.files[0];
+                                  if (f) {
+                                    setInvoiceFile(f);
+                                    setInvoicePreview(f.name);
+                                  }
+                                }}
+                                className="hidden"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              disabled={removingDoc === 'invoice' || fulfilling}
+                              onClick={() => handleRemoveDoc('invoice')}
+                              className="text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg border border-rose-200 inline-flex items-center gap-1 transition-colors disabled:opacity-50"
+                            >
+                              {removingDoc === 'invoice' ? (
+                                <><RefreshCw className="w-3 h-3 animate-spin" /> Removing...</>
+                              ) : (
+                                <><Trash2 className="w-3 h-3" /> Remove</>
+                              )}
+                            </button>
+                          </div>
+
+                          {invoicePreview && (
+                            <div className="flex items-center justify-between gap-2 text-[11px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-1 rounded-lg">
+                              <span className="truncate font-semibold">New: {invoicePreview}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInvoiceFile(null);
+                                  setInvoicePreview(null);
+                                }}
+                                className="text-amber-700 hover:text-amber-950 font-bold shrink-0"
+                                title="Cancel new file selection"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <input
