@@ -893,6 +893,14 @@ export default function Distribution() {
               font-size: 9.5px;
               width: 70px;
             }
+            .ref-cell {
+              text-align: center;
+              font-weight: 800;
+              font-size: 9px;
+              width: 78px;
+              white-space: nowrap;
+              color: #000000;
+            }
             .contact-cell {
               font-size: 9px;
               width: 110px;
@@ -1052,6 +1060,7 @@ export default function Distribution() {
             <thead>
               <tr>
                 <th style="width: 28px; text-align: center;">#</th>
+                <th style="width: 78px; text-align: center;">Demand Ref</th>
                 <th>Institution Name & Address</th>
                 <th style="width: 70px; text-align: center;">ETA / Leg</th>
                 <th style="width: 55px; text-align: center;">PIN</th>
@@ -1064,6 +1073,7 @@ export default function Distribution() {
             <tbody>
               ${stops.map((s, idx) => {
       const pkts = Number(s.total_quantity) || 0;
+      const demandRef = s.demand_number || (s.id ? `#${s.id}` : '—');
       const addr = s.complete_address ? `<div class="inst-addr">${s.complete_address}</div>` : '';
       const anoName = s.ano_cto_name ? `<div class="contact-name">${s.ano_cto_name}</div>` : '<div class="contact-name">ANO / Caretaker</div>';
       const anoPhone = s.ano_cto_contact ? `<div class="contact-phone">Tel: ${s.ano_cto_contact}</div>` : '';
@@ -1072,6 +1082,7 @@ export default function Distribution() {
       return `
                   <tr>
                     <td class="seq-cell">${idx + 1}</td>
+                    <td class="ref-cell">${demandRef}</td>
                     <td>
                       <div class="inst-title">${(s.institution_name || '').toUpperCase()}</div>
                       ${addr}
@@ -1095,7 +1106,7 @@ export default function Distribution() {
                 `;
     }).join('')}
               <tr class="total-row">
-                <td colspan="5" style="text-align: right; padding-right: 10px; font-weight: 900;">
+                <td colspan="6" style="text-align: right; padding-right: 10px; font-weight: 900;">
                   TOTAL REFRESHMENT LOAD (${stops.length} STOPS):
                 </td>
                 <td class="pkts-cell" style="font-weight: 900; font-size: 13px;">
@@ -1108,7 +1119,7 @@ export default function Distribution() {
               ${tour.returnLeg ? `
                 <tr class="return-row">
                   <td class="seq-cell" style="background: #f2f2f2;">🏁</td>
-                  <td colspan="4">
+                  <td colspan="5">
                     <strong>RETURN: Central Warehouse Depot (${warehouse.name})</strong>
                     <div class="inst-addr">${tour.returnLeg.address}</div>
                   </td>
