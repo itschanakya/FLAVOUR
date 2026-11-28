@@ -284,7 +284,7 @@ export default function RefreshmentReports({ defaultTab }) {
       return acc;
     }, {});
 
-    const sortedWeekKeys = Object.keys(weeksGrouped).sort((a, b) => b.localeCompare(a)).slice(0, 4);
+    const sortedWeekKeys = Object.keys(weeksGrouped).sort((a, b) => b.localeCompare(a));
 
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
